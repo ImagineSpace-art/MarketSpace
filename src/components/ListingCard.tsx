@@ -18,17 +18,24 @@ const categoryArt: Record<string, string> = {
 }
 
 export function ListingCard({ listing, saved = false, onOpen, onToggleSave, compact = false }: ListingCardProps) {
-  const cardClassName = compact ? 'listing-card marketplace-listing-card' : 'listing-card'
-  const artStyle = { background: categoryArt[listing.category] ?? 'linear-gradient(135deg, #dbeafe, #0f766e)' }
+  let cardClassName = compact ? 'listing-card marketplace-listing-card' : 'listing-card'
+  if (listing.sponsored) {
+    cardClassName += ' sponsored'
+  }
+
+  const artStyle = (listing.images && listing.images.length > 0)
+    ? { backgroundImage: `url(${listing.images[0]})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+    : { background: categoryArt[listing.category] ?? 'linear-gradient(135deg, #dbeafe, #0f766e)' }
 
   return (
     <article className={cardClassName}>
+      {listing.sponsored && <span className="sponsored-badge">Sponsored</span>}
       {compact ? (
         <button className="listing-image-button" style={artStyle} onClick={() => onOpen(listing)} aria-label={`Open ${listing.title}`}>
           <span>{listing.category}</span>
         </button>
       ) : null}
-      <div className="listing-top-row">
+      <div className="listing-top-row" style={{ top: listing.sponsored ? '32px' : '6px' }}>
         {!compact ? <span className="chip">{listing.category}</span> : null}
         <button className="icon-btn" onClick={() => onToggleSave?.(Number(listing.id))}>
           {saved ? '*' : '+'}

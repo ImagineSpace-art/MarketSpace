@@ -815,3 +815,318 @@ select {
         grid-template-columns: minmax(260px, 1fr) minmax(220px, 320px) auto;
     }
 }
+
+/* --- Horizontal Navigation & Layout Updates --- */
+.top-nav {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+    flex-grow: 1;
+    margin-inline: 20px;
+}
+
+.top-nav-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-weight: 700;
+    padding: 8px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.top-nav-btn:hover {
+    background: rgba(37, 99, 235, 0.08);
+    color: var(--text);
+}
+
+.top-nav-btn.active {
+    background: linear-gradient(135deg, #2563eb, #0f766e);
+    color: white;
+}
+
+.topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.content-grid.full-width {
+    grid-template-columns: 1fr !important;
+}
+
+.content-grid.has-sidebar {
+    /* Responsive template columns handled by media queries */
+}
+
+/* --- Sponsored / Promoted Listings --- */
+.listing-card.sponsored {
+    border: 2px solid #eab308;
+    background: linear-gradient(180deg, rgba(254, 240, 138, 0.1) 0%, var(--surface) 100%);
+    position: relative;
+}
+
+.sponsored-badge {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    background: #eab308;
+    color: #0f172a;
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    box-shadow: 0 2px 8px rgba(234, 179, 8, 0.3);
+    z-index: 2;
+}
+
+/* --- Listing Management Actions --- */
+.listing-management-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+.compact-btn {
+    min-height: 32px !important;
+    padding: 6px 12px !important;
+    font-size: 0.8rem !important;
+    border-radius: 8px !important;
+}
+
+.delete-btn {
+    color: #ef4444 !important;
+    background: rgba(239, 68, 68, 0.05) !important;
+}
+
+.delete-btn:hover {
+    background: rgba(239, 68, 68, 0.15) !important;
+}
+
+/* --- Image Upload Zones --- */
+.image-upload-zone {
+    border: 2px dashed var(--border);
+    background: var(--panel);
+    border-radius: 14px;
+    padding: 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.image-upload-zone:hover {
+    border-color: #2563eb;
+}
+
+.upload-icon {
+    font-size: 2rem;
+}
+
+.upload-thumbnails {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.upload-thumbnail {
+    position: relative;
+    width: 72px;
+    height: 72px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+}
+
+.upload-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.remove-thumb-btn {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    background: rgba(239, 68, 68, 0.85);
+    color: white;
+    font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+}
+
+/* --- Business Pages / Hub styles --- */
+.business-hub-grid {
+    display: grid;
+    gap: 16px;
+}
+
+.business-header {
+    position: relative;
+    border-radius: 20px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.business-cover {
+    height: 150px;
+    background-size: cover;
+    background-position: center;
+    position: relative;
+}
+
+.business-cover-placeholder {
+    height: 150px;
+    background: linear-gradient(135deg, #1d4ed8, #0f766e);
+}
+
+.business-info-bar {
+    display: flex;
+    gap: 16px;
+    padding: 16px;
+    align-items: flex-end;
+    margin-top: -40px;
+    position: relative;
+    z-index: 2;
+}
+
+.business-logo {
+    width: 80px;
+    height: 80px;
+    border-radius: 20px;
+    border: 4px solid var(--surface);
+    overflow: hidden;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+}
+
+.business-logo img,
+.business-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.business-title-block {
+    flex-grow: 1;
+    margin-bottom: 8px;
+}
+
+.business-title-block h2 {
+    margin: 0;
+    font-size: 1.4rem;
+}
+
+.business-title-block p {
+    margin: 4px 0 0;
+    color: var(--text-secondary);
+}
+
+.catalog-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.catalog-card {
+    border-radius: 14px;
+    overflow: hidden;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+}
+
+.catalog-img {
+    height: 120px;
+    background-size: cover;
+    background-position: center;
+}
+
+.catalog-details {
+    padding: 10px;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.catalog-details h4 {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+.catalog-details p {
+    margin: 4px 0;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    flex-grow: 1;
+}
+
+.catalog-details strong {
+    font-size: 0.95rem;
+    color: var(--text);
+}
+
+.ad-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.ad-status-pill {
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+
+.ad-status-pill.active {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+}
+
+.ad-status-pill.paused {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+}
+
+/* --- Mobile Responsiveness Adjustments --- */
+@media (max-width: 759px) {
+    .topbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .top-nav {
+        margin: 8px 0;
+        justify-content: flex-start;
+        padding-bottom: 6px;
+        overflow-x: auto;
+    }
+    .topbar-right {
+        justify-content: space-between;
+    }
+}

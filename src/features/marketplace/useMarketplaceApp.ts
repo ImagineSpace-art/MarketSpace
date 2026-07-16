@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type Dispatch, type FormEvent, type SetSt
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabaseClient'
 import { CATEGORY_OPTIONS, CONDITION_OPTIONS, DELIVERY_OPTIONS } from './constants'
-import type { Listing, Profile, View } from '../../types'
+import type { Listing, Profile, View, BusinessProfile } from '../../types'
 
 export type NotificationItem = {
   id: number
@@ -88,10 +88,10 @@ export interface MarketplaceAppModel {
   activeCategories: string[]
   setActiveCategories: Dispatch<SetStateAction<string[]>>
   toggleCategory: (category: string) => void
-  priceRange: string
-  setPriceRange: Dispatch<SetStateAction<string>>
-  distanceFilter: string
-  setDistanceFilter: Dispatch<SetStateAction<string>>
+  priceRange: number
+  setPriceRange: Dispatch<SetStateAction<number>>
+  distanceFilter: number
+  setDistanceFilter: Dispatch<SetStateAction<number>>
   sortBy: string
   setSortBy: Dispatch<SetStateAction<string>>
   showOnlyAvailable: boolean
@@ -145,6 +145,21 @@ export interface MarketplaceAppModel {
   savedListings: Listing[]
   myListings: Listing[]
   heroStats: Array<{ label: string; value: string }>
+  businessProfile: BusinessProfile | null
+  setBusinessProfile: Dispatch<SetStateAction<BusinessProfile | null>>
+  allBusinesses: Record<string, BusinessProfile>
+  setAllBusinesses: Dispatch<SetStateAction<Record<string, BusinessProfile>>>
+  selectedStore: BusinessProfile | null
+  setSelectedStore: Dispatch<SetStateAction<BusinessProfile | null>>
+  uploadedImages: string[]
+  setUploadedImages: Dispatch<SetStateAction<string[]>>
+  handleCreateOrUpdateBusiness: (profile: BusinessProfile) => void
+  handleDeleteListing: (listingId: number) => Promise<void>
+  handleRenewListing: (listingId: number) => Promise<void>
+  handleUpdateListingStatus: (listingId: number, status: string) => Promise<void>
+  handleUploadAvatar: (base64: string) => Promise<void>
+  cardSize: number
+  setCardSize: Dispatch<SetStateAction<number>>
 }
 
 type ListingRow = Listing & {
@@ -195,8 +210,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   const [authUsername, setAuthUsername] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [activeCategories, setActiveCategories] = useState<string[]>(['All'])
-  const [priceRange, setPriceRange] = useState('Any price')
-  const [distanceFilter, setDistanceFilter] = useState('Within 65 km')
+  const [priceRange, setPriceRange] = useState<number>(3000)
+  const [distanceFilter, setDistanceFilter] = useState<number>(65)
   const [sortBy, setSortBy] = useState('Newest')
   const [showOnlyAvailable, setShowOnlyAvailable] = useState(true)
   const [savedIds, setSavedIds] = useState<string[]>(getStoredSavedIds)
@@ -206,7 +221,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   const [chatDraft, setChatDraft] = useState('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [price, setPrice] = useState('')
+  const [price, setPrice] = useState<string>('3000')
   const [category, setCategory] = useState('Electronics')
   const [location, setLocation] = useState('Lusaka')
   const [status, setStatus] = useState('Available')
@@ -214,6 +229,19 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   const [condition, setCondition] = useState('Used - Good')
   const [deliveryOption, setDeliveryOption] = useState('Meetup')
   const [canMessage, setCanMessage] = useState(true)
+  const [cardSize, setCardSize] = useState<number>(() => {
+    if (typeof window === 'undefined') return 180
+    const stored = window.localStorage.getItem('marketspace-card-size')
+    return stored ? Number(stored) || 180 : 180
+  })
+
+  useEffect(() => {
+    window.localStorage.setItem('marketspace-card-size', String(cardSize))
+  }, [cardSize])
+  const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null)
+  const [allBusinesses, setAllBusinesses] = useState<Record<string, BusinessProfile>>({})
+  const [selectedStore, setSelectedStore] = useState<BusinessProfile | null>(null)
+  const [uploadedImages, setUploadedImages] = useState<string[]>([])
 
   const userEmail = session?.user?.email ?? profile?.email ?? 'Guest'
 
@@ -345,13 +373,14 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   const resetForm = () => {
     setTitle('')
     setDescription('')
-    setPrice('')
+    setPrice('0')
     setCategory('Electronics')
     setLocation('Lusaka')
     setStatus('Available')
     setListingType('single')
     setCondition('Used - Good')
     setDeliveryOption('Meetup')
+    setUploadedImages([])
   }
 
   const handleCreateListing = async (event: FormEvent<HTMLFormElement>) => {
@@ -365,7 +394,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       user_id: session.user.id,
       title,
       description,
-      price,
+      price: Number(price) || 0,
       category,
       location,
       status,
@@ -396,13 +425,14 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     const { error } = await supabase.from('listings').update({
       title,
       description,
-      price,
+      price: Number(price) || 0,
       category,
       location,
       status,
       listing_type: listingType,
       condition,
       delivery_option: deliveryOption,
+      images: uploadedImages,
     }).eq('id', editingListing.id)
 
     if (error) {
@@ -424,13 +454,14 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setEditingListing(listing)
     setTitle(listing.title)
     setDescription(listing.description)
-    setPrice(listing.price)
+    setPrice(String(listing.price))
     setCategory(listing.category)
     setLocation(listing.location)
     setStatus(listing.status ?? 'Available')
     setListingType(listing.listing_type ?? 'single')
     setCondition(listing.condition ?? 'Used - Good')
     setDeliveryOption(listing.delivery_option ?? 'Meetup')
+    setUploadedImages(listing.images ?? [])
     setView('edit')
   }
 
@@ -481,41 +512,146 @@ export function useMarketplaceApp(): MarketplaceAppModel {
 
   const filteredListings = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase()
-    const priceLimitMap: Record<string, [number, number]> = {
-      'Under ZMW500': [0, 500],
-      'ZMW500 - ZMW1,500': [500, 1500],
-      'ZMW1,500+': [1500, Number.POSITIVE_INFINITY],
-    }
-    const activePriceLimit = priceLimitMap[priceRange]
 
     return [...listings]
+      .map((listing) => {
+        const listingSellerId = listing.user_id || ''
+        const sellerBusiness = allBusinesses[listingSellerId]
+        const isAdActive = sellerBusiness?.ads?.some(
+          (ad) => ad.listingId === listing.id && ad.status === 'Active'
+        )
+        return {
+          ...listing,
+          sponsored: isAdActive || false,
+        }
+      })
       .filter((listing) => {
-        const listingPrice = Number(listing.price.replace(/[^\d.]/g, ''))
+        const listingPrice = Number(String(listing.price).replace(/[^\d.]/g, ''))
+        
         const matchesQuery = !normalizedQuery || `${listing.title} ${listing.description}`.toLowerCase().includes(normalizedQuery)
         const matchesCategory = activeCategories.includes('All') || activeCategories.includes(listing.category)
-        const matchesPrice = !activePriceLimit || (listingPrice >= activePriceLimit[0] && listingPrice <= activePriceLimit[1])
+        const matchesPrice = priceRange === 3000 || listingPrice <= priceRange
         const matchesAvailability = !showOnlyAvailable || (listing.status ?? 'Available') === 'Available'
+        
         return matchesQuery && matchesCategory && matchesPrice && matchesAvailability
       })
       .sort((a, b) => {
+        const aSponsored = a.sponsored ? 1 : 0
+        const bSponsored = b.sponsored ? 1 : 0
+        if (aSponsored !== bSponsored) {
+          return bSponsored - aSponsored
+        }
+
         if (sortBy === 'Price: Low to High') {
-          return Number(a.price.replace(/[^\d.]/g, '')) - Number(b.price.replace(/[^\d.]/g, ''))
+          return Number(String(a.price).replace(/[^\d.]/g, '')) - Number(String(b.price).replace(/[^\d.]/g, ''))
         }
         if (sortBy === 'Price: High to Low') {
-          return Number(b.price.replace(/[^\d.]/g, '')) - Number(a.price.replace(/[^\d.]/g, ''))
+          return Number(String(b.price).replace(/[^\d.]/g, '')) - Number(String(a.price).replace(/[^\d.]/g, ''))
         }
         return Number(b.id) - Number(a.id)
       })
-  }, [listings, searchQuery, activeCategories, priceRange, showOnlyAvailable, sortBy])
+  }, [listings, searchQuery, activeCategories, priceRange, showOnlyAvailable, sortBy, allBusinesses])
 
-  const savedListings = useMemo(() => listings.filter((listing) => savedIds.includes(String(listing.id))), [listings, savedIds])
-  const myListings = useMemo(() => listings.filter((listing) => listing.user_id === session?.user?.id), [listings, session])
+  // --- ADD THESE MISSING VARIABLES ---
+  const savedListings = useMemo(() => {
+    return listings.filter((listing) => savedIds.includes(String(listing.id)))
+  }, [listings, savedIds])
+
+  const myListings = useMemo(() => {
+    if (!session?.user?.id) return []
+    // Using type assertion because user_id comes from ListingRow
+    return listings.filter((listing) => (listing as ListingRow).user_id === session.user.id)
+  }, [listings, session])
 
   const heroStats = useMemo(() => [
-    { label: 'Live listings', value: filteredListings.length.toString() },
-    { label: 'Saved items', value: savedListings.length.toString() },
-    { label: 'Unread alerts', value: notifications.filter((item) => item.unread).length.toString() },
-  ], [filteredListings.length, savedListings.length, notifications])
+    { label: 'Active Listings', value: String(listings.length) },
+    { label: 'Saved Items', value: String(savedIds.length) },
+    { label: 'Unread Messages', value: String(chatThreads.filter(t => t.unread).length) }
+  ], [listings.length, savedIds.length, chatThreads])
+
+  const handleDeleteListing = async (listingId: number) => {
+    const { error } = await supabase.from('listings').delete().eq('id', listingId)
+    if (error) {
+      setMessage(error.message)
+      return
+    }
+    setMessage('Listing deleted successfully')
+    await fetchListings()
+  }
+
+  const handleRenewListing = async (listingId: number) => {
+    const { error } = await supabase.from('listings').update({
+      created_at: new Date().toISOString(),
+      status: 'Available'
+    }).eq('id', listingId)
+    if (error) {
+      setMessage(error.message)
+      return
+    }
+    setMessage('Listing renewed successfully')
+    await fetchListings()
+  }
+
+  const handleUpdateListingStatus = async (listingId: number, nextStatus: string) => {
+    const { error } = await supabase.from('listings').update({ status: nextStatus }).eq('id', listingId)
+    if (error) {
+      setMessage(error.message)
+      return
+    }
+    setMessage(`Listing marked as ${nextStatus.toLowerCase()}`)
+    await fetchListings()
+  }
+
+  const handleUploadAvatar = async (base64: string) => {
+    if (!session?.user?.id) return
+    const { error } = await supabase.from('profiles').update({ avatar_url: base64 }).eq('user_id', session.user.id)
+    if (!error) {
+      setProfile((current) => current ? { ...current, avatar_url: base64 } : null)
+      setMessage('Avatar updated successfully')
+    } else {
+      setMessage(error.message)
+    }
+  }
+
+  const handleCreateOrUpdateBusiness = (updated: BusinessProfile) => {
+    const nextAll = { ...allBusinesses, [updated.userId]: updated }
+    setAllBusinesses(nextAll)
+    setBusinessProfile(updated)
+    window.localStorage.setItem('marketspace-all-businesses', JSON.stringify(nextAll))
+    setMessage('Business profile updated successfully')
+    
+    // Update matching store profile data in Supabase too
+    if (session?.user?.id) {
+      void supabase.from('profiles').update({
+        username: updated.shopName,
+      }).eq('user_id', session.user.id)
+    }
+    setView('business-hub')
+  }
+
+  const loadBusinesses = () => {
+    const stored = window.localStorage.getItem('marketspace-all-businesses')
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as Record<string, BusinessProfile>
+        setAllBusinesses(parsed)
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  useEffect(() => {
+    loadBusinesses()
+  }, [])
+
+  useEffect(() => {
+    if (session?.user?.id && allBusinesses[session.user.id]) {
+      setBusinessProfile(allBusinesses[session.user.id])
+    } else {
+      setBusinessProfile(null)
+    }
+  }, [session, allBusinesses])
 
   return {
     view,
@@ -606,6 +742,21 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     savedListings,
     myListings,
     heroStats,
+    businessProfile,
+    setBusinessProfile,
+    allBusinesses,
+    setAllBusinesses,
+    selectedStore,
+    setSelectedStore,
+    uploadedImages,
+    setUploadedImages,
+    handleCreateOrUpdateBusiness,
+    handleDeleteListing,
+    handleRenewListing,
+    handleUpdateListingStatus,
+    handleUploadAvatar,
+    cardSize,
+    setCardSize,
   }
 }
 

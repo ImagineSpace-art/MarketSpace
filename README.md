@@ -1,6 +1,6 @@
 # MarketSpace
 
-A standalone marketplace web app built with React, TypeScript, Vite, and Supabase. It is intentionally independent from the Flutter marketplace app and uses the same Supabase backend.
+A standalone marketplace web app built with React, TypeScript, Vite, and Supabase.
 
 ## Setup
 

@@ -6,7 +6,7 @@ import { HomePage } from './pages/HomePage'
 import { ListingDetailPage, ListingFormPage } from './pages/ListingPage'
 import { SavedItemsPage, NotificationsPage } from './pages/SavedNotificationsPage'
 import { MessagesPage, AuthPage } from './pages/MessagesAuthPage'
-import { StoresPage, ProfilePage, SettingsPage } from './pages/StoresProfileSettingsPage'
+import { StoresPage, ProfilePage, SettingsPage, BusinessSetupPage, BusinessHubPage, StoreViewPage } from './pages/StoresProfileSettingsPage'
 
 export function AppContent() {
   const app = useMarketplaceApp()
@@ -80,7 +80,19 @@ export function AppContent() {
     toggleSave,
     markAllRead,
     sendInboxMessage,
-    heroStats,
+    businessProfile,
+    allBusinesses,
+    selectedStore,
+    setSelectedStore,
+    uploadedImages,
+    setUploadedImages,
+    handleCreateOrUpdateBusiness,
+    handleDeleteListing,
+    handleRenewListing,
+    handleUpdateListingStatus,
+    handleUploadAvatar,
+    cardSize,
+    setCardSize,
   } = app
 
   const handleAuthSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -100,12 +112,13 @@ export function AppContent() {
           loading={loading}
           filteredListings={app.filteredListings}
           savedIds={savedIds}
-          savedListings={savedListings}
-          heroStats={heroStats}
           openListing={openListing}
           toggleSave={toggleSave}
           setView={setView}
           distanceFilter={distanceFilter}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          cardSize={cardSize}
         />
       )
     }
@@ -117,7 +130,7 @@ export function AppContent() {
           session={session}
           onBack={() => setView('home')}
           onMessageSeller={() => {
-            setView('messages')
+            setView('inbox')
             setCanMessage(true)
           }}
           onToggleSave={toggleSave}
@@ -139,6 +152,8 @@ export function AppContent() {
           listingType={listingType}
           condition={condition}
           deliveryOption={deliveryOption}
+          uploadedImages={uploadedImages}
+          onUploadedImagesChange={setUploadedImages}
           onSubmit={handleCreateListing}
           onCancel={() => setView('home')}
           onTitleChange={setTitle}
@@ -167,6 +182,8 @@ export function AppContent() {
           listingType={listingType}
           condition={condition}
           deliveryOption={deliveryOption}
+          uploadedImages={uploadedImages}
+          onUploadedImagesChange={setUploadedImages}
           onSubmit={handleUpdateListing}
           onCancel={() => setView('home')}
           onTitleChange={setTitle}
@@ -191,7 +208,17 @@ export function AppContent() {
     }
 
     if (view === 'stores') {
-      return <StoresPage stores={stores} onOpenProfile={() => setView('profile')} />
+      return (
+        <StoresPage
+          stores={stores}
+          allBusinesses={allBusinesses}
+          onVisitShop={(shop) => {
+            setSelectedStore(shop)
+            setView('store-view')
+          }}
+          onOpenProfile={() => setView('profile')}
+        />
+      )
     }
 
     if (view === 'profile') {
@@ -202,10 +229,67 @@ export function AppContent() {
           myListings={myListings}
           listings={listings}
           savedListings={savedListings}
+          savedIds={savedIds}
+          businessProfile={businessProfile}
           onOpenSettings={() => setView('settings')}
           onCreateListing={() => setView('create')}
           onEditListing={openEditListing}
+          onRenewListing={handleRenewListing}
+          onDeleteListing={handleDeleteListing}
+          onUpdateStatus={handleUpdateListingStatus}
+          onOpenBusinessSetup={() => setView('business-setup')}
+          onOpenBusinessHub={() => setView('business-hub')}
+          onUploadAvatar={handleUploadAvatar}
+          onOpenListing={openListing}
+          onToggleSave={toggleSave}
           onLogout={handleLogout}
+        />
+      )
+    }
+
+    if (view === 'business-setup') {
+      return (
+        <BusinessSetupPage
+          userId={session?.user?.id || ''}
+          businessProfile={businessProfile}
+          onSave={handleCreateOrUpdateBusiness}
+          onCancel={() => setView('profile')}
+        />
+      )
+    }
+
+    if (view === 'business-hub') {
+      if (!businessProfile) {
+        setView('profile')
+        return null
+      }
+      return (
+        <BusinessHubPage
+          businessProfile={businessProfile}
+          myListings={myListings}
+          onSave={handleCreateOrUpdateBusiness}
+          onBack={() => setView('profile')}
+        />
+      )
+    }
+
+    if (view === 'store-view') {
+      if (!selectedStore) {
+        setView('stores')
+        return null
+      }
+      return (
+        <StoreViewPage
+          shop={selectedStore}
+          listings={listings}
+          onBack={() => setView('stores')}
+          onMessageSeller={() => {
+            setView('inbox')
+            setCanMessage(true)
+          }}
+          onOpenListing={openListing}
+          onToggleSave={toggleSave}
+          savedIds={savedIds}
         />
       )
     }
@@ -215,13 +299,15 @@ export function AppContent() {
         <SettingsPage
           theme={theme}
           location={location}
+          cardSize={cardSize}
+          onCardSizeChange={setCardSize}
           onToggleTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')}
           onGoHome={() => setView('home')}
         />
       )
     }
 
-    if (view === 'messages') {
+    if (view === 'inbox') {
       return (
         <MessagesPage
           chatThreads={chatThreads}
@@ -262,15 +348,11 @@ export function AppContent() {
   return (
     <Shell
       view={view}
-      session={session}
-      searchQuery={searchQuery}
       activeCategories={activeCategories}
       priceRange={priceRange}
       distanceFilter={distanceFilter}
       sortBy={sortBy}
       showOnlyAvailable={showOnlyAvailable}
-      onSearchChange={setSearchQuery}
-      onSubmitSearch={() => setView('home')}
       onCategoryToggle={toggleCategory}
       onPriceRangeChange={setPriceRange}
       onDistanceChange={setDistanceFilter}
