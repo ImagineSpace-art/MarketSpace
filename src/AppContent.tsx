@@ -5,8 +5,13 @@ import { useMarketplaceApp } from './features/marketplace/useMarketplaceApp'
 import { HomePage } from './pages/HomePage'
 import { ListingDetailPage, ListingFormPage } from './pages/ListingPage'
 import { SavedItemsPage, NotificationsPage } from './pages/SavedNotificationsPage'
-import { MessagesPage, AuthPage } from './pages/MessagesAuthPage'
-import { StoresPage, ProfilePage, SettingsPage, BusinessSetupPage, BusinessHubPage, StoreViewPage } from './pages/StoresProfileSettingsPage'
+import { MessagesPage } from './pages/MessagesPage'
+import { AuthPage } from './pages/AuthenticationPage'
+import { SettingsPage } from './pages/SettingsPage'
+import { StoreViewPage } from './pages/StoreViewPage'
+import { StoresPage, ProfilePage } from './pages/StoresProfileSettingsPage'
+import { BusinessHubPage } from './pages/BusinessPage'
+import { StoreSetupPage } from './pages/StoreSetupPage'
 
 export function AppContent() {
   const app = useMarketplaceApp()
@@ -93,6 +98,7 @@ export function AppContent() {
     handleUploadAvatar,
     cardSize,
     setCardSize,
+    handleStartChat,
   } = app
 
   const handleAuthSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -119,6 +125,8 @@ export function AppContent() {
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           cardSize={cardSize}
+          toggleCategory={toggleCategory}
+          activeCategories={activeCategories}
         />
       )
     }
@@ -130,8 +138,9 @@ export function AppContent() {
           session={session}
           onBack={() => setView('home')}
           onMessageSeller={() => {
-            setView('inbox')
-            setCanMessage(true)
+            if (selectedListing) {
+              void handleStartChat(selectedListing)
+            }
           }}
           onToggleSave={toggleSave}
           onEditListing={openEditListing}
@@ -237,8 +246,8 @@ export function AppContent() {
           onRenewListing={handleRenewListing}
           onDeleteListing={handleDeleteListing}
           onUpdateStatus={handleUpdateListingStatus}
-          onOpenBusinessSetup={() => setView('business-setup')}
-          onOpenBusinessHub={() => setView('business-hub')}
+          onOpenStoreSetup={() => setView('business-setup')}
+          onOpenStoreHub={() => setView('business-hub')}
           onUploadAvatar={handleUploadAvatar}
           onOpenListing={openListing}
           onToggleSave={toggleSave}
@@ -249,7 +258,7 @@ export function AppContent() {
 
     if (view === 'business-setup') {
       return (
-        <BusinessSetupPage
+        <StoreSetupPage
           userId={session?.user?.id || ''}
           businessProfile={businessProfile}
           onSave={handleCreateOrUpdateBusiness}
@@ -284,8 +293,22 @@ export function AppContent() {
           listings={listings}
           onBack={() => setView('stores')}
           onMessageSeller={() => {
-            setView('inbox')
-            setCanMessage(true)
+            if (selectedStore) {
+              const shopListing = listings.find(l => l.user_id === selectedStore.userId)
+              if (shopListing) {
+                void handleStartChat(shopListing)
+              } else {
+                void handleStartChat({
+                  id: -1,
+                  title: `Shop inquiry: ${selectedStore.shopName}`,
+                  description: `Direct message to ${selectedStore.shopName}`,
+                  price: 0,
+                  category: selectedStore.category,
+                  location: selectedStore.address,
+                  user_id: selectedStore.userId
+                })
+              }
+            }
           }}
           onOpenListing={openListing}
           onToggleSave={toggleSave}
@@ -348,6 +371,7 @@ export function AppContent() {
   return (
     <Shell
       view={view}
+      session={session}
       activeCategories={activeCategories}
       priceRange={priceRange}
       distanceFilter={distanceFilter}

@@ -28,34 +28,6 @@ export type ChatThread = {
   messages: ChatMessage[]
 }
 
-const seedThreads: ChatThread[] = [
-  {
-    id: 1,
-    title: 'About the mountain bike',
-    participant: 'Ava',
-    listingTitle: 'Mountain bike',
-    unread: true,
-    messages: [
-      { id: 1, sender: 'them', content: 'Is the bike still available?', time: '9:41 AM' },
-      { id: 2, sender: 'me', content: 'Yes, it is. Would you like to see it today?', time: '9:43 AM' },
-    ],
-  },
-  {
-    id: 2,
-    title: 'Coffee table pickup',
-    participant: 'Noah',
-    listingTitle: 'Coffee table',
-    unread: false,
-    messages: [{ id: 1, sender: 'them', content: 'Can I pick it up after work?', time: 'Yesterday' }],
-  },
-]
-
-const seedNotifications: NotificationItem[] = [
-  { id: 1, title: 'New question on your listing', body: 'A buyer asked about the condition.', time: '2m ago', unread: true },
-  { id: 2, title: 'Saved item went live', body: 'A matching item was posted near you.', time: '1h ago', unread: true },
-  { id: 3, title: 'Your post got a boost', body: 'Your listing reached more buyers today.', time: 'Yesterday', unread: false },
-]
-
 export interface MarketplaceAppModel {
   view: View
   setView: Dispatch<SetStateAction<View>>
@@ -160,6 +132,7 @@ export interface MarketplaceAppModel {
   handleUploadAvatar: (base64: string) => Promise<void>
   cardSize: number
   setCardSize: Dispatch<SetStateAction<number>>
+  handleStartChat: (listing: Listing) => Promise<void>
 }
 
 type ListingRow = Listing & {
@@ -215,8 +188,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   const [sortBy, setSortBy] = useState('Newest')
   const [showOnlyAvailable, setShowOnlyAvailable] = useState(true)
   const [savedIds, setSavedIds] = useState<string[]>(getStoredSavedIds)
-  const [notifications, setNotifications] = useState<NotificationItem[]>(seedNotifications)
-  const [chatThreads, setChatThreads] = useState<ChatThread[]>(seedThreads)
+  const [notifications, setNotifications] = useState<NotificationItem[]>([])
+  const [chatThreads, setChatThreads] = useState<ChatThread[]>([])
   const [activeChatId, setActiveChatId] = useState<number | null>(1)
   const [chatDraft, setChatDraft] = useState('')
   const [title, setTitle] = useState('')
@@ -251,11 +224,11 @@ export function useMarketplaceApp(): MarketplaceAppModel {
 
     const { data: profilesData } = await supabase.from('profiles').select('user_id, username')
     const sellerMap = new Map<string, string>()
-    ;((profilesData ?? []) as ProfileSummary[]).forEach((profileRow) => {
-      if (profileRow.user_id) {
-        sellerMap.set(profileRow.user_id, profileRow.username ?? 'Seller')
-      }
-    })
+      ; ((profilesData ?? []) as ProfileSummary[]).forEach((profileRow) => {
+        if (profileRow.user_id) {
+          sellerMap.set(profileRow.user_id, profileRow.username ?? 'Seller')
+        }
+      })
 
     const enriched = ((data ?? []) as ListingRow[]).map((item) => ({
       ...item,
@@ -279,6 +252,95 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     }
   }
 
+  async function fetchChatThreads() {
+    if (!session) return
+
+    const { data: chatsData, error: chatsError } = await supabase
+      .from('chats')
+      .select('*')
+      .or(`buyer_id.eq.${session.user.id},seller_id.eq.${session.user.id}`)
+
+    if (chatsError) return
+
+    if (!chatsData || chatsData.length === 0) {
+      setChatThreads([])
+      return
+    }
+
+    const chatIds = chatsData.map(c => c.id)
+
+    const { data: messagesData, error: messagesError } = await supabase
+      .from('messages')
+      .select('*')
+      .in('chat_id', chatIds)
+      .order('created_at', { ascending: true })
+
+    if (messagesError) return
+
+    const userIds = new Set<string>()
+    chatsData.forEach(c => {
+      userIds.add(c.buyer_id)
+      userIds.add(c.seller_id)
+    })
+
+    const { data: profilesData } = await supabase
+      .from('profiles')
+      .select('user_id, username')
+      .in('user_id', Array.from(userIds))
+
+    const profileMap = new Map<string, string>()
+    if (profilesData) {
+      profilesData.forEach(p => {
+        if (p.user_id) profileMap.set(p.user_id, p.username || 'User')
+      })
+    }
+
+    const threads: ChatThread[] = chatsData.map(chatRow => {
+      const chatMessages = (messagesData ?? [])
+        .filter(m => m.chat_id === chatRow.id)
+        .map(m => {
+          const timeVal = m.created_at
+            ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : 'Now'
+          return {
+            id: m.id,
+            sender: m.sender_id === session.user.id ? ('me' as const) : ('them' as const),
+            content: m.content,
+            time: timeVal
+          }
+        })
+
+      const otherUserId = chatRow.buyer_id === session.user.id ? chatRow.seller_id : chatRow.buyer_id
+      const participantName = profileMap.get(otherUserId) || 'Other User'
+
+      return {
+        id: chatRow.id,
+        title: chatRow.title || 'Chat',
+        participant: participantName,
+        listingTitle: chatRow.title || 'Inquiry',
+        unread: false,
+        messages: chatMessages
+      }
+    })
+
+    setChatThreads(threads)
+  }
+
+  useEffect(() => {
+    if (!session) return
+
+    const channel = supabase
+      .channel('chat-messages-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
+        void fetchChatThreads()
+      })
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [session])
+
   useEffect(() => {
     const loadInitialData = async () => {
       const {
@@ -299,6 +361,12 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   }, [])
 
   useEffect(() => {
+    if (session) {
+      void fetchChatThreads()
+    }
+  }, [session])
+
+  useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, currentSession) => {
       setSession(currentSession)
       if (currentSession) {
@@ -307,6 +375,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         setView('home')
       } else {
         setProfile(null)
+        setChatThreads([])
         setView('login')
       }
     })
@@ -491,23 +560,80 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setNotifications((current) => current.map((item) => ({ ...item, unread: false })))
   }
 
-  const sendInboxMessage = () => {
-    if (!chatDraft.trim()) return
-    const activeThread = chatThreads.find((thread) => thread.id === activeChatId)
-    if (!activeThread) return
+  const sendInboxMessage = async () => {
+    if (!chatDraft.trim() || !activeChatId || !session) return
 
-    const nextThread = {
-      ...activeThread,
-      unread: false,
-      messages: [
-        ...activeThread.messages,
-        { id: Date.now(), sender: 'me' as const, content: chatDraft.trim(), time: 'Now' },
-      ],
+    const messageText = chatDraft.trim()
+    setChatDraft('')
+
+    const { error } = await supabase.from('messages').insert({
+      chat_id: activeChatId,
+      sender_id: session.user.id,
+      content: messageText
+    })
+
+    if (error) {
+      setMessage('Failed to send message: ' + error.message)
+    } else {
+      await fetchChatThreads()
+    }
+  }
+
+  const handleStartChat = async (listing: Listing) => {
+    if (!session) {
+      setMessage('Please sign in to message the seller')
+      setView('login')
+      return
+    }
+    if (listing.user_id === session.user.id) {
+      setMessage("You cannot message yourself about your own listing")
+      return
     }
 
-    setChatThreads((current) => current.map((thread) => (thread.id === activeChatId ? nextThread : thread)))
-    setChatDraft('')
-    setMessage('Message sent')
+    setLoading(true)
+    try {
+      const { data: existingChats, error: selectError } = await supabase
+        .from('chats')
+        .select('*')
+        .eq('listing_id', listing.id)
+        .eq('buyer_id', session.user.id)
+        .eq('seller_id', listing.user_id || '')
+
+      if (selectError) throw selectError
+
+      let chatId: number
+      if (existingChats && existingChats.length > 0) {
+        chatId = existingChats[0].id
+      } else {
+        const { data: newChat, error: insertError } = await supabase
+          .from('chats')
+          .insert({
+            listing_id: listing.id,
+            buyer_id: session.user.id,
+            seller_id: listing.user_id || '',
+            title: listing.title
+          })
+          .select()
+          .single()
+
+        if (insertError) throw insertError
+        chatId = newChat.id
+
+        await supabase.from('messages').insert({
+          chat_id: chatId,
+          sender_id: session.user.id,
+          content: "Hi, is this still available?"
+        })
+      }
+
+      await fetchChatThreads()
+      setActiveChatId(chatId)
+      setView('inbox')
+    } catch (err: any) {
+      setMessage(err.message || 'Failed to start chat')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const filteredListings = useMemo(() => {
@@ -527,12 +653,12 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       })
       .filter((listing) => {
         const listingPrice = Number(String(listing.price).replace(/[^\d.]/g, ''))
-        
+
         const matchesQuery = !normalizedQuery || `${listing.title} ${listing.description}`.toLowerCase().includes(normalizedQuery)
         const matchesCategory = activeCategories.includes('All') || activeCategories.includes(listing.category)
         const matchesPrice = priceRange === 3000 || listingPrice <= priceRange
         const matchesAvailability = !showOnlyAvailable || (listing.status ?? 'Available') === 'Available'
-        
+
         return matchesQuery && matchesCategory && matchesPrice && matchesAvailability
       })
       .sort((a, b) => {
@@ -619,7 +745,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setBusinessProfile(updated)
     window.localStorage.setItem('marketspace-all-businesses', JSON.stringify(nextAll))
     setMessage('Business profile updated successfully')
-    
+
     // Update matching store profile data in Supabase too
     if (session?.user?.id) {
       void supabase.from('profiles').update({
@@ -757,6 +883,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     handleUploadAvatar,
     cardSize,
     setCardSize,
+    handleStartChat,
   }
 }
 

@@ -181,7 +181,7 @@ export function ListingFormPage({
           <div className="image-upload-zone" style={{ marginTop: '4px' }}>
             <input type="file" accept="image/*" multiple onChange={handleFileChange} style={{ display: 'none' }} id="listing-file-input" />
             <label htmlFor="listing-file-input" style={{ cursor: 'pointer' }}>
-              <div className="upload-icon">📷</div>
+              <div className="upload-icon"><span className="material-icons">add_a_photo</span></div>
               <span>Click or Drop images to upload</span>
             </label>
           </div>

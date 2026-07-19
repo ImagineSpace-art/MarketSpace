@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react'
+import { useState, useEffect, type CSSProperties } from 'react'
 import { ListingCard } from '../components/ListingCard'
 import type { MarketplaceAppModel } from '../features/marketplace/useMarketplaceApp'
 
@@ -12,7 +12,9 @@ type HomePageProps = Pick<MarketplaceAppModel,
   'distanceFilter' |
   'searchQuery' |
   'setSearchQuery' |
-  'cardSize'
+  'cardSize' |
+  'toggleCategory' |
+  'activeCategories'
 >
 
 export function HomePage({
@@ -26,14 +28,95 @@ export function HomePage({
   searchQuery,
   setSearchQuery,
   cardSize,
+  toggleCategory,
+  activeCategories
 }: HomePageProps) {
   const listingGridStyle = { '--card-size': `${cardSize}px` } as CSSProperties
+
+  const [currentSlide, setCurrentSlide] = useState(0)
+  const slides = [
+    '/banners/banner_electronics.png',
+    '/banners/banner_fashion.png',
+    '/banners/banner_community.png'
+  ]
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % slides.length)
+    }, 6000)
+    return () => clearInterval(timer)
+  }, [slides.length])
 
   return (
     <div className="marketplace-home">
       
+      {/* Background Hero Banner Slider */}
+      <div className="hero-slider-section">
+        {slides.map((slide, index) => (
+          <div
+            key={slide}
+            className={`hero-slide ${index === currentSlide ? 'active' : ''}`}
+            style={{ backgroundImage: `url(${slide})` }}
+          />
+        ))}
+        <div className="hero-slider-fade" />
+      </div>
 
-      <section className="marketplace-toolbar" aria-label="Marketplace filters" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+      {/* Overlapping Content Cards */}
+      <div className="featured-overlay-grid">
+        <div className="featured-card">
+          <h3>Local Electronics</h3>
+          <p>Find computers, audio systems, and gaming gear in Lusaka.</p>
+          <div className="featured-card-links" style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+            <button
+              className={`chip-btn ${activeCategories.includes('Electronics') ? 'active' : ''}`}
+              onClick={() => toggleCategory('Electronics')}
+              style={{ padding: '6px 12px', fontSize: '0.82rem', borderRadius: '16px', border: '1px solid var(--border)', cursor: 'pointer', background: 'var(--panel)', color: 'var(--text)' }}
+            >
+              Electronics
+            </button>
+            <button
+              className={`chip-btn ${activeCategories.includes('Gaming') ? 'active' : ''}`}
+              onClick={() => toggleCategory('Gaming')}
+              style={{ padding: '6px 12px', fontSize: '0.82rem', borderRadius: '16px', border: '1px solid var(--border)', cursor: 'pointer', background: 'var(--panel)', color: 'var(--text)' }}
+            >
+              Gaming
+            </button>
+          </div>
+        </div>
+
+        <div className="featured-card">
+          <h3>Fashion & Trends</h3>
+          <p>Update your wardrobe with sneakers and stylish wear.</p>
+          <div style={{ marginTop: '12px' }}>
+            <button
+              className={`chip-btn ${activeCategories.includes('Fashion') ? 'active' : ''}`}
+              onClick={() => toggleCategory('Fashion')}
+              style={{ padding: '6px 12px', fontSize: '0.82rem', borderRadius: '16px', border: '1px solid var(--border)', cursor: 'pointer', background: 'var(--panel)', color: 'var(--text)' }}
+            >
+              Fashion & Apparel
+            </button>
+          </div>
+        </div>
+
+        <div className="featured-card">
+          <h3>Verified Local Stores</h3>
+          <p>Support local businesses, browse catalogs, and request direct pick-up.</p>
+          <button className="primary-btn compact-btn" style={{ marginTop: '12px' }} onClick={() => setView('stores')}>
+            Browse Stores
+          </button>
+        </div>
+
+        <div className="featured-card">
+          <h3>Sell on MarketSpace</h3>
+          <p>List your goods instantly and get messages from direct buyers.</p>
+          <button className="primary-btn compact-btn" style={{ marginTop: '12px' }} onClick={() => setView('create')}>
+            Start Selling
+          </button>
+        </div>
+      </div>
+
+      <section className="marketplace-toolbar" aria-label="Marketplace filters" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginTop: '24px' }}>
         <div>
           <p className="eyebrow">Browsing</p>
           <strong>Lusaka, Zambia</strong>

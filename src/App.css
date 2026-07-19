@@ -25,6 +25,7 @@
 * {
     box-sizing: border-box;
 }
+
 body {
     margin: 0;
     min-height: 100%;
@@ -215,11 +216,9 @@ select {
     gap: 12px;
     border-radius: 20px;
     padding: 14px;
-    background: linear-gradient(
-        135deg,
-        rgba(37, 99, 235, 0.16),
-        rgba(15, 118, 110, 0.12)
-    );
+    background: linear-gradient(135deg,
+            rgba(37, 99, 235, 0.16),
+            rgba(15, 118, 110, 0.12));
 }
 
 .hero-actions,
@@ -242,7 +241,7 @@ select {
     padding: 10px;
 }
 
-.stats-card > div {
+.stats-card>div {
     display: flex;
     flex-direction: column;
     gap: 2px;
@@ -251,7 +250,7 @@ select {
     background: rgba(255, 255, 255, 0.45);
 }
 
-:root[data-theme="dark"] .stats-card > div {
+:root[data-theme="dark"] .stats-card>div {
     background: rgba(255, 255, 255, 0.08);
 }
 
@@ -692,7 +691,7 @@ select {
     margin-bottom: 12px;
 }
 
-.notification-summary > div {
+.notification-summary>div {
     display: flex;
     flex-direction: column;
     gap: 2px;
@@ -715,8 +714,8 @@ select {
     background: rgba(37, 99, 235, 0.16);
 }
 
-.detail-meta > div,
-.profile-stats > div,
+.detail-meta>div,
+.profile-stats>div,
 .mini-card,
 .message-panel,
 .composer {
@@ -760,34 +759,42 @@ select {
     .app-shell {
         padding: 20px;
     }
+
     .content-grid {
         grid-template-columns: 240px 1fr;
     }
+
     .hero-panel {
         flex-direction: row;
         justify-content: space-between;
         align-items: center;
     }
+
     .listing-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+
     .marketplace-alerts,
     .marketplace-toolbar {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+
     .detail-body,
     .setting-row {
         flex-direction: row;
         justify-content: space-between;
         align-items: center;
     }
+
     .messages-layout {
         grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
         align-items: start;
     }
+
     .profile-hero {
         grid-template-columns: auto 1fr auto;
     }
+
     .profile-hero .profile-actions {
         grid-column: auto;
         justify-content: flex-end;
@@ -798,6 +805,7 @@ select {
     .topbar {
         grid-template-columns: 1fr auto;
     }
+
     .topbar-search {
         grid-column: 1 / -1;
         grid-row: 2;
@@ -808,9 +816,11 @@ select {
     .listing-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
+
     .app-shell {
         padding: 24px;
     }
+
     .marketplace-toolbar {
         grid-template-columns: minmax(260px, 1fr) minmax(220px, 320px) auto;
     }
@@ -1120,13 +1130,191 @@ select {
         flex-direction: column;
         align-items: stretch;
     }
+
     .top-nav {
         margin: 8px 0;
         justify-content: flex-start;
         padding-bottom: 6px;
         overflow-x: auto;
     }
+
     .topbar-right {
         justify-content: space-between;
+    }
+}
+
+/* --- Filter Drawer styles --- */
+.filter-drawer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 320px;
+    background-color: var(--surface);
+    border-right: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.filter-drawer.open {
+    transform: translateX(0);
+}
+
+.drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(15, 23, 42, 0.6);
+    z-index: 999;
+    backdrop-filter: blur(2px);
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.content-grid.full-width {
+    grid-template-columns: 1fr;
+}
+
+/* --- Hero Banner Carousel & Overlay Cards --- */
+.hero-slider-section {
+    position: relative;
+    height: 380px;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 16px;
+    background-color: var(--panel);
+}
+
+.hero-slide {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0;
+    transition: opacity 1s ease-in-out;
+}
+
+.hero-slide.active {
+    opacity: 1;
+}
+
+.hero-slider-fade {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 160px;
+    background: linear-gradient(to top, var(--bg) 0%, transparent 100%);
+    pointer-events: none;
+}
+
+.featured-overlay-grid {
+    position: relative;
+    margin-top: -120px;
+    z-index: 10;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 20px;
+    padding: 0 16px;
+}
+
+.featured-card {
+    background-color: var(--surface);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.featured-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+}
+
+.featured-card h3 {
+    margin: 0;
+    font-size: 1.15rem;
+    color: var(--text);
+}
+
+.featured-card p {
+    margin: 0;
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    flex-grow: 1;
+}
+
+.featured-card-links {
+    margin-top: 10px;
+}
+
+.chip-btn {
+    transition: all 0.2s;
+}
+
+.chip-btn.active {
+    background-color: rgba(37, 99, 235, 0.15) !important;
+    border-color: #2563eb !important;
+    color: #2563eb !important;
+}
+
+/* Adjust top-nav rules to support center aligned circular icon buttons */
+.top-nav {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    flex-grow: 1;
+}
+
+.top-nav-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+}
+
+.top-nav-btn:hover {
+    background: var(--border);
+    color: var(--text);
+}
+
+.top-nav-btn.active {
+    background: rgba(37, 99, 235, 0.15);
+    color: #2563eb;
+}
+
+[data-theme="dark"] .top-nav-btn.active {
+    background: rgba(59, 130, 246, 0.25);
+    color: #60a5fa;
+}
+
+@media (max-width: 759px) {
+    .hero-slider-section {
+        height: 240px;
+    }
+    .featured-overlay-grid {
+        margin-top: -40px;
+        grid-template-columns: 1fr;
     }
 }
