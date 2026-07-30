@@ -1,5 +1,4 @@
 import { type FormEvent } from 'react'
-import './AuthPage.css'
 
 type AuthPageProps = {
     mode: 'login' | 'signup'

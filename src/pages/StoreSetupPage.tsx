@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type ChangeEvent } from 'react'
 import type { BusinessProfile } from '../types'
-import { fileToBase64Compressed } from '../features/marketplace/FileToBase64'
+import { uploadImageToSupabase } from '../features/marketplace/ImageUploader'
 
 // ---------------- STORE SETUP PAGE ----------------
 type StoreSetupPageProps = {
@@ -21,15 +21,15 @@ export function StoreSetupPage({ userId, businessProfile, onSave, onCancel }: St
 
     const handleLogoChange = async (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
-            const base64 = await fileToBase64Compressed(e.target.files[0], 150, 150)
-            setLogo(base64)
+            const url = await uploadImageToSupabase(e.target.files[0], 'marketspace-media', 'logos')
+            setLogo(url)
         }
     }
 
     const handleCoverChange = async (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
-            const base64 = await fileToBase64Compressed(e.target.files[0], 600, 200)
-            setCover(base64)
+            const url = await uploadImageToSupabase(e.target.files[0], 'marketspace-media', 'covers')
+            setCover(url)
         }
     }
 
@@ -47,6 +47,14 @@ export function StoreSetupPage({ userId, businessProfile, onSave, onCancel }: St
             catalog: businessProfile?.catalog || [],
             ads: businessProfile?.ads || []
         })
+        if (!businessProfile) {
+            setShopName('')
+            setDescription('')
+            setAddress('')
+            setWhatsapp('')
+            setLogo('')
+            setCover('')
+        }
     }
 
     return (

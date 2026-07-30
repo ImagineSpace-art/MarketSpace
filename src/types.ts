@@ -1,4 +1,4 @@
-export type View = 'home' | 'listing' | 'create' | 'edit' | 'saved' | 'notifications' | 'stores' | 'profile' | 'settings' | 'inbox' | 'account' | 'login' | 'signup' | 'business-hub' | 'business-setup' | 'store-view'
+export type View = 'home' | 'listing' | 'create' | 'edit' | 'saved' | 'notifications' | 'stores' | 'profile' | 'settings' | 'inbox' | 'account' | 'login' | 'signup' | 'business-hub' | 'business-setup' | 'store-view' | 'seller'
 
 export type Listing = {
   id: number
@@ -15,6 +15,7 @@ export type Listing = {
   user_id?: string
   images?: string[]
   sponsored?: boolean
+  available_colors?: string[]
 }
 
 export type Profile = {
@@ -60,4 +61,32 @@ export type MessageRecord = {
   content: string
   sender_id: string
   created_at?: string
+}
+
+export type StoreReview = {
+  id: string
+  storeId: string
+  reviewerId: string
+  reviewerName: string
+  rating: number
+  comment: string
+  createdAt: string
+  reply?: string
+}
+
+export type PaymentMethodItem = {
+  id: string
+  type: 'mobile_money' | 'card' | 'bank'
+  title: string
+  accountNumber: string
+  provider: string
+  isDefault?: boolean
+}
+
+export type NotificationConfig = {
+  email: boolean
+  push: boolean
+  sms: boolean
+  orders: boolean
+  promos: boolean
 }

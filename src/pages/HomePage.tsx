@@ -1,4 +1,5 @@
 import { useState, useEffect, type CSSProperties } from 'react'
+import { Link } from 'react-router-dom'
 import { ListingCard } from '../components/ListingCard'
 import type { MarketplaceAppModel } from '../features/marketplace/useMarketplaceApp'
 
@@ -8,7 +9,6 @@ type HomePageProps = Pick<MarketplaceAppModel,
   'savedIds' |
   'openListing' |
   'toggleSave' |
-  'setView' |
   'distanceFilter' |
   'searchQuery' |
   'setSearchQuery' |
@@ -23,7 +23,6 @@ export function HomePage({
   savedIds,
   openListing,
   toggleSave,
-  setView,
   distanceFilter,
   searchQuery,
   setSearchQuery,
@@ -49,9 +48,9 @@ export function HomePage({
 
   return (
     <div className="marketplace-home">
-      
+
       {/* Background Hero Banner Slider */}
-      <div className="hero-slider-section">
+      <div className="hero-slider-section" style={{ position: 'relative' }}>
         {slides.map((slide, index) => (
           <div
             key={slide}
@@ -60,6 +59,45 @@ export function HomePage({
           />
         ))}
         <div className="hero-slider-fade" />
+
+        {/* Dark Tint Overlay */}
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(15, 23, 42, 0.45)' }} />
+
+        {/* Search Bar overlay */}
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '90%',
+          maxWidth: '420px',
+          zIndex: 10,
+          textAlign: 'center'
+        }}>
+          <h2 style={{ color: '#ffffff', textShadow: '0 2px 4px rgba(0,0,0,0.5)', marginBottom: '16px', fontSize: '1.6rem', fontWeight: 700, fontFamily: 'sans-serif' }}>
+            Find anything on MarketSpace
+          </h2>
+          <div style={{ position: 'relative' }}>
+            <span className="material-icons" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }}>search</span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search items, categories, and locations..."
+              style={{
+                width: '100%',
+                padding: '12px 16px 12px 48px',
+                borderRadius: '24px',
+                border: 'none',
+                background: 'var(--surface, #ffffff)',
+                color: 'var(--text, #1c1e21)',
+                fontSize: '0.95rem',
+                outline: 'none',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+              }}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Overlapping Content Cards */}
@@ -102,33 +140,19 @@ export function HomePage({
         <div className="featured-card">
           <h3>Verified Local Stores</h3>
           <p>Support local businesses, browse catalogs, and request direct pick-up.</p>
-          <button className="primary-btn compact-btn" style={{ marginTop: '12px' }} onClick={() => setView('stores')}>
+          <Link className="primary-btn compact-btn" style={{ marginTop: '12px', textDecoration: 'none', display: 'inline-block', textAlign: 'center' }} to="/stores">
             Browse Stores
-          </button>
+          </Link>
         </div>
 
         <div className="featured-card">
           <h3>Sell on MarketSpace</h3>
           <p>List your goods instantly and get messages from direct buyers.</p>
-          <button className="primary-btn compact-btn" style={{ marginTop: '12px' }} onClick={() => setView('create')}>
+          <Link className="primary-btn compact-btn" style={{ marginTop: '12px', textDecoration: 'none', display: 'inline-block', textAlign: 'center' }} to="/profile/create">
             Start Selling
-          </button>
+          </Link>
         </div>
       </div>
-
-      <section className="marketplace-toolbar" aria-label="Marketplace filters" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginTop: '24px' }}>
-        <div>
-          <p className="eyebrow">Browsing</p>
-          <strong>Lusaka, Zambia</strong>
-          <p className="subtitle">{distanceFilter === 100 ? 'Any distance' : `Within ${distanceFilter} km`}</p>
-        </div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexGrow: 1, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-          <form className="topbar-search" onSubmit={(event) => event.preventDefault()} style={{ display: 'flex', gap: '8px', maxWidth: '360px', flexGrow: 1 }}>
-            <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search Marketplace..." style={{ borderRadius: '999px', padding: '10px 16px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', width: '100%' }} />
-          </form>
-          <button className="primary-btn" onClick={() => setView('create')}>+ Create new listing</button>
-        </div>
-      </section>
 
       <section className="marketplace-feed">
         <div className="marketplace-feed-header">
@@ -136,7 +160,7 @@ export function HomePage({
             <h2>Today's picks</h2>
             <p>Lusaka, Zambia - {distanceFilter === 100 ? 'Any distance' : `Within ${distanceFilter} km`}</p>
           </div>
-          <button className="ghost-btn" onClick={() => setView('stores')}>See all</button>
+          <Link className="ghost-btn" style={{ textDecoration: 'none' }} to="/stores">See all</Link>
         </div>
         {loading ? (
           <p>Loading listings...</p>

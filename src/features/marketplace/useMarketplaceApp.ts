@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, type Dispatch, type FormEvent, type SetStateAction } from 'react'
 import type { Session } from '@supabase/supabase-js'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { CATEGORY_OPTIONS, CONDITION_OPTIONS, DELIVERY_OPTIONS } from './constants'
-import type { Listing, Profile, View, BusinessProfile } from '../../types'
+import type { Listing, Profile, View, BusinessProfile, StoreReview, PaymentMethodItem, NotificationConfig } from '../../types'
 
 export type NotificationItem = {
   id: number
@@ -26,6 +27,9 @@ export type ChatThread = {
   listingTitle: string
   unread: boolean
   messages: ChatMessage[]
+  isPinned?: boolean
+  isFavorite?: boolean
+  isArchived?: boolean
 }
 
 export interface MarketplaceAppModel {
@@ -70,6 +74,10 @@ export interface MarketplaceAppModel {
   setShowOnlyAvailable: Dispatch<SetStateAction<boolean>>
   savedIds: string[]
   setSavedIds: Dispatch<SetStateAction<string[]>>
+  followingIds: string[]
+  notifyStoreIds: string[]
+  toggleFollowStore: (storeId: string) => void
+  toggleNotifyStore: (storeId: string) => void
   notifications: NotificationItem[]
   setNotifications: Dispatch<SetStateAction<NotificationItem[]>>
   chatThreads: ChatThread[]
@@ -132,7 +140,31 @@ export interface MarketplaceAppModel {
   handleUploadAvatar: (base64: string) => Promise<void>
   cardSize: number
   setCardSize: Dispatch<SetStateAction<number>>
-  handleStartChat: (listing: Listing) => Promise<void>
+  handleStartChat: (listing: Listing, customMessage?: string) => Promise<void>
+  availableColors: string[]
+  setAvailableColors: Dispatch<SetStateAction<string[]>>
+  listingKindFilter: 'all' | 'item' | 'service'
+  setListingKindFilter: Dispatch<SetStateAction<'all' | 'item' | 'service'>>
+  storeReviews: StoreReview[]
+  addStoreReview: (storeId: string, rating: number, comment: string) => void
+  replyToStoreReview: (reviewId: string, replyText: string) => void
+  currency: 'ZMW' | 'USD' | 'EUR'
+  setCurrency: Dispatch<SetStateAction<'ZMW' | 'USD' | 'EUR'>>
+  notificationsConfig: NotificationConfig
+  setNotificationsConfig: Dispatch<SetStateAction<NotificationConfig>>
+  blockedUserIds: string[]
+  toggleBlockUser: (userId: string) => void
+  paymentMethods: PaymentMethodItem[]
+  addPaymentMethod: (item: Omit<PaymentMethodItem, 'id'>) => void
+  removePaymentMethod: (id: string) => void
+  browsingHistory: Array<{ id: number; title: string; price: number; image?: string; timestamp: string }>
+  clearBrowsingHistory: () => void
+  searchHistory: string[]
+  clearSearchHistory: () => void
+  togglePinChat: (chatId: number) => void
+  toggleFavoriteChat: (chatId: number) => void
+  toggleArchiveChat: (chatId: number) => void
+  deleteChat: (chatId: number) => void
 }
 
 type ListingRow = Listing & {
@@ -168,6 +200,7 @@ function getStoredSavedIds(): string[] {
 }
 
 export function useMarketplaceApp(): MarketplaceAppModel {
+  const navigate = useNavigate()
   const [view, setView] = useState<View>('home')
   const [theme, setTheme] = useState<'light' | 'dark'>(getStoredTheme)
   const [session, setSession] = useState<Session | null>(null)
@@ -202,6 +235,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   const [condition, setCondition] = useState('Used - Good')
   const [deliveryOption, setDeliveryOption] = useState('Meetup')
   const [canMessage, setCanMessage] = useState(true)
+  const [availableColors, setAvailableColors] = useState<string[]>([])
+  const [listingKindFilter, setListingKindFilter] = useState<'all' | 'item' | 'service'>('all')
   const [cardSize, setCardSize] = useState<number>(() => {
     if (typeof window === 'undefined') return 180
     const stored = window.localStorage.getItem('marketspace-card-size')
@@ -211,10 +246,220 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   useEffect(() => {
     window.localStorage.setItem('marketspace-card-size', String(cardSize))
   }, [cardSize])
+
+  useEffect(() => {
+    if (message) {
+      const timer = setTimeout(() => {
+        setMessage('')
+      }, 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [message])
+
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null)
   const [allBusinesses, setAllBusinesses] = useState<Record<string, BusinessProfile>>({})
   const [selectedStore, setSelectedStore] = useState<BusinessProfile | null>(null)
   const [uploadedImages, setUploadedImages] = useState<string[]>([])
+
+  const [followingIds, setFollowingIds] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return []
+    const stored = window.localStorage.getItem('marketspace-following-ids')
+    return stored ? JSON.parse(stored) : []
+  })
+
+  const [notifyStoreIds, setNotifyStoreIds] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return []
+    const stored = window.localStorage.getItem('marketspace-notify-store-ids')
+    return stored ? JSON.parse(stored) : []
+  })
+
+  const [storeReviews, setStoreReviews] = useState<StoreReview[]>(() => {
+    if (typeof window === 'undefined') return []
+    const stored = window.localStorage.getItem('marketspace-store-reviews')
+    return stored ? JSON.parse(stored) : []
+  })
+
+  const [currency, setCurrency] = useState<'ZMW' | 'USD' | 'EUR'>(() => {
+    if (typeof window === 'undefined') return 'ZMW'
+    return (window.localStorage.getItem('marketspace-currency') as any) || 'ZMW'
+  })
+
+  useEffect(() => {
+    window.localStorage.setItem('marketspace-currency', currency)
+  }, [currency])
+
+  const [notificationsConfig, setNotificationsConfig] = useState<NotificationConfig>(() => {
+    if (typeof window === 'undefined') return { email: true, push: true, sms: false, orders: true, promos: false }
+    const stored = window.localStorage.getItem('marketspace-notifications-config')
+    return stored ? JSON.parse(stored) : { email: true, push: true, sms: false, orders: true, promos: false }
+  })
+
+  useEffect(() => {
+    window.localStorage.setItem('marketspace-notifications-config', JSON.stringify(notificationsConfig))
+  }, [notificationsConfig])
+
+  const [blockedUserIds, setBlockedUserIds] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return []
+    const stored = window.localStorage.getItem('marketspace-blocked-user-ids')
+    return stored ? JSON.parse(stored) : []
+  })
+
+  useEffect(() => {
+    window.localStorage.setItem('marketspace-blocked-user-ids', JSON.stringify(blockedUserIds))
+  }, [blockedUserIds])
+
+  const toggleBlockUser = (targetUserId: string) => {
+    setBlockedUserIds((prev) =>
+      prev.includes(targetUserId) ? prev.filter((id) => id !== targetUserId) : [...prev, targetUserId]
+    )
+    setMessage(blockedUserIds.includes(targetUserId) ? 'User unblocked' : 'User blocked')
+  }
+
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodItem[]>(() => {
+    if (typeof window === 'undefined') return []
+    const stored = window.localStorage.getItem('marketspace-payment-methods')
+    return stored ? JSON.parse(stored) : []
+  })
+
+  useEffect(() => {
+    window.localStorage.setItem('marketspace-payment-methods', JSON.stringify(paymentMethods))
+  }, [paymentMethods])
+
+  const addPaymentMethod = (item: Omit<PaymentMethodItem, 'id'>) => {
+    const newItem: PaymentMethodItem = {
+      ...item,
+      id: 'p-' + Date.now(),
+    }
+    setPaymentMethods((prev) => [...prev, newItem])
+    setMessage('Payment method added')
+  }
+
+  const removePaymentMethod = (id: string) => {
+    setPaymentMethods((prev) => prev.filter((p) => p.id !== id))
+    setMessage('Payment method removed')
+  }
+
+  const [browsingHistory, setBrowsingHistory] = useState<Array<{ id: number; title: string; price: number; image?: string; timestamp: string }>>(() => {
+    if (typeof window === 'undefined') return []
+    const stored = window.localStorage.getItem('marketspace-browsing-history')
+    return stored ? JSON.parse(stored) : []
+  })
+
+  const clearBrowsingHistory = () => {
+    setBrowsingHistory([])
+    window.localStorage.removeItem('marketspace-browsing-history')
+    setMessage('Browsing history cleared')
+  }
+
+  const [searchHistory, setSearchHistory] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return []
+    const stored = window.localStorage.getItem('marketspace-search-history')
+    return stored ? JSON.parse(stored) : []
+  })
+
+  const clearSearchHistory = () => {
+    setSearchHistory([])
+    window.localStorage.removeItem('marketspace-search-history')
+    setMessage('Search history cleared')
+  }
+
+  const [chatFlags, setChatFlags] = useState<Record<number, { isPinned?: boolean; isFavorite?: boolean; isArchived?: boolean }>>(() => {
+    if (typeof window === 'undefined') return {}
+    const stored = window.localStorage.getItem('marketspace-chat-flags')
+    return stored ? JSON.parse(stored) : {}
+  })
+
+  useEffect(() => {
+    window.localStorage.setItem('marketspace-chat-flags', JSON.stringify(chatFlags))
+  }, [chatFlags])
+
+  const [deletedChatIds, setDeletedChatIds] = useState<number[]>(() => {
+    if (typeof window === 'undefined') return []
+    const stored = window.localStorage.getItem('marketspace-deleted-chats')
+    return stored ? JSON.parse(stored) : []
+  })
+
+  useEffect(() => {
+    window.localStorage.setItem('marketspace-deleted-chats', JSON.stringify(deletedChatIds))
+  }, [deletedChatIds])
+
+  const togglePinChat = (chatId: number) => {
+    setChatFlags((prev) => ({
+      ...prev,
+      [chatId]: { ...prev[chatId], isPinned: !prev[chatId]?.isPinned }
+    }))
+  }
+
+  const toggleFavoriteChat = (chatId: number) => {
+    setChatFlags((prev) => ({
+      ...prev,
+      [chatId]: { ...prev[chatId], isFavorite: !prev[chatId]?.isFavorite }
+    }))
+  }
+
+  const toggleArchiveChat = (chatId: number) => {
+    setChatFlags((prev) => ({
+      ...prev,
+      [chatId]: { ...prev[chatId], isArchived: !prev[chatId]?.isArchived }
+    }))
+  }
+
+  const deleteChat = (chatId: number) => {
+    setDeletedChatIds((prev) => [...prev, chatId])
+    if (activeChatId === chatId) {
+      setActiveChatId(null)
+    }
+    setMessage('Chat thread deleted')
+  }
+
+  useEffect(() => {
+    window.localStorage.setItem('marketspace-following-ids', JSON.stringify(followingIds))
+  }, [followingIds])
+
+  useEffect(() => {
+    window.localStorage.setItem('marketspace-notify-store-ids', JSON.stringify(notifyStoreIds))
+  }, [notifyStoreIds])
+
+  useEffect(() => {
+    window.localStorage.setItem('marketspace-store-reviews', JSON.stringify(storeReviews))
+  }, [storeReviews])
+
+  const addStoreReview = (storeId: string, rating: number, comment: string) => {
+    if (!session) {
+      setMessage('Please sign in to write a review')
+      return
+    }
+    const newReview: StoreReview = {
+      id: Math.random().toString(36).substring(2, 9),
+      storeId,
+      reviewerId: session.user.id,
+      reviewerName: profile?.username || session.user.email || 'Anonymous',
+      rating,
+      comment,
+      createdAt: new Date().toISOString(),
+    }
+    setStoreReviews((prev) => [newReview, ...prev])
+    setMessage('Review submitted successfully')
+  }
+
+  const replyToStoreReview = (reviewId: string, replyText: string) => {
+    setStoreReviews((prev) =>
+      prev.map((r) => (r.id === reviewId ? { ...r, reply: replyText } : r))
+    )
+    setMessage('Response posted successfully')
+  }
+
+  const toggleFollowStore = (storeId: string) => {
+    setFollowingIds(prev =>
+      prev.includes(storeId) ? prev.filter(id => id !== storeId) : [...prev, storeId]
+    )
+  }
+
+  const toggleNotifyStore = (storeId: string) => {
+    setNotifyStoreIds(prev =>
+      prev.includes(storeId) ? prev.filter(id => id !== storeId) : [...prev, storeId]
+    )
+  }
 
   const userEmail = session?.user?.email ?? profile?.email ?? 'Guest'
 
@@ -312,6 +557,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
 
       const otherUserId = chatRow.buyer_id === session.user.id ? chatRow.seller_id : chatRow.buyer_id
       const participantName = profileMap.get(otherUserId) || 'Other User'
+      const flags = chatFlags[chatRow.id] || {}
 
       return {
         id: chatRow.id,
@@ -319,9 +565,12 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         participant: participantName,
         listingTitle: chatRow.title || 'Inquiry',
         unread: false,
-        messages: chatMessages
+        messages: chatMessages,
+        isPinned: !!flags.isPinned,
+        isFavorite: !!flags.isFavorite,
+        isArchived: !!flags.isArchived,
       }
-    })
+    }).filter((t) => !deletedChatIds.includes(t.id))
 
     setChatThreads(threads)
   }
@@ -372,11 +621,9 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       if (currentSession) {
         void loadProfile(currentSession.user.id)
         void fetchListings()
-        setView('home')
       } else {
         setProfile(null)
         setChatThreads([])
-        setView('login')
       }
     })
 
@@ -403,7 +650,9 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     }
     setSession(data.session)
     setMessage('Welcome back to MarketSpace')
-    setView('home')
+    setAuthEmail('')
+    setAuthPassword('')
+    navigate('/')
   }
 
   const handleSignup = async () => {
@@ -429,14 +678,17 @@ export function useMarketplaceApp(): MarketplaceAppModel {
 
     setSession(data.session)
     setMessage('Account created successfully')
-    setView('home')
+    setAuthEmail('')
+    setAuthPassword('')
+    setAuthUsername('')
+    navigate('/')
   }
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
     setSession(null)
     setProfile(null)
-    setView('login')
+    navigate('/login')
   }
 
   const resetForm = () => {
@@ -450,6 +702,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setCondition('Used - Good')
     setDeliveryOption('Meetup')
     setUploadedImages([])
+    setAvailableColors([])
   }
 
   const handleCreateListing = async (event: FormEvent<HTMLFormElement>) => {
@@ -470,9 +723,9 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       listing_type: listingType,
       condition,
       delivery_option: deliveryOption,
-      images: [],
+      images: uploadedImages,
       colors: [],
-      available_colors: [],
+      available_colors: availableColors,
       color: null,
     })
 
@@ -484,7 +737,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setMessage('Listing posted successfully')
     resetForm()
     await fetchListings()
-    setView('home')
+    navigate('/')
   }
 
   const handleUpdateListing = async (event: FormEvent<HTMLFormElement>) => {
@@ -502,6 +755,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       condition,
       delivery_option: deliveryOption,
       images: uploadedImages,
+      available_colors: availableColors,
     }).eq('id', editingListing.id)
 
     if (error) {
@@ -510,13 +764,15 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     }
 
     setMessage('Listing updated successfully')
+    resetForm()
+    setEditingListing(null)
     await fetchListings()
-    setView('home')
+    navigate('/')
   }
 
   const openListing = (listing: Listing) => {
     setSelectedListing(listing)
-    setView('listing')
+    navigate(`/listings/${listing.id}`)
   }
 
   const openEditListing = (listing: Listing) => {
@@ -531,13 +787,41 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setCondition(listing.condition ?? 'Used - Good')
     setDeliveryOption(listing.delivery_option ?? 'Meetup')
     setUploadedImages(listing.images ?? [])
-    setView('edit')
+    setAvailableColors(listing.available_colors ?? [])
+    navigate(`/edit/${listing.id}`)
   }
 
-  const toggleSave = (listingId: number) => {
-    const id = String(listingId)
-    setSavedIds((current) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id]))
-    setMessage('Saved to your watchlist')
+  async function fetchSavedListings(userId: string) {
+    const { data } = await supabase.from('saved_listings').select('listing_id').eq('user_id', userId)
+    if (data) {
+      setSavedIds(data.map((item: any) => String(item.listing_id)))
+    }
+  }
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      void fetchSavedListings(session.user.id)
+    } else {
+      setSavedIds([])
+    }
+  }, [session?.user?.id])
+
+  const toggleSave = async (listingId: number) => {
+    if (!session) {
+      setMessage('Please sign in to save items')
+      return
+    }
+    const strId = String(listingId)
+    const exists = savedIds.includes(strId)
+    const nextSaved = exists ? savedIds.filter((id) => id !== strId) : [...savedIds, strId]
+    setSavedIds(nextSaved)
+    setMessage(exists ? 'Item removed from saved' : 'Item saved')
+
+    if (exists) {
+      await supabase.from('saved_listings').delete().eq('user_id', session.user.id).eq('listing_id', strId)
+    } else {
+      await supabase.from('saved_listings').upsert({ user_id: session.user.id, listing_id: strId }, { onConflict: 'user_id,listing_id' })
+    }
   }
 
   const toggleCategory = (nextCategory: string) => {
@@ -579,10 +863,10 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     }
   }
 
-  const handleStartChat = async (listing: Listing) => {
+  const handleStartChat = async (listing: Listing, customMessage?: string) => {
     if (!session) {
       setMessage('Please sign in to message the seller')
-      setView('login')
+      navigate('/login')
       return
     }
     if (listing.user_id === session.user.id) {
@@ -619,16 +903,26 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         if (insertError) throw insertError
         chatId = newChat.id
 
+        if (!customMessage) {
+          await supabase.from('messages').insert({
+            chat_id: chatId,
+            sender_id: session.user.id,
+            content: "Hi, is this still available?"
+          })
+        }
+      }
+
+      if (customMessage) {
         await supabase.from('messages').insert({
           chat_id: chatId,
           sender_id: session.user.id,
-          content: "Hi, is this still available?"
+          content: customMessage
         })
       }
 
       await fetchChatThreads()
       setActiveChatId(chatId)
-      setView('inbox')
+      navigate('/inbox')
     } catch (err: any) {
       setMessage(err.message || 'Failed to start chat')
     } finally {
@@ -658,8 +952,12 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         const matchesCategory = activeCategories.includes('All') || activeCategories.includes(listing.category)
         const matchesPrice = priceRange === 3000 || listingPrice <= priceRange
         const matchesAvailability = !showOnlyAvailable || (listing.status ?? 'Available') === 'Available'
+        const matchesKind =
+          listingKindFilter === 'all' ||
+          (listingKindFilter === 'service' && listing.listing_type === 'service') ||
+          (listingKindFilter === 'item' && listing.listing_type !== 'service')
 
-        return matchesQuery && matchesCategory && matchesPrice && matchesAvailability
+        return matchesQuery && matchesCategory && matchesPrice && matchesAvailability && matchesKind
       })
       .sort((a, b) => {
         const aSponsored = a.sponsored ? 1 : 0
@@ -676,7 +974,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         }
         return Number(b.id) - Number(a.id)
       })
-  }, [listings, searchQuery, activeCategories, priceRange, showOnlyAvailable, sortBy, allBusinesses])
+  }, [listings, searchQuery, activeCategories, priceRange, showOnlyAvailable, sortBy, allBusinesses, listingKindFilter])
 
   // --- ADD THESE MISSING VARIABLES ---
   const savedListings = useMemo(() => {
@@ -746,29 +1044,58 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     window.localStorage.setItem('marketspace-all-businesses', JSON.stringify(nextAll))
     setMessage('Business profile updated successfully')
 
-    // Update matching store profile data in Supabase too
     if (session?.user?.id) {
-      void supabase.from('profiles').update({
-        username: updated.shopName,
-      }).eq('user_id', session.user.id)
+      void supabase.from('stores').upsert({
+        user_id: updated.userId,
+        shop_name: updated.shopName,
+        description: updated.description,
+        category: updated.category,
+        address: updated.address,
+        whatsapp: updated.whatsapp,
+        logo: updated.logo,
+        cover: updated.cover,
+        catalog: updated.catalog,
+        ads: updated.ads,
+      }, { onConflict: 'user_id' })
     }
-    setView('business-hub')
+    navigate('/profile/store-dashboard')
   }
 
-  const loadBusinesses = () => {
+  const loadBusinesses = async () => {
     const stored = window.localStorage.getItem('marketspace-all-businesses')
+    let baseStores: Record<string, BusinessProfile> = {}
     if (stored) {
       try {
-        const parsed = JSON.parse(stored) as Record<string, BusinessProfile>
-        setAllBusinesses(parsed)
+        baseStores = JSON.parse(stored) as Record<string, BusinessProfile>
       } catch {
         // ignore
       }
     }
+    setAllBusinesses(baseStores)
+
+    const { data } = await supabase.from('stores').select('*')
+    if (data && data.length > 0) {
+      const dbStores: Record<string, BusinessProfile> = {}
+      data.forEach((s: any) => {
+        dbStores[s.user_id] = {
+          userId: s.user_id,
+          shopName: s.shop_name,
+          description: s.description,
+          category: s.category,
+          address: s.address,
+          whatsapp: s.whatsapp,
+          logo: s.logo,
+          cover: s.cover,
+          catalog: s.catalog || [],
+          ads: s.ads || [],
+        }
+      })
+      setAllBusinesses(prev => ({ ...prev, ...dbStores }))
+    }
   }
 
   useEffect(() => {
-    loadBusinesses()
+    void loadBusinesses()
   }, [])
 
   useEffect(() => {
@@ -884,6 +1211,34 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     cardSize,
     setCardSize,
     handleStartChat,
+    availableColors,
+    setAvailableColors,
+    listingKindFilter,
+    setListingKindFilter,
+    followingIds,
+    notifyStoreIds,
+    toggleFollowStore,
+    toggleNotifyStore,
+    storeReviews,
+    addStoreReview,
+    replyToStoreReview,
+    currency,
+    setCurrency,
+    notificationsConfig,
+    setNotificationsConfig,
+    blockedUserIds,
+    toggleBlockUser,
+    paymentMethods,
+    addPaymentMethod,
+    removePaymentMethod,
+    browsingHistory,
+    clearBrowsingHistory,
+    searchHistory,
+    clearSearchHistory,
+    togglePinChat,
+    toggleFavoriteChat,
+    toggleArchiveChat,
+    deleteChat,
   }
 }
 

@@ -1,6 +1,6 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
 import type { BusinessProfile, Listing, CatalogItem, BusinessAd } from '../types'
-import { fileToBase64Compressed } from '../features/marketplace/FileToBase64'
+import { uploadImageToSupabase } from '../features/marketplace/ImageUploader'
 
 // ---------------- BUSINESS HUB PAGE ----------------
 type BusinessHubPageProps = {
@@ -27,9 +27,9 @@ export function BusinessHubPage({ businessProfile, myListings, onSave, onBack }:
 
     const handleCatImageChange = async (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
-            const base64 = await fileToBase64Compressed(e.target.files[0], 400, 400)
-            setLogo(base64)
-            setCatImage(base64)
+            const url = await uploadImageToSupabase(e.target.files[0], 'marketspace-media', 'catalog')
+            setLogo(url)
+            setCatImage(url)
         }
     }
 
