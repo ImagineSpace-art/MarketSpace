@@ -1,11 +1,11 @@
 import type { Listing } from '../types'
+import { formatZMWPrice } from '../utils/formatPrice'
 
 type ListingCardProps = {
   listing: Listing
   saved?: boolean
   onOpen: (listing: Listing) => void
   onToggleSave?: (listingId: number) => void
-  compact?: boolean
 }
 
 const categoryArt: Record<string, string> = {
@@ -17,8 +17,8 @@ const categoryArt: Record<string, string> = {
   Sports: 'linear-gradient(135deg, #ffedd5, #ea580c)',
 }
 
-export function ListingCard({ listing, saved = false, onOpen, onToggleSave, compact = false }: ListingCardProps) {
-  let cardClassName = compact ? 'listing-card marketplace-listing-card' : 'listing-card'
+export function ListingCard({ listing, saved = false, onOpen, onToggleSave }: ListingCardProps) {
+  let cardClassName = 'listing-card marketplace-listing-card'
   if (listing.sponsored) {
     cardClassName += ' sponsored'
   }
@@ -30,27 +30,34 @@ export function ListingCard({ listing, saved = false, onOpen, onToggleSave, comp
   return (
     <article className={cardClassName}>
       {listing.sponsored && <span className="sponsored-badge">Sponsored</span>}
-      {compact ? (
-        <button className="listing-image-button" style={artStyle} onClick={() => onOpen(listing)} aria-label={`Open ${listing.title}`}>
-          <span>{listing.category}</span>
-        </button>
-      ) : null}
-      <div className="listing-top-row" style={{ top: listing.sponsored ? '32px' : '6px' }}>
-        {!compact ? <span className="chip">{listing.category}</span> : null}
-        <button className="icon-btn" onClick={() => onToggleSave?.(Number(listing.id))}>
-          {saved ? '*' : '+'}
+
+      <button className="listing-image-button" style={artStyle} onClick={() => onOpen(listing)} aria-label={`Open ${listing.title}`}>
+        <span>{listing.category}</span>
+      </button>
+
+      <div className="listing-top-row" style={{ top: listing.sponsored ? '32px' : '10px', right: '10px', display: 'flex', gap: '6px', alignItems: 'center' }}>
+        <span className="chip" style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '4px' }}>{listing.category}</span>
+        <button className="icon-btn" onClick={() => onToggleSave?.(Number(listing.id))} title={saved ? 'Remove Bookmark' : 'Bookmark Listing'}>
+          <span className="material-icons" style={{ fontSize: '18px', color: saved ? '#ef4444' : 'inherit' }}>
+            {saved ? 'bookmark' : 'bookmark_border'}
+          </span>
         </button>
       </div>
-      <div onClick={() => onOpen(listing)}>
-        <h3>{listing.title}</h3>
-        {!compact ? <p>{listing.description}</p> : null}
-        <div className="meta-row">
-          <span>{listing.location}</span>
-          <strong>{listing.price}</strong>
+
+      <div className="listing-card-body" onClick={() => onOpen(listing)} style={{ cursor: 'pointer', padding: '12px' }}>
+        <h3 style={{ margin: '0 0 6px 0', fontSize: '1rem', fontWeight: 700, color: 'var(--text)' }}>{listing.title}</h3>
+        {listing.description && (
+          <p style={{ margin: '0 0 10px 0', fontSize: '0.84rem', color: 'var(--text-secondary)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.4' }}>
+            {listing.description}
+          </p>
+        )}
+        <div className="meta-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0', fontSize: '0.85rem' }}>
+          <span style={{ color: 'var(--text-muted)' }}>{listing.location}</span>
+          <strong style={{ color: 'var(--primary)', fontSize: '1.05rem' }}>{formatZMWPrice(listing.price)}</strong>
         </div>
-        <div className="meta-row">
+        <div className="meta-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
           <span>{listing.seller_name}</span>
-          <span>{listing.status ?? 'Available'}</span>
+          <span style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>{listing.status ?? 'Available'}</span>
         </div>
       </div>
     </article>

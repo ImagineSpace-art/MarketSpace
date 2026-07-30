@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { CATEGORY_OPTIONS, CONDITION_OPTIONS, DELIVERY_OPTIONS } from '../features/marketplace/constants'
 import type { Listing } from '../types'
+import { formatZMWPrice } from '../utils/formatPrice'
 import { uploadImageToSupabase } from '../features/marketplace/ImageUploader'
 
 type ListingDetailPageProps = {
@@ -197,7 +198,7 @@ export function ListingDetailPage({
               </div>
               <div>
                 <span style={{ display: 'block', fontSize: '0.74rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Price</span>
-                <strong style={{ display: 'block', fontSize: '0.98rem', color: 'var(--text)', marginTop: '2px' }}>{selectedListing.price}</strong>
+                <strong style={{ display: 'block', fontSize: '0.98rem', color: 'var(--text)', marginTop: '2px' }}>{formatZMWPrice(selectedListing.price)}</strong>
               </div>
             </div>
 
@@ -237,7 +238,7 @@ export function ListingDetailPage({
         <div className="buy-box-panel">
           <div>
             <span style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Total Price</span>
-            <h3 style={{ color: '#2563eb', marginTop: '4px' }}>{selectedListing.price}</h3>
+            <h3 style={{ color: '#2563eb', marginTop: '4px' }}>{formatZMWPrice(selectedListing.price)}</h3>
           </div>
 
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px' }}>

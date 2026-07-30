@@ -233,7 +233,6 @@ export function StoreViewPage({
                                     saved={savedIds.includes(String(listing.id))}
                                     onOpen={onOpenListing}
                                     onToggleSave={onToggleSave}
-                                    compact
                                 />
                             ))}
                         </div>

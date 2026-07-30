@@ -71,9 +71,9 @@ export function StoresPage({ stores, allBusinesses, onVisitShop, onOpenProfile, 
   })
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%', boxSizing: 'border-box' }}>
       {/* Carousel Banner Slider */}
-      <section className="hero-slider-section" style={{ position: 'relative', overflow: 'hidden', height: '280px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+      <section className="hero-slider-section" style={{ position: 'relative', overflow: 'hidden', height: '280px', borderRadius: '12px', border: '1px solid var(--border)', width: '100%', boxSizing: 'border-box' }}>
         {slides.map((slide, idx) => (
           <div
             key={idx}

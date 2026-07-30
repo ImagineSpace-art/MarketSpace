@@ -221,7 +221,46 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   const [sortBy, setSortBy] = useState('Newest')
   const [showOnlyAvailable, setShowOnlyAvailable] = useState(true)
   const [savedIds, setSavedIds] = useState<string[]>(getStoredSavedIds)
-  const [notifications, setNotifications] = useState<NotificationItem[]>([])
+  const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
+    if (typeof window === 'undefined') return []
+    const stored = window.localStorage.getItem('marketspace-notifications')
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      } catch { }
+    }
+    return [
+      {
+        id: 'notif-1',
+        user_id: 'all',
+        title: 'Welcome to MarketSpace!',
+        body: 'Explore thousands of verified local listings, stores, and services in Zambia.',
+        time: 'Just now',
+        unread: true
+      },
+      {
+        id: 'notif-2',
+        user_id: 'all',
+        title: 'System Currency Update',
+        body: 'All item and service prices automatically display in ZMW (Zambian Kwacha).',
+        time: 'Today',
+        unread: true
+      },
+      {
+        id: 'notif-3',
+        user_id: 'all',
+        title: 'Verified Store Feature',
+        body: 'Create your digital storefront on MarketSpace and publish your product catalogs.',
+        time: 'Yesterday',
+        unread: false
+      }
+    ]
+  })
+
+  useEffect(() => {
+    window.localStorage.setItem('marketspace-notifications', JSON.stringify(notifications))
+  }, [notifications])
   const [chatThreads, setChatThreads] = useState<ChatThread[]>([])
   const [activeChatId, setActiveChatId] = useState<number | null>(1)
   const [chatDraft, setChatDraft] = useState('')

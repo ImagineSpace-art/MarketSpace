@@ -81,7 +81,6 @@ export function SellerProfilePage({
                                 saved={savedIds.includes(String(listing.id))}
                                 onOpen={onOpenListing}
                                 onToggleSave={onToggleSave}
-                                compact
                             />
                         ))}
                     </div>

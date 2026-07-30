@@ -13,6 +13,7 @@ import { StoreViewPage } from './pages/StoreViewPage'
 import { StoresPage } from './pages/StoresPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { SellerProfilePage } from './pages/SellerProfilePage'
+import { SettingsPage } from './pages/SettingsPage'
 import type { Listing, Profile, BusinessProfile } from './types'
 
 export function AppContent() {
@@ -183,6 +184,8 @@ export function AppContent() {
         profile={profile}
         listingKindFilter={listingKindFilter}
         onListingKindChange={setListingKindFilter}
+        notifications={app.notifications}
+        onMarkAllRead={app.markAllRead}
       >
         {message ? <div className="status-banner">{message}</div> : null}
         <Routes>
@@ -198,7 +201,6 @@ export function AppContent() {
                 distanceFilter={distanceFilter}
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
-                cardSize={cardSize}
                 toggleCategory={toggleCategory}
                 activeCategories={activeCategories}
               />
@@ -399,39 +401,11 @@ export function AppContent() {
           <Route
             path="/settings/:category?"
             element={
-              <ProfileTabRoute
-                session={session}
-                profile={profile}
-                userEmail={userEmail}
-                myListings={myListings}
-                listings={listings}
-                savedListings={savedListings}
-                savedIds={savedIds}
-                businessProfile={businessProfile}
-                allBusinesses={allBusinesses}
-                followingIds={followingIds}
-                notifyStoreIds={notifyStoreIds}
-                onToggleFollowStore={toggleFollowStore}
-                onToggleNotifyStore={toggleNotifyStore}
-                onEditListing={openEditListing}
-                onRenewListing={handleRenewListing}
-                onDeleteListing={handleDeleteListing}
-                onUpdateStatus={handleUpdateListingStatus}
-                onUploadAvatar={handleUploadAvatar}
-                onOpenListing={openListing}
-                onToggleSave={toggleSave}
-                onLogout={handleLogout}
-                onOpenDashboardPanel={() => setIsProfilePanelOpen(true)}
+              <SettingsPage
                 theme={theme}
-                locationString={formLocation}
-                cardSize={cardSize}
-                onCardSizeChange={setCardSize}
+                location={formLocation}
                 onToggleTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')}
                 onGoHome={() => navigate('/')}
-                notifications={notifications}
-                onMarkAllRead={markAllRead}
-                currency={app.currency}
-                setCurrency={app.setCurrency}
                 notificationsConfig={app.notificationsConfig}
                 setNotificationsConfig={app.setNotificationsConfig}
                 blockedUserIds={app.blockedUserIds}
@@ -443,35 +417,7 @@ export function AppContent() {
                 clearBrowsingHistory={app.clearBrowsingHistory}
                 searchHistory={app.searchHistory}
                 clearSearchHistory={app.clearSearchHistory}
-                createListingProps={{
-                  title,
-                  description,
-                  price,
-                  category,
-                  location: formLocation,
-                  status,
-                  listingType,
-                  condition,
-                  deliveryOption,
-                  uploadedImages,
-                  onUploadedImagesChange: setUploadedImages,
-                  onSubmit: handleCreateListing,
-                  onTitleChange: setTitle,
-                  onDescriptionChange: setDescription,
-                  onPriceChange: setPrice,
-                  onCategoryChange: setCategory,
-                  onLocationChange: setLocation,
-                  onStatusChange: setStatus,
-                  onListingTypeChange: setListingType,
-                  onConditionChange: setCondition,
-                  onDeliveryOptionChange: setDeliveryOption,
-                  availableColors,
-                  onAvailableColorsChange: setAvailableColors,
-                }}
-                storeSetupProps={{
-                  userId: session ? session.user.id : '',
-                  onSave: handleCreateOrUpdateBusiness,
-                }}
+                userEmail={userEmail}
               />
             }
           />

@@ -2,7 +2,6 @@ import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import type { Listing, Profile, BusinessProfile, PaymentMethodItem, NotificationConfig } from '../types'
 import { ListingCard } from '../components/ListingCard'
-import { SettingsPage } from './SettingsPage'
 import { NotificationsPage } from './SavedNotificationsPage'
 import { ListingFormPage } from './ListingPage'
 import { StoreSetupPage } from './StoreSetupPage'
@@ -113,12 +112,6 @@ export function ProfilePage({
     onLogout,
     onOpenDashboardPanel,
     activeSection,
-    theme,
-    locationString,
-    cardSize,
-    onCardSizeChange,
-    onToggleTheme,
-    onGoHome,
     notifications,
     onMarkAllRead,
     createListingProps,
@@ -126,19 +119,6 @@ export function ProfilePage({
     allBusinesses = {},
     followingIds = [],
     onToggleFollowStore = () => {},
-    currency = 'ZMW',
-    setCurrency = () => {},
-    notificationsConfig = { email: true, push: true, sms: false, orders: true, promos: false },
-    setNotificationsConfig = () => {},
-    blockedUserIds = [],
-    toggleBlockUser = () => {},
-    paymentMethods = [],
-    addPaymentMethod = () => {},
-    removePaymentMethod = () => {},
-    browsingHistory = [],
-    clearBrowsingHistory = () => {},
-    searchHistory = [],
-    clearSearchHistory = () => {},
 }: ProfilePageProps) {
     const displayName = profile?.username || 'Your profile'
     const navigate = useNavigate()
@@ -244,30 +224,83 @@ export function ProfilePage({
         }
     }
 
+    const [isMobileNavExpanded, setIsMobileNavExpanded] = useState(false)
+
+    const navItems = [
+        { path: '/profile/create', label: 'Create new listing', icon: 'add_circle', isPrimary: true },
+        { path: '/profile', label: 'Seller dashboard', icon: 'dashboard', exact: true },
+        { path: '/profile/store-dashboard', label: 'Store dashboard', icon: 'storefront' },
+    ]
+
     return (
         <div className="dashboard-layout">
-            {/* --- LEFT SIDEBAR (NAVIGATION) --- */}
-            <aside className="dashboard-sidebar section-card">
+            {/* --- MOBILE PROFILE NAVIGATION DROPDOWN (<1024px) --- */}
+            <div className="mobile-profile-nav-toggle-bar">
+                <button
+                    className="mobile-profile-nav-btn"
+                    onClick={() => setIsMobileNavExpanded(!isMobileNavExpanded)}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span className="material-icons" style={{ fontSize: '20px', color: '#1967d2' }}>
+                            {activeSection === 'settings' ? 'settings' :
+                             activeSection === 'create' ? 'add_circle' :
+                             activeSection === 'store-dashboard' ? 'storefront' :
+                             activeSection === 'saved-listings' ? 'bookmark' :
+                             activeSection === 'notifications' ? 'notifications' : 'dashboard'}
+                        </span>
+                        <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>
+                            {activeSection === 'settings' ? 'Settings Menu' :
+                             activeSection === 'create' ? 'Create New Listing' :
+                             activeSection === 'store-dashboard' ? 'Store Dashboard' :
+                             activeSection === 'saved-listings' ? 'Saved Listings' :
+                             activeSection === 'notifications' ? 'Notifications' : 'Seller Dashboard'}
+                        </span>
+                    </div>
+                    <span className="material-icons" style={{ fontSize: '22px' }}>
+                        {isMobileNavExpanded ? 'expand_less' : 'expand_more'}
+                    </span>
+                </button>
+
+                {isMobileNavExpanded && (
+                    <div className="mobile-profile-dropdown-menu">
+                        {navItems.map((item) => (
+                            <NavLink
+                                key={item.path}
+                                className={({ isActive }) => `nav-btn ${item.isPrimary ? 'primary-action' : ''} ${isActive ? 'active' : ''}`}
+                                to={item.path}
+                                end={item.exact}
+                                onClick={() => setIsMobileNavExpanded(false)}
+                                style={{ textDecoration: 'none' }}
+                            >
+                                <span className="material-icons">{item.icon}</span> {item.label}
+                            </NavLink>
+                        ))}
+                        <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', marginTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div className="mini-avatar-placeholder" style={{ width: '28px', height: '28px', fontSize: '0.8rem' }}>{displayName.slice(0, 1).toUpperCase()}</div>
+                                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{displayName}</span>
+                            </div>
+                            <button className="ghost-btn" style={{ padding: '4px 10px', fontSize: '0.8rem' }} onClick={onLogout}>Log out</button>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* --- LEFT SIDEBAR (DESKTOP NAVIGATION) --- */}
+            <aside className="dashboard-sidebar section-card desktop-profile-sidebar">
 
                 <nav className="sidebar-nav">
-                    <NavLink className={({ isActive }) => `nav-btn primary-action ${isActive ? 'active' : ''}`} to="/profile/create" style={{ textDecoration: 'none' }}>
-                        <span className="material-icons">add_circle</span> Create new listing
-                    </NavLink>
-                    <NavLink className={({ isActive }) => `nav-btn ${isActive ? 'active' : ''}`} to="/profile" end style={{ textDecoration: 'none' }}>
-                        <span className="material-icons">dashboard</span> Seller dashboard
-                    </NavLink>
-                    <NavLink className={({ isActive }) => `nav-btn ${isActive ? 'active' : ''}`} to="/profile/store-dashboard" style={{ textDecoration: 'none' }}>
-                        <span className="material-icons">storefront</span> Store dashboard
-                    </NavLink>
-                    <NavLink className={({ isActive }) => `nav-btn ${isActive ? 'active' : ''}`} to="/profile/saved-listings" style={{ textDecoration: 'none' }}>
-                        <span className="material-icons">bookmark</span> Saved listings
-                    </NavLink>
-                    <NavLink className={({ isActive }) => `nav-btn ${isActive ? 'active' : ''}`} to="/profile/notifications" style={{ textDecoration: 'none' }}>
-                        <span className="material-icons">notifications</span> Notifications
-                    </NavLink>
-                    <NavLink className={({ isActive }) => `nav-btn ${isActive ? 'active' : ''}`} to="/profile/settings" style={{ textDecoration: 'none' }}>
-                        <span className="material-icons">settings</span> Settings
-                    </NavLink>
+                    {navItems.map((item) => (
+                        <NavLink
+                            key={item.path}
+                            className={({ isActive }) => `nav-btn ${item.isPrimary ? 'primary-action' : ''} ${isActive ? 'active' : ''}`}
+                            to={item.path}
+                            end={item.exact}
+                            style={{ textDecoration: 'none' }}
+                        >
+                            <span className="material-icons">{item.icon}</span> {item.label}
+                        </NavLink>
+                    ))}
                 </nav>
 
                 <div className="sidebar-footer">
@@ -299,30 +332,7 @@ export function ProfilePage({
 
             {/* --- MAIN CONTENT AREA --- */}
             <main className="dashboard-main">
-                {activeSection === 'settings' ? (
-                    <SettingsPage
-                        theme={theme}
-                        location={locationString}
-                        cardSize={cardSize}
-                        onCardSizeChange={onCardSizeChange}
-                        onToggleTheme={onToggleTheme}
-                        onGoHome={onGoHome}
-                        currency={currency}
-                        setCurrency={setCurrency}
-                        notificationsConfig={notificationsConfig}
-                        setNotificationsConfig={setNotificationsConfig}
-                        blockedUserIds={blockedUserIds}
-                        toggleBlockUser={toggleBlockUser}
-                        paymentMethods={paymentMethods}
-                        addPaymentMethod={addPaymentMethod}
-                        removePaymentMethod={removePaymentMethod}
-                        browsingHistory={browsingHistory}
-                        clearBrowsingHistory={clearBrowsingHistory}
-                        searchHistory={searchHistory}
-                        clearSearchHistory={clearSearchHistory}
-                        userEmail={userEmail}
-                    />
-                ) : activeSection === 'notifications' ? (
+                {activeSection === 'notifications' ? (
                     <NotificationsPage
                         notifications={notifications}
                         onMarkAllRead={onMarkAllRead}
@@ -759,7 +769,6 @@ export function ProfilePage({
                                                     saved={savedIds.includes(String(listing.id))}
                                                     onOpen={onOpenListing}
                                                     onToggleSave={onToggleSave}
-                                                    compact
                                                 />
                                             </div>
                                             <div className="listing-row-actions">

@@ -90,3 +90,13 @@ export type NotificationConfig = {
   orders: boolean
   promos: boolean
 }
+
+export type NotificationItem = {
+  id: string | number
+  user_id?: string | null
+  title: string
+  body: string
+  time: string
+  unread: boolean
+  link_url?: string
+}

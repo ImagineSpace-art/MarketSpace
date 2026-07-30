@@ -1,7 +1,8 @@
-import { useState, useEffect, type CSSProperties } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { ListingCard } from '../components/ListingCard'
 import type { MarketplaceAppModel } from '../features/marketplace/useMarketplaceApp'
+import type { Listing } from '../types'
 
 type HomePageProps = Pick<MarketplaceAppModel,
   'loading' |
@@ -12,7 +13,6 @@ type HomePageProps = Pick<MarketplaceAppModel,
   'distanceFilter' |
   'searchQuery' |
   'setSearchQuery' |
-  'cardSize' |
   'toggleCategory' |
   'activeCategories'
 >
@@ -26,12 +26,9 @@ export function HomePage({
   distanceFilter,
   searchQuery,
   setSearchQuery,
-  cardSize,
   toggleCategory,
   activeCategories
 }: HomePageProps) {
-  const listingGridStyle = { '--card-size': `${cardSize}px` } as CSSProperties
-
   const [currentSlide, setCurrentSlide] = useState(0)
   const slides = [
     '/banners/banner_electronics.png',
@@ -45,6 +42,12 @@ export function HomePage({
     }, 6000)
     return () => clearInterval(timer)
   }, [slides.length])
+
+  // Group listings into horizontal scroll rails capped at 5 items per row
+  const horizontalScrollGroups: Listing[][] = []
+  for (let i = 0; i < filteredListings.length; i += 5) {
+    horizontalScrollGroups.push(filteredListings.slice(i, i + 5))
+  }
 
   return (
     <div className="marketplace-home">
@@ -109,14 +112,14 @@ export function HomePage({
             <button
               className={`chip-btn ${activeCategories.includes('Electronics') ? 'active' : ''}`}
               onClick={() => toggleCategory('Electronics')}
-              style={{ padding: '6px 12px', fontSize: '0.82rem', borderRadius: '16px', border: '1px solid var(--border)', cursor: 'pointer', background: 'var(--panel)', color: 'var(--text)' }}
+              style={{ padding: '6px 12px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--border)', cursor: 'pointer', background: 'var(--panel)', color: 'var(--text)' }}
             >
               Electronics
             </button>
             <button
               className={`chip-btn ${activeCategories.includes('Gaming') ? 'active' : ''}`}
               onClick={() => toggleCategory('Gaming')}
-              style={{ padding: '6px 12px', fontSize: '0.82rem', borderRadius: '16px', border: '1px solid var(--border)', cursor: 'pointer', background: 'var(--panel)', color: 'var(--text)' }}
+              style={{ padding: '6px 12px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--border)', cursor: 'pointer', background: 'var(--panel)', color: 'var(--text)' }}
             >
               Gaming
             </button>
@@ -130,7 +133,7 @@ export function HomePage({
             <button
               className={`chip-btn ${activeCategories.includes('Fashion') ? 'active' : ''}`}
               onClick={() => toggleCategory('Fashion')}
-              style={{ padding: '6px 12px', fontSize: '0.82rem', borderRadius: '16px', border: '1px solid var(--border)', cursor: 'pointer', background: 'var(--panel)', color: 'var(--text)' }}
+              style={{ padding: '6px 12px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--border)', cursor: 'pointer', background: 'var(--panel)', color: 'var(--text)' }}
             >
               Fashion & Apparel
             </button>
@@ -140,7 +143,7 @@ export function HomePage({
         <div className="featured-card">
           <h3>Verified Local Stores</h3>
           <p>Support local businesses, browse catalogs, and request direct pick-up.</p>
-          <Link className="primary-btn compact-btn" style={{ marginTop: '12px', textDecoration: 'none', display: 'inline-block', textAlign: 'center' }} to="/stores">
+          <Link className="primary-btn" style={{ marginTop: '12px', textDecoration: 'none', display: 'inline-block', textAlign: 'center' }} to="/stores">
             Browse Stores
           </Link>
         </div>
@@ -148,7 +151,7 @@ export function HomePage({
         <div className="featured-card">
           <h3>Sell on MarketSpace</h3>
           <p>List your goods instantly and get messages from direct buyers.</p>
-          <Link className="primary-btn compact-btn" style={{ marginTop: '12px', textDecoration: 'none', display: 'inline-block', textAlign: 'center' }} to="/profile/create">
+          <Link className="primary-btn" style={{ marginTop: '12px', textDecoration: 'none', display: 'inline-block', textAlign: 'center' }} to="/profile/create">
             Start Selling
           </Link>
         </div>
@@ -167,9 +170,19 @@ export function HomePage({
         ) : filteredListings.length === 0 ? (
           <p>No listings match your filters yet.</p>
         ) : (
-          <div className="marketplace-listing-grid" style={listingGridStyle}>
-            {filteredListings.map((listing) => (
-              <ListingCard key={listing.id} listing={listing} saved={savedIds.includes(String(listing.id))} onOpen={openListing} onToggleSave={toggleSave} compact />
+          <div className="horizontal-scroll-feed-container">
+            {horizontalScrollGroups.map((group, groupIndex) => (
+              <div key={groupIndex} className="horizontal-scroll-rail">
+                {group.map((listing) => (
+                  <ListingCard
+                    key={listing.id}
+                    listing={listing}
+                    saved={savedIds.includes(String(listing.id))}
+                    onOpen={openListing}
+                    onToggleSave={toggleSave}
+                  />
+                ))}
+              </div>
             ))}
           </div>
         )}

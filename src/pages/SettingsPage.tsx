@@ -5,12 +5,8 @@ import type { PaymentMethodItem, NotificationConfig } from '../types'
 type SettingsPageProps = {
     theme: 'light' | 'dark'
     location: string
-    cardSize: number
-    onCardSizeChange: (size: number) => void
     onToggleTheme: () => void
     onGoHome: () => void
-    currency: 'ZMW' | 'USD' | 'EUR'
-    setCurrency: (curr: 'ZMW' | 'USD' | 'EUR') => void
     notificationsConfig: NotificationConfig
     setNotificationsConfig: React.Dispatch<React.SetStateAction<NotificationConfig>>
     blockedUserIds: string[]
@@ -28,12 +24,8 @@ type SettingsPageProps = {
 export function SettingsPage({
     theme,
     location,
-    cardSize,
-    onCardSizeChange,
     onToggleTheme,
     onGoHome,
-    currency,
-    setCurrency,
     notificationsConfig,
     setNotificationsConfig,
     blockedUserIds,
@@ -103,25 +95,53 @@ export function SettingsPage({
     const activeTab = category.toLowerCase()
 
     return (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '24px', alignItems: 'start' }} className="settings-container">
-            {/* Main Category Sub-page Content */}
-            <section className="section-card settings-page" style={{ margin: 0, padding: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', borderBottom: '1px solid var(--border)', paddingBottom: '16px' }}>
-                    <button className="ghost-btn compact-btn" onClick={() => navigate('/settings')} style={{ padding: '6px 12px' }}>
-                        ← Categories
-                    </button>
-                    <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800 }}>
-                        {activeTab === 'account' && 'Your Account & Security'}
-                        {activeTab === 'preferences' && 'App Preferences'}
-                        {activeTab === 'audience' && 'Audience & Privacy Visibility'}
-                        {activeTab === 'payments' && 'Payments & Payouts'}
-                        {activeTab === 'activity' && 'Your Activity & Log History'}
-                        {activeTab === 'legal' && 'Community Standards & Legal Policies'}
-                    </h2>
-                </div>
+        <div className="section-card settings-page" style={{ margin: 0, padding: '24px', width: '100%', boxSizing: 'border-box' }}>
+            {/* Header Banner */}
+            <div style={{ marginBottom: '20px', borderBottom: '1px solid var(--border)', paddingBottom: '16px' }}>
+                <h2 style={{ margin: '0 0 6px 0', fontSize: '1.6rem', fontWeight: 800, color: 'var(--text)' }}>
+                    Settings & Account Preferences
+                </h2>
+                <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
+                    Manage your account security, notification alerts, payment methods, and legal policies.
+                </p>
+            </div>
 
-                {/* 1. ACCOUNT SUB-PAGE */}
-                {activeTab === 'account' && (
+            {/* Horizontal Settings Tabs at Top */}
+            <div className="settings-nav-tabs" style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '24px', borderBottom: '1px solid var(--border)' }}>
+                {[
+                    { id: 'account', label: 'Your Account', icon: 'manage_accounts' },
+                    { id: 'preferences', label: 'Preferences', icon: 'tune' },
+                    { id: 'audience', label: 'Audience & Visibility', icon: 'visibility' },
+                    { id: 'payments', label: 'Payments', icon: 'payment' },
+                    { id: 'activity', label: 'Your Activity', icon: 'history' },
+                    { id: 'legal', label: 'Legal & Policies', icon: 'gavel' },
+                ].map((item) => {
+                    const isCurrent = activeTab === item.id || (!activeTab && item.id === 'account')
+                    return (
+                        <button
+                            key={item.id}
+                            className={isCurrent ? "primary-btn" : "ghost-btn"}
+                            onClick={() => navigate(`/settings/${item.id}`)}
+                            style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '10px 16px',
+                                borderRadius: '20px',
+                                whiteSpace: 'nowrap',
+                                fontSize: '0.88rem',
+                                fontWeight: isCurrent ? 700 : 500
+                            }}
+                        >
+                            <span className="material-icons" style={{ fontSize: '18px' }}>{item.icon}</span>
+                            {item.label}
+                        </button>
+                    )
+                })}
+            </div>
+
+            {/* 1. ACCOUNT SUB-PAGE */}
+            {(!activeTab || activeTab === 'account') && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                         <div className="setting-box" style={{ background: 'var(--panel)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border)' }}>
                             <h3 style={{ marginTop: 0, fontSize: '1.1rem' }}>Personal Information</h3>
@@ -246,25 +266,6 @@ export function SettingsPage({
                         </div>
 
                         <div className="setting-box" style={{ background: 'var(--panel)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                            <h3 style={{ marginTop: 0, fontSize: '1.1rem' }}>Listing Feed Density & Card Size</h3>
-                            <div className="setting-row range-row" style={{ marginTop: '12px' }}>
-                                <div>
-                                    <h4 style={{ margin: 0 }}>Card Width: {cardSize}px</h4>
-                                    <p className="text-muted" style={{ margin: '4px 0 0 0', fontSize: '0.85rem' }}>Adjust how compact or large product cards appear in feeds.</p>
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '10px' }}>
-                                    <input
-                                        type="range"
-                                        min="130" max="260"
-                                        value={cardSize}
-                                        onChange={(event) => onCardSizeChange(Number(event.target.value))}
-                                        style={{ flexGrow: 1 }}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="setting-box" style={{ background: 'var(--panel)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border)' }}>
                             <h3 style={{ marginTop: 0, fontSize: '1.1rem' }}>Location & Currency</h3>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '12px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -273,22 +274,6 @@ export function SettingsPage({
                                         <p className="text-muted" style={{ margin: '2px 0 0 0', fontSize: '0.85rem' }}>Currently set to {location}</p>
                                     </div>
                                     <button className="secondary-btn compact-btn" onClick={onGoHome}>Change City</button>
-                                </div>
-
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
-                                    <div>
-                                        <h4 style={{ margin: 0 }}>Display Currency</h4>
-                                        <p className="text-muted" style={{ margin: '2px 0 0 0', fontSize: '0.85rem' }}>Select your preferred currency display.</p>
-                                    </div>
-                                    <select
-                                        value={currency}
-                                        onChange={(e) => setCurrency(e.target.value as any)}
-                                        style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }}
-                                    >
-                                        <option value="ZMW">ZMW (Zambian Kwacha)</option>
-                                        <option value="USD">USD ($ United States Dollar)</option>
-                                        <option value="EUR">EUR (€ Euro)</option>
-                                    </select>
                                 </div>
                             </div>
                         </div>
@@ -503,53 +488,6 @@ export function SettingsPage({
                         </div>
                     </div>
                 )}
-            </section>
-
-            {/* Right Side: Sidebar Table of Contents Navigation */}
-            <aside style={{ position: 'sticky', top: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }} className="settings-sidebar">
-                <div className="section-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px', background: 'var(--panel)', border: '1px solid var(--border)' }}>
-                    <h3 style={{ margin: 0, fontSize: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '8px', fontWeight: 700 }}>
-                        Settings Menu
-                    </h3>
-                    <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        {[
-                            { id: 'account', label: 'Your Account', icon: 'manage_accounts' },
-                            { id: 'preferences', label: 'Preferences', icon: 'tune' },
-                            { id: 'audience', label: 'Audience & Visibility', icon: 'visibility' },
-                            { id: 'payments', label: 'Payments', icon: 'payment' },
-                            { id: 'activity', label: 'Your Activity', icon: 'history' },
-                            { id: 'legal', label: 'Legal & Policies', icon: 'gavel' },
-                        ].map((item) => {
-                            const isCurrent = activeTab === item.id
-                            return (
-                                <button
-                                    key={item.id}
-                                    className={isCurrent ? "primary-btn" : "ghost-btn"}
-                                    onClick={() => navigate(`/settings/${item.id}`)}
-                                    style={{
-                                        textAlign: 'left',
-                                        fontSize: '0.88rem',
-                                        padding: '10px 12px',
-                                        width: '100%',
-                                        justifyContent: 'flex-start',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '10px',
-                                        borderRadius: '8px',
-                                        background: isCurrent ? 'var(--primary)' : 'transparent',
-                                        color: isCurrent ? 'white' : 'var(--text)'
-                                    }}
-                                >
-                                    <span className="material-icons" style={{ fontSize: '18px', color: isCurrent ? 'white' : 'var(--primary)' }}>
-                                        {item.icon}
-                                    </span>
-                                    {item.label}
-                                </button>
-                            )
-                        })}
-                    </nav>
-                </div>
-            </aside>
         </div>
     )
 }

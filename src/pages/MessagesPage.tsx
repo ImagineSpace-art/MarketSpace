@@ -118,7 +118,7 @@ export function MessagesPage({
   }, [chatCategory, chatThreads])
 
   return (
-    <div className="messenger-layout">
+    <div className={`messenger-layout ${activeThread ? 'has-active-thread' : 'no-active-thread'}`}>
       {/* Left Pane: Sidebar */}
       <aside className="threads-sidebar">
         <div className="sidebar-header">
@@ -211,8 +211,16 @@ export function MessagesPage({
       {/* Right Pane: Conversation Area */}
       {activeThread ? (
         <section className="conversation-pane">
-          <div className="conversation-header">
-            <div className="conversation-info">
+          <div className="conversation-header" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              className="mobile-back-btn"
+              onClick={() => onSelectThread(0)}
+              title="Back to Inbox"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text)', padding: '4px', display: 'flex', alignItems: 'center' }}
+            >
+              <span className="material-icons">arrow_back</span>
+            </button>
+            <div className="conversation-info" style={{ flex: 1 }}>
               <strong>{activeThread.participant}</strong>
               <p>{activeThread.listingTitle}</p>
             </div>
