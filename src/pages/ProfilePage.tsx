@@ -120,7 +120,7 @@ export function ProfilePage({
     followingIds = [],
     onToggleFollowStore = () => {},
 }: ProfilePageProps) {
-    const displayName = profile?.username || 'Your profile'
+    const displayName = profile?.username || (userEmail && userEmail !== 'Guest' ? userEmail.split('@')[0] : 'User Profile')
     const navigate = useNavigate()
 
     const [storeTab, setStoreTab] = useState<'analytics' | 'catalog' | 'ads' | 'social'>('analytics')

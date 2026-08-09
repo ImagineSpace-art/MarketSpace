@@ -109,7 +109,7 @@ export interface MarketplaceAppModel {
   userEmail: string
   fetchListings: () => Promise<void>
   fetchStores: () => Promise<void>
-  loadProfile: (userId: string) => Promise<void>
+  loadProfile: (userId: string, userObj?: any) => Promise<Profile>
   handleLogin: () => Promise<void>
   handleSignup: () => Promise<void>
   handleLogout: () => Promise<void>
@@ -146,7 +146,7 @@ export interface MarketplaceAppModel {
   listingKindFilter: 'all' | 'item' | 'service'
   setListingKindFilter: Dispatch<SetStateAction<'all' | 'item' | 'service'>>
   storeReviews: StoreReview[]
-  addStoreReview: (storeId: string, rating: number, comment: string) => void
+  addStoreReview: (storeId: string | null, rating: number, comment: string, targetUserId?: string | null) => void
   replyToStoreReview: (reviewId: string, replyText: string) => void
   currency: 'ZMW' | 'USD' | 'EUR'
   setCurrency: Dispatch<SetStateAction<'ZMW' | 'USD' | 'EUR'>>
@@ -165,6 +165,7 @@ export interface MarketplaceAppModel {
   toggleFavoriteChat: (chatId: number) => void
   toggleArchiveChat: (chatId: number) => void
   deleteChat: (chatId: number) => void
+  handleDeleteAccount: () => Promise<void>
 }
 
 type ListingRow = Listing & {
@@ -463,14 +464,15 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     window.localStorage.setItem('marketspace-store-reviews', JSON.stringify(storeReviews))
   }, [storeReviews])
 
-  const addStoreReview = (storeId: string, rating: number, comment: string) => {
+  const addStoreReview = async (storeId: string | null, rating: number, comment: string, targetUserId?: string | null) => {
     if (!session) {
       setMessage('Please sign in to write a review')
       return
     }
     const newReview: StoreReview = {
       id: Math.random().toString(36).substring(2, 9),
-      storeId,
+      storeId: storeId ?? null,
+      targetUserId: targetUserId ?? null,
       reviewerId: session.user.id,
       reviewerName: profile?.username || session.user.email || 'Anonymous',
       rating,
@@ -479,6 +481,14 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     }
     setStoreReviews((prev) => [newReview, ...prev])
     setMessage('Review submitted successfully')
+
+    await supabase.from('reviews').insert({
+      reviewer_id: session.user.id,
+      store_id: storeId || null,
+      target_user_id: targetUserId || null,
+      rating,
+      comment,
+    })
   }
 
   const replyToStoreReview = (reviewId: string, replyText: string) => {
@@ -529,11 +539,31 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     }
   }
 
-  async function loadProfile(userId: string) {
-    const { data } = await supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle()
-    if (data) {
-      setProfile(data as Profile)
+  async function loadProfile(userId: string, userObj?: any) {
+    let { data } = await supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle()
+
+    const fallbackUsername = userObj?.user_metadata?.username || (userObj?.email ? userObj.email.split('@')[0] : '') || 'User'
+    const fallbackEmail = userObj?.email || ''
+
+    if (!data) {
+      const newProfile: Profile = {
+        user_id: userId,
+        username: fallbackUsername,
+        email: fallbackEmail,
+        phone_verified: false,
+      }
+      await supabase.from('profiles').upsert(newProfile)
+      setProfile(newProfile)
+      return newProfile
     }
+
+    if (!data.username && fallbackUsername) {
+      data.username = fallbackUsername
+      await supabase.from('profiles').update({ username: fallbackUsername }).eq('user_id', userId)
+    }
+
+    setProfile(data as Profile)
+    return data as Profile
   }
 
   async function fetchChatThreads() {
@@ -561,8 +591,20 @@ export function useMarketplaceApp(): MarketplaceAppModel {
 
     if (messagesError) return
 
+    const threadMap = new Map<number, ChatMessage[]>()
+    messagesData?.forEach((m: any) => {
+      const list = threadMap.get(m.chat_id) || []
+      list.push({
+        id: m.id,
+        sender: m.sender_id === session.user.id ? 'me' : 'them',
+        content: m.content,
+        time: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      })
+      threadMap.set(m.chat_id, list)
+    })
+
     const userIds = new Set<string>()
-    chatsData.forEach(c => {
+    chatsData.forEach((c) => {
       userIds.add(c.buyer_id)
       userIds.add(c.seller_id)
     })
@@ -572,44 +614,25 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       .select('user_id, username')
       .in('user_id', Array.from(userIds))
 
-    const profileMap = new Map<string, string>()
-    if (profilesData) {
-      profilesData.forEach(p => {
-        if (p.user_id) profileMap.set(p.user_id, p.username || 'User')
-      })
-    }
+    const nameMap = new Map<string, string>()
+    profilesData?.forEach((p: any) => {
+      nameMap.set(p.user_id, p.username || 'User')
+    })
 
-    const threads: ChatThread[] = chatsData.map(chatRow => {
-      const chatMessages = (messagesData ?? [])
-        .filter(m => m.chat_id === chatRow.id)
-        .map(m => {
-          const timeVal = m.created_at
-            ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            : 'Now'
-          return {
-            id: m.id,
-            sender: m.sender_id === session.user.id ? ('me' as const) : ('them' as const),
-            content: m.content,
-            time: timeVal
-          }
-        })
-
-      const otherUserId = chatRow.buyer_id === session.user.id ? chatRow.seller_id : chatRow.buyer_id
-      const participantName = profileMap.get(otherUserId) || 'Other User'
-      const flags = chatFlags[chatRow.id] || {}
+    const threads: ChatThread[] = chatsData.map((c) => {
+      const otherId = c.buyer_id === session.user.id ? c.seller_id : c.buyer_id
+      const participantName = nameMap.get(otherId) || 'User'
+      const msgs = threadMap.get(c.id) || []
 
       return {
-        id: chatRow.id,
-        title: chatRow.title || 'Chat',
+        id: c.id,
+        title: c.title || 'Inquiry',
         participant: participantName,
-        listingTitle: chatRow.title || 'Inquiry',
+        listingTitle: c.title || 'Marketplace Item',
         unread: false,
-        messages: chatMessages,
-        isPinned: !!flags.isPinned,
-        isFavorite: !!flags.isFavorite,
-        isArchived: !!flags.isArchived,
+        messages: msgs,
       }
-    }).filter((t) => !deletedChatIds.includes(t.id))
+    })
 
     setChatThreads(threads)
   }
@@ -636,13 +659,23 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       } = await supabase.auth.getSession()
       setSession(currentSession)
 
+      let loadedProfile: Profile | null = null
       if (currentSession) {
-        await loadProfile(currentSession.user.id)
+        loadedProfile = await loadProfile(currentSession.user.id, currentSession.user)
       }
 
       await fetchListings()
       await fetchStores()
       setLoading(false)
+
+      const needsOnboarding = currentSession && (
+        !loadedProfile?.onboarding_choice ||
+        (loadedProfile.onboarding_choice === 'seller' && !loadedProfile.phone_verified)
+      )
+
+      if (needsOnboarding && (window.location.pathname === '/' || window.location.pathname === '/profile')) {
+        navigate('/onboarding')
+      }
     }
 
     void loadInitialData()
@@ -655,11 +688,18 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   }, [session])
 
   useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, currentSession) => {
       setSession(currentSession)
       if (currentSession) {
-        void loadProfile(currentSession.user.id)
+        const loadedProfile = await loadProfile(currentSession.user.id, currentSession.user)
         void fetchListings()
+
+        const needsOnboarding = !loadedProfile?.onboarding_choice ||
+          (loadedProfile.onboarding_choice === 'seller' && !loadedProfile.phone_verified)
+
+        if (needsOnboarding && (window.location.pathname === '/' || window.location.pathname === '/profile')) {
+          navigate('/onboarding')
+        }
       } else {
         setProfile(null)
         setChatThreads([])
@@ -691,7 +731,14 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setMessage('Welcome back to MarketSpace')
     setAuthEmail('')
     setAuthPassword('')
-    navigate('/')
+
+    // Fetch user profile choice
+    const { data: profileRow } = await supabase.from('profiles').select('onboarding_choice').eq('user_id', data.user.id).maybeSingle()
+    if (!profileRow?.onboarding_choice) {
+      navigate('/onboarding')
+    } else {
+      navigate('/')
+    }
   }
 
   const handleSignup = async () => {
@@ -715,12 +762,21 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       })
     }
 
+    if (!data.session) {
+      setMessage('Account created! Please check your email inbox to confirm your account before logging in.')
+      setAuthEmail('')
+      setAuthPassword('')
+      setAuthUsername('')
+      navigate('/login')
+      return
+    }
+
     setSession(data.session)
     setMessage('Account created successfully')
     setAuthEmail('')
     setAuthPassword('')
     setAuthUsername('')
-    navigate('/')
+    navigate('/onboarding')
   }
 
   const handleLogout = async () => {
@@ -728,6 +784,38 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setSession(null)
     setProfile(null)
     navigate('/login')
+  }
+
+  const handleDeleteAccount = async () => {
+    if (!session?.user?.id) return
+
+    try {
+      // 1. Trigger secure RPC database function to wipe auth.users & CASCADE all profile/listings/store data
+      const { error: rpcError } = await supabase.rpc('delete_my_account')
+
+      if (rpcError) {
+        console.warn('RPC delete_my_account fallback:', rpcError.message)
+        await supabase.from('profiles').delete().eq('user_id', session.user.id)
+      }
+    } catch (err) {
+      console.error('Error deleting account:', err)
+      await supabase.from('profiles').delete().eq('user_id', session.user.id)
+    }
+
+    // 2. Sign out of Supabase Auth
+    await supabase.auth.signOut()
+
+    // 3. Clear local session & profile state
+    setSession(null)
+    setProfile(null)
+    setSavedIds([])
+    setBusinessProfile(null)
+    window.localStorage.removeItem('marketspace-saved')
+    window.localStorage.removeItem('marketspace-notify-store-ids')
+
+    // 4. Notify user and redirect to homepage
+    setMessage('Your account and associated data have been permanently deleted.')
+    navigate('/')
   }
 
   const resetForm = () => {
@@ -1278,6 +1366,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     toggleFavoriteChat,
     toggleArchiveChat,
     deleteChat,
+    handleDeleteAccount,
   }
 }
 

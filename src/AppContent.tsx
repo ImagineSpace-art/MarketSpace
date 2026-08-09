@@ -9,6 +9,7 @@ import { ListingDetailPage, ListingFormPage } from './pages/ListingPage'
 import { SavedItemsPage } from './pages/SavedNotificationsPage'
 import { MessagesPage } from './pages/MessagesPage'
 import { AuthPage } from './pages/AuthenticationPage'
+import { OnboardingPage } from './pages/OnboardingPage'
 import { StoreViewPage } from './pages/StoreViewPage'
 import { StoresPage } from './pages/StoresPage'
 import { ProfilePage } from './pages/ProfilePage'
@@ -401,24 +402,29 @@ export function AppContent() {
           <Route
             path="/settings/:category?"
             element={
-              <SettingsPage
-                theme={theme}
-                location={formLocation}
-                onToggleTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-                onGoHome={() => navigate('/')}
-                notificationsConfig={app.notificationsConfig}
-                setNotificationsConfig={app.setNotificationsConfig}
-                blockedUserIds={app.blockedUserIds}
-                toggleBlockUser={app.toggleBlockUser}
-                paymentMethods={app.paymentMethods}
-                addPaymentMethod={app.addPaymentMethod}
-                removePaymentMethod={app.removePaymentMethod}
-                browsingHistory={app.browsingHistory}
-                clearBrowsingHistory={app.clearBrowsingHistory}
-                searchHistory={app.searchHistory}
-                clearSearchHistory={app.clearSearchHistory}
-                userEmail={userEmail}
-              />
+              session ? (
+                <SettingsPage
+                  theme={theme}
+                  location={formLocation}
+                  onToggleTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+                  onGoHome={() => navigate('/')}
+                  notificationsConfig={app.notificationsConfig}
+                  setNotificationsConfig={app.setNotificationsConfig}
+                  blockedUserIds={app.blockedUserIds}
+                  toggleBlockUser={app.toggleBlockUser}
+                  paymentMethods={app.paymentMethods}
+                  addPaymentMethod={app.addPaymentMethod}
+                  removePaymentMethod={app.removePaymentMethod}
+                  browsingHistory={app.browsingHistory}
+                  clearBrowsingHistory={app.clearBrowsingHistory}
+                  searchHistory={app.searchHistory}
+                  clearSearchHistory={app.clearSearchHistory}
+                  userEmail={userEmail}
+                  onDeleteAccount={app.handleDeleteAccount}
+                />
+              ) : (
+                <Navigate to="/login" replace />
+              )
             }
           />
 
@@ -483,6 +489,21 @@ export function AppContent() {
                 onLogout={handleLogout}
                 onGoProfile={() => navigate('/profile')}
               />
+            }
+          />
+          <Route
+            path="/onboarding"
+            element={
+              session ? (
+                <OnboardingPage
+                  session={session}
+                  profile={profile}
+                  setProfile={app.setProfile}
+                  setMessage={app.setMessage}
+                />
+              ) : (
+                <Navigate to="/login" replace />
+              )
             }
           />
           <Route path="/auth" element={<Navigate to="/login" replace />} />

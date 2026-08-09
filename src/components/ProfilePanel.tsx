@@ -17,7 +17,7 @@ export function ProfilePanel({
   myListings,
   businessProfile,
 }: ProfilePanelProps) {
-  const displayName = profile?.username || 'Your Profile'
+  const displayName = profile?.username || (userEmail && userEmail !== 'Guest' ? userEmail.split('@')[0] : 'User Profile')
 
   // Calculate stats dynamically
   const activeListingsCount = myListings.filter((l) => l.status !== 'Sold').length

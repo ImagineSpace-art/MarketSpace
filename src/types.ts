@@ -1,4 +1,4 @@
-export type View = 'home' | 'listing' | 'create' | 'edit' | 'saved' | 'notifications' | 'stores' | 'profile' | 'settings' | 'inbox' | 'account' | 'login' | 'signup' | 'business-hub' | 'business-setup' | 'store-view' | 'seller'
+export type View = 'home' | 'listing' | 'create' | 'edit' | 'saved' | 'notifications' | 'stores' | 'profile' | 'settings' | 'inbox' | 'account' | 'login' | 'signup' | 'business-hub' | 'business-setup' | 'store-view' | 'seller' | 'onboarding'
 
 export type Listing = {
   id: number
@@ -24,6 +24,9 @@ export type Profile = {
   email?: string
   phone_number?: string
   avatar_url?: string
+  pending_otp?: string
+  onboarding_choice?: string
+  phone_verified?: boolean
 }
 
 export type CatalogItem = {
@@ -65,7 +68,8 @@ export type MessageRecord = {
 
 export type StoreReview = {
   id: string
-  storeId: string
+  storeId?: string | null
+  targetUserId?: string | null
   reviewerId: string
   reviewerName: string
   rating: number

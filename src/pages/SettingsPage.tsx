@@ -19,6 +19,7 @@ type SettingsPageProps = {
     searchHistory: string[]
     clearSearchHistory: () => void
     userEmail?: string
+    onDeleteAccount?: () => void
 }
 
 export function SettingsPage({
@@ -38,6 +39,7 @@ export function SettingsPage({
     searchHistory,
     clearSearchHistory,
     userEmail = 'user@marketspace.zm',
+    onDeleteAccount,
 }: SettingsPageProps) {
     const { category = 'account' } = useParams<{ category?: string }>()
     const navigate = useNavigate()
@@ -236,7 +238,7 @@ export function SettingsPage({
                                     className="primary-btn compact-btn"
                                     onClick={() => {
                                         if (window.confirm('Are you sure you want to PERMANENTLY delete your account? All your listings, store data, and chat history will be erased. This action cannot be undone.')) {
-                                            alert('Account deletion request submitted.')
+                                            if (onDeleteAccount) onDeleteAccount()
                                         }
                                     }}
                                     style={{ background: '#dc2626', color: 'white', border: 'none' }}
