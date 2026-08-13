@@ -59,7 +59,6 @@ export function AppContent() {
     authEmail,
     authPassword,
     authUsername,
-    searchQuery,
     activeCategories,
     priceRange,
     distanceFilter,
@@ -85,7 +84,6 @@ export function AppContent() {
     setAuthEmail,
     setAuthPassword,
     setAuthUsername,
-    setSearchQuery,
     toggleCategory,
     setPriceRange,
     setDistanceFilter,
@@ -187,6 +185,8 @@ export function AppContent() {
         onListingKindChange={setListingKindFilter}
         notifications={app.notifications}
         onMarkAllRead={app.markAllRead}
+        savedCount={savedIds.length}
+        unreadChatCount={app.chatThreads.filter((t) => t.unread).length}
       >
         {message ? <div className="status-banner">{message}</div> : null}
         <Routes>
@@ -200,10 +200,7 @@ export function AppContent() {
                 openListing={openListing}
                 toggleSave={toggleSave}
                 distanceFilter={distanceFilter}
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
                 toggleCategory={toggleCategory}
-                activeCategories={activeCategories}
               />
             }
           />
@@ -219,6 +216,8 @@ export function AppContent() {
                 toggleSave={toggleSave}
                 openEditListing={openEditListing}
                 allBusinesses={allBusinesses}
+                handleRenewListing={handleRenewListing}
+                handleDeleteListing={handleDeleteListing}
               />
             }
           />
@@ -577,7 +576,7 @@ function ProfileTabRoute({ session, ...props }: any) {
   )
 }
 
-function ListingDetailRoute({ listings, loading, session, navigate, handleStartChat, toggleSave, openEditListing, allBusinesses }: { listings: Listing[]; loading: boolean; session: any; navigate: any; handleStartChat: any; toggleSave: any; openEditListing: any; allBusinesses: any }) {
+function ListingDetailRoute({ listings, loading, session, navigate, handleStartChat, toggleSave, openEditListing, allBusinesses, handleRenewListing, handleDeleteListing }: { listings: Listing[]; loading: boolean; session: any; navigate: any; handleStartChat: any; toggleSave: any; openEditListing: any; allBusinesses: any; handleRenewListing: any; handleDeleteListing: any }) {
   const { id } = useParams()
   const listing = listings.find((l: Listing) => String(l.id) === id)
   if (!listing) {
@@ -596,6 +595,8 @@ function ListingDetailRoute({ listings, loading, session, navigate, handleStartC
       onEditListing={openEditListing}
       allBusinesses={allBusinesses}
       onVisitStore={(userId) => navigate(`/store/${userId}`)}
+      onRenewListing={handleRenewListing}
+      onDeleteListing={handleDeleteListing}
     />
   )
 }

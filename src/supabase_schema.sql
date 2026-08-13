@@ -47,10 +47,10 @@ CREATE TABLE IF NOT EXISTS public.listings (
     status TEXT DEFAULT 'Available',
     listing_type TEXT DEFAULT 'item',
     condition TEXT DEFAULT 'Used - Good',
-    delivery_option TEXT DEFAULT 'Meetup',
     images TEXT[] DEFAULT '{}',
     sponsored BOOLEAN DEFAULT false,
     available_colors TEXT[] DEFAULT '{}',
+    last_renewed_at TIMESTAMPTZ DEFAULT NOW(),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

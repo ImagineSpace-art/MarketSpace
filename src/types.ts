@@ -16,6 +16,8 @@ export type Listing = {
   images?: string[]
   sponsored?: boolean
   available_colors?: string[]
+  last_renewed_at?: string
+  created_at?: string
 }
 
 export type Profile = {

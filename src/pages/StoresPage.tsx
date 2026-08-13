@@ -13,7 +13,7 @@ type StoresPageProps = {
 
 export function StoresPage({ stores, allBusinesses, onVisitShop, onOpenProfile, listingKindFilter, listings }: StoresPageProps) {
   const activeShops = Object.values(allBusinesses)
-  const [searchQuery, setSearchQuery] = useState('')
+  const searchQuery = ''
   const [currentSlide, setCurrentSlide] = useState(0)
 
   const slides = [
@@ -72,62 +72,44 @@ export function StoresPage({ stores, allBusinesses, onVisitShop, onOpenProfile, 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%', boxSizing: 'border-box' }}>
-      {/* Carousel Banner Slider */}
-      <section className="hero-slider-section" style={{ position: 'relative', overflow: 'hidden', height: '280px', borderRadius: '12px', border: '1px solid var(--border)', width: '100%', boxSizing: 'border-box' }}>
-        {slides.map((slide, idx) => (
-          <div
-            key={idx}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              backgroundImage: `url(${slide})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              opacity: idx === currentSlide ? 1 : 0,
-              transition: 'opacity 1s ease-in-out',
-            }}
-          />
-        ))}
-        {/* Dark Tint Overlay */}
-        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(15, 23, 42, 0.45)' }} />
-
-        {/* Small Search Bar overlay */}
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: '90%',
-          maxWidth: '420px',
-          zIndex: 10,
-          textAlign: 'center'
-        }}>
-          <h2 style={{ color: '#ffffff', textShadow: '0 2px 4px rgba(0,0,0,0.5)', marginBottom: '16px', fontSize: '1.6rem', fontWeight: 700, fontFamily: 'sans-serif' }}>
-            Find Local Stores on MarketSpace
-          </h2>
-          <div style={{ position: 'relative' }}>
-            <span className="material-icons" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }}>search</span>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search stores, categories, and locations..."
+      {/* Sliding Store Hero Banner */}
+      <section style={{ position: 'relative', overflow: 'hidden', height: '240px', borderRadius: '16px', border: '1px solid var(--border)', width: '100%', boxSizing: 'border-box', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.25)' }}>
+        <div
+          style={{
+            display: 'flex',
+            width: `${slides.length * 100}%`,
+            transform: `translateX(-${(currentSlide * 100) / slides.length}%)`,
+            transition: 'transform 0.6s cubic-bezier(0.25, 1, 0.5, 1)',
+            height: '100%'
+          }}
+        >
+          {slides.map((slide, idx) => (
+            <div
+              key={idx}
               style={{
-                width: '100%',
-                padding: '12px 16px 12px 48px',
-                borderRadius: '24px',
-                border: 'none',
-                background: 'var(--surface, #ffffff)',
-                color: 'var(--text, #1c1e21)',
-                fontSize: '0.95rem',
-                outline: 'none',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                width: `${100 / slides.length}%`,
+                position: 'relative',
+                height: '100%',
+                backgroundImage: `url(${slide})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                display: 'flex',
+                alignItems: 'center',
+                padding: '0 40px',
+                boxSizing: 'border-box'
               }}
-            />
-          </div>
+            >
+              <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(15, 23, 42, 0.55)' }} />
+              <div style={{ position: 'relative', zIndex: 5, color: '#ffffff' }}>
+                <span style={{ display: 'inline-block', padding: '4px 12px', backgroundColor: '#2563eb', color: '#ffffff', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>
+                  Zambian Merchant Stores
+                </span>
+                <h2 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+                  Discover Verified Shops & Local Businesses
+                </h2>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 

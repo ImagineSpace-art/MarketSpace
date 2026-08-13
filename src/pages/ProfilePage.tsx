@@ -98,7 +98,6 @@ export function ProfilePage({
     profile,
     userEmail,
     myListings,
-    listings,
     savedListings,
     savedIds,
     businessProfile,
@@ -124,6 +123,7 @@ export function ProfilePage({
     const navigate = useNavigate()
 
     const [storeTab, setStoreTab] = useState<'analytics' | 'catalog' | 'ads' | 'social'>('analytics')
+    const [sellerTab, setSellerTab] = useState<'active' | 'sold' | 'drafts'>('active')
 
     // Catalog Item creation states
     const [catName, setCatName] = useState('')
@@ -732,7 +732,7 @@ export function ProfilePage({
                             <h3>Overview</h3>
                             <div className="stats-grid">
                                 <div className="stat-card">
-                                    <span className="stat-label">Total Listings</span>
+                                    <span className="stat-label">Your Listings</span>
                                     <span className="stat-value">{myListings.length}</span>
                                 </div>
                                 <div className="stat-card">
@@ -740,49 +740,79 @@ export function ProfilePage({
                                     <span className="stat-value">{savedListings.length}</span>
                                 </div>
                                 <div className="stat-card">
-                                    <span className="stat-label">Marketplace Total</span>
-                                    <span className="stat-value">{listings.length}</span>
+                                    <span className="stat-label">Unread Alerts</span>
+                                    <span className="stat-value">{notifications.filter(n => n.unread).length}</span>
                                 </div>
                             </div>
                         </section>
 
                         {/* YOUR LISTINGS SECTION */}
                         <section className="dashboard-section">
-                            <div className="section-header-flex">
-                                <h3>Your listings</h3>
-                                <div className="listing-filters">
-                                    <button className="filter-pill active">Active & pending</button>
-                                    <button className="filter-pill">Sold out</button>
-                                    <button className="filter-pill">Drafts</button>
+                            <div className="section-header-flex" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+                                <h3 style={{ margin: 0 }}>Your listings</h3>
+                                <div className="listing-filters" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                    <button
+                                        type="button"
+                                        className={`filter-pill ${sellerTab === 'active' ? 'active' : ''}`}
+                                        onClick={() => setSellerTab('active')}
+                                    >
+                                        Active & pending ({myListings.filter(l => l.status !== 'Sold' && l.status !== 'Draft' && l.status !== 'Drafts').length})
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`filter-pill ${sellerTab === 'sold' ? 'active' : ''}`}
+                                        onClick={() => setSellerTab('sold')}
+                                    >
+                                        Sold out ({myListings.filter(l => l.status === 'Sold').length})
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`filter-pill ${sellerTab === 'drafts' ? 'active' : ''}`}
+                                        onClick={() => setSellerTab('drafts')}
+                                    >
+                                        Drafts ({myListings.filter(l => l.status === 'Draft' || l.status === 'Drafts').length})
+                                    </button>
                                 </div>
                             </div>
 
-                            <div className="dashboard-listing-grid">
-                                {myListings.length === 0 ? (
-                                    <p className="empty-state">No listings yet. Create your first one.</p>
+                            <div className="dashboard-listing-grid" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                                {myListings.filter((l) => {
+                                    if (sellerTab === 'sold') return l.status === 'Sold'
+                                    if (sellerTab === 'drafts') return l.status === 'Draft' || l.status === 'Drafts'
+                                    return l.status !== 'Sold' && l.status !== 'Draft' && l.status !== 'Drafts'
+                                }).length === 0 ? (
+                                    <p className="empty-state" style={{ color: 'var(--text-secondary)', padding: '16px', textAlign: 'center', background: 'var(--panel)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                                        No {sellerTab} listings found.
+                                    </p>
                                 ) : (
-                                    myListings.map((listing) => (
-                                        <div key={listing.id} className="dashboard-listing-row">
-                                            <div className="listing-row-item">
-                                                <ListingCard
-                                                    listing={listing}
-                                                    saved={savedIds.includes(String(listing.id))}
-                                                    onOpen={onOpenListing}
-                                                    onToggleSave={onToggleSave}
-                                                />
+                                    myListings
+                                        .filter((l) => {
+                                            if (sellerTab === 'sold') return l.status === 'Sold'
+                                            if (sellerTab === 'drafts') return l.status === 'Draft' || l.status === 'Drafts'
+                                            return l.status !== 'Sold' && l.status !== 'Draft' && l.status !== 'Drafts'
+                                        })
+                                        .map((listing) => (
+                                            <div key={listing.id} className="dashboard-listing-row">
+                                                <div className="listing-row-item">
+                                                    <ListingCard
+                                                        listing={listing}
+                                                        saved={savedIds.includes(String(listing.id))}
+                                                        onOpen={onOpenListing}
+                                                        onToggleSave={onToggleSave}
+                                                    />
+                                                </div>
+                                                <div className="listing-row-actions">
+                                                    <button className="secondary-btn compact-btn" onClick={() => onEditListing(listing)}>Edit</button>
+                                                    <button className="secondary-btn compact-btn" onClick={() => onUpdateStatus(listing.id, listing.status === 'Sold' ? 'Available' : 'Sold')}>
+                                                        {listing.status === 'Sold' ? 'Restock' : 'Mark Sold'}
+                                                    </button>
+                                                    <button className="secondary-btn compact-btn" onClick={() => onRenewListing(listing.id)}>Renew</button>
+                                                    <button className="ghost-btn compact-btn delete-btn" onClick={() => onDeleteListing(listing.id)}>
+                                                        <span className="material-icons">delete</span>
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div className="listing-row-actions">
-                                                <button className="secondary-btn compact-btn" onClick={() => onEditListing(listing)}>Edit</button>
-                                                <button className="secondary-btn compact-btn" onClick={() => onUpdateStatus(listing.id, listing.status === 'Sold' ? 'Available' : 'Sold')}>
-                                                    {listing.status === 'Sold' ? 'Restock' : 'Mark Sold'}
-                                                </button>
-                                                <button className="secondary-btn compact-btn" onClick={() => onRenewListing(listing.id)}>Renew</button>
-                                                <button className="ghost-btn compact-btn delete-btn" onClick={() => onDeleteListing(listing.id)}>
-                                                    <span className="material-icons">delete</span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))
+                                        ))
                                 )}
                             </div>
                         </section>

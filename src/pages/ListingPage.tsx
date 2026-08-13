@@ -1,7 +1,7 @@
 import { useState, type FormEvent, type ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
-import { CATEGORY_OPTIONS, CONDITION_OPTIONS, DELIVERY_OPTIONS } from '../features/marketplace/constants'
+import { CATEGORY_OPTIONS, CONDITION_OPTIONS } from '../features/marketplace/constants'
 import type { Listing } from '../types'
 import { formatZMWPrice } from '../utils/formatPrice'
 import { uploadImageToSupabase } from '../features/marketplace/ImageUploader'
@@ -15,6 +15,8 @@ type ListingDetailPageProps = {
   onEditListing: (listing: Listing) => void
   allBusinesses: Record<string, any>
   onVisitStore: (userId: string) => void
+  onRenewListing?: (listingId: number) => void
+  onDeleteListing?: (listingId: number) => void
 }
 
 export function ListingDetailPage({
@@ -25,7 +27,9 @@ export function ListingDetailPage({
   onToggleSave,
   onEditListing,
   allBusinesses,
-  onVisitStore
+  onVisitStore,
+  onRenewListing,
+  onDeleteListing
 }: ListingDetailPageProps) {
   const navigate = useNavigate()
   const [selectedColors, setSelectedColors] = useState<string[]>([])
@@ -33,6 +37,7 @@ export function ListingDetailPage({
   const [deliveryOption, setDeliveryOption] = useState(selectedListing?.delivery_option || '')
   const [phone, setPhone] = useState('')
   const [locationAddress, setLocationAddress] = useState('')
+  const [offerAmount, setOfferAmount] = useState('')
   const [copied, setCopied] = useState(false)
   const [activeImageIdx, setActiveImageIdx] = useState(0)
 
@@ -54,39 +59,58 @@ export function ListingDetailPage({
     )
   }
 
-  const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  const handleBuyNow = () => {
-    const buyPayload = {
-      colors: selectedColors,
-      quantity,
-      deliveryOption,
-      phone,
-      location: locationAddress,
-      isService: selectedListing.listing_type === 'service'
-    }
-    const customMessage = `[ORDER_CARD]${JSON.stringify(buyPayload)}`
-    onMessageSeller(customMessage)
-  }
-
   const isService = selectedListing.listing_type === 'service'
   const deliveryOptionsList = isService
-    ? ["Online / Remote", "At Buyer's Location", "At Seller's Location", "Flexible / Negotiable"]
-    : ["Meetup", "Shipping", "Pickup", "Negotiable"]
+    ? ["Online/Remote", "At Buyer's Location", "At Seller's Location", "Flexible"]
+    : ["In-Person Meetup", "Local Delivery", "Courier Shipping", "Pickup Available"]
+
+  const handleBuyNow = () => {
+    const selectedColsText = selectedColors.length > 0 ? selectedColors.join(', ') : 'Default'
+    const orderDetails = `[ORDER_CARD]{"listingId":${selectedListing.id},"title":"${selectedListing.title.replace(/"/g, '\\"')
+      }","price":${selectedListing.price},"quantity":${quantity},"deliveryOption":"${deliveryOption || 'Flexible'
+      }","phone":"${phone}","location":"${locationAddress}","colors":"${selectedColsText}","totalPrice":${selectedListing.price * quantity}}`
+
+    onMessageSeller(orderDetails)
+  }
+
+  const handleMakeOffer = () => {
+    if (!offerAmount || Number(offerAmount) <= 0) {
+      alert('Please enter a valid offer amount in ZMW.')
+      return
+    }
+    const offerMsg = `[OFFER] Proposed Offer: ZMW ${offerAmount} for "${selectedListing.title}" (Original: ZMW ${selectedListing.price}) | Phone: ${phone || 'Not provided'} | Location: ${locationAddress || selectedListing.location}`
+    onMessageSeller(offerMsg)
+  }
+
+  const handleShare = async () => {
+    const url = window.location.href
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: selectedListing.title,
+          text: `Check out ${selectedListing.title} on MarketSpace!`,
+          url,
+        })
+        return
+      } catch {
+        // Fallback to clipboard
+      }
+    }
+    await navigator.clipboard.writeText(url)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2500)
+  }
+
+  const lastRenewedTime = new Date(selectedListing.last_renewed_at || selectedListing.created_at || Date.now()).getTime()
+  const daysSinceRenewed = Math.floor((Date.now() - lastRenewedTime) / (1000 * 60 * 60 * 24))
+  const daysRemaining = Math.max(0, 7 - daysSinceRenewed)
 
   return (
-    <section className="section-card detail-card" style={{ background: 'transparent', border: 'none', padding: 0, boxShadow: 'none' }}>
-      <div className="section-header" style={{ marginBottom: '20px', background: 'var(--surface)', padding: '16px 20px', borderRadius: '12px', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <p className="eyebrow" style={{ margin: 0 }}>Listing details</p>
-          <h2 style={{ margin: '4px 0 0 0', fontSize: '1.4rem' }}>{selectedListing.title}</h2>
-        </div>
-        <button className="ghost-btn" onClick={onBack}>Back</button>
-      </div>
+    <section className="section-card detail-card" style={{ maxWidth: '1100px', margin: '0 auto' }}>
+      <button className="ghost-btn" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '4px' }} onClick={onBack}>
+        <span className="material-icons">arrow_back</span>
+        Back to feed
+      </button>
 
       <div className="listing-detail-container">
         {/* Left Column: Media, Details, Metadata */}
@@ -250,8 +274,8 @@ export function ListingDetailPage({
 
           {/* Color Selection (Multi-select) */}
           {selectedListing.available_colors && selectedListing.available_colors.length > 0 && (
-            <label>
-              <span>Select Color(s)</span>
+            <label style={{ display: 'block' }}>
+              <span style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text)' }}>Available Color Options</span>
               <div style={{ display: 'flex', gap: '10px', marginTop: '6px', flexWrap: 'wrap' }}>
                 {selectedListing.available_colors.map((color) => {
                   const isChosen = selectedColors.includes(color)
@@ -281,8 +305,8 @@ export function ListingDetailPage({
           )}
 
           {/* Quantity Selector */}
-          <label>
-            <span>Quantity</span>
+          <label style={{ display: 'block' }}>
+            <span style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text)' }}>Quantity</span>
             <select value={quantity} onChange={(e) => setQuantity(Number(e.target.value))}>
               {[...Array(10)].map((_, i) => (
                 <option key={i + 1} value={i + 1}>
@@ -293,8 +317,8 @@ export function ListingDetailPage({
           </label>
 
           {/* Delivery Option Selector */}
-          <label>
-            <span>Delivery Option</span>
+          <label style={{ display: 'block' }}>
+            <span style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text)' }}>Delivery Option</span>
             <select value={deliveryOption} onChange={(e) => setDeliveryOption(e.target.value)}>
               <option value="">Select Option</option>
               {deliveryOptionsList.map((opt) => (
@@ -305,9 +329,31 @@ export function ListingDetailPage({
             </select>
           </label>
 
+          {/* Make an Offer Section */}
+          <div style={{ padding: '12px', background: 'var(--panel)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+            <span style={{ display: 'block', fontSize: '0.86rem', fontWeight: 600, color: 'var(--text)', marginBottom: '6px' }}>Make an Offer (ZMW)</span>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input
+                type="number"
+                placeholder={`e.g. ${Math.round(selectedListing.price * 0.9)}`}
+                value={offerAmount}
+                onChange={(e) => setOfferAmount(e.target.value)}
+                style={{ flex: 1, padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.9rem' }}
+              />
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={handleMakeOffer}
+                style={{ padding: '10px 14px', fontSize: '0.86rem', fontWeight: 600, background: '#2563eb', color: '#fff', border: 'none' }}
+              >
+                Send Offer
+              </button>
+            </div>
+          </div>
+
           {/* Mobile Phone Input */}
-          <label>
-            <span>Your Mobile Number</span>
+          <label style={{ display: 'block' }}>
+            <span style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text)' }}>Your Mobile Number</span>
             <input
               type="tel"
               placeholder="e.g. +260977123456"
@@ -317,8 +363,8 @@ export function ListingDetailPage({
           </label>
 
           {/* Buyer Location Input */}
-          <label>
-            <span>Your Delivery / Service Location</span>
+          <label style={{ display: 'block' }}>
+            <span style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text)' }}>Your Delivery / Service Location</span>
             <input
               type="text"
               placeholder="e.g. Cairo Road Branch"
@@ -338,7 +384,7 @@ export function ListingDetailPage({
                 Wishlist
               </button>
               <button className="secondary-btn" onClick={handleShare} style={{ padding: '10px' }}>
-                {copied ? 'Copied!' : 'Share'}
+                {copied ? 'Link Copied!' : 'Share Listing'}
               </button>
             </div>
 
@@ -367,11 +413,55 @@ export function ListingDetailPage({
               )
             )}
 
-            {/* Owner Edit Actions */}
+            {/* Owner Management Panel: Renew, Edit, Delete */}
             {session?.user?.id === selectedListing.user_id && (
-              <button className="secondary-btn" style={{ width: '100%', borderColor: '#f59e0b', color: '#d97706', padding: '10px' }} onClick={() => onEditListing(selectedListing)}>
-                Edit Listing
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px', padding: '12px', background: 'var(--panel)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Seller Management</span>
+
+                <button
+                  type="button"
+                  className="primary-btn"
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    backgroundColor: daysRemaining === 0 ? '#ef4444' : '#10b981',
+                    color: '#ffffff',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                  onClick={() => onRenewListing?.(selectedListing.id)}
+                >
+                  <span className="material-icons" style={{ fontSize: '18px' }}>autorenew</span>
+                  {daysRemaining === 0 ? 'Expired — Renew Listing Now!' : `Renew Listing (${daysRemaining}d left)`}
+                </button>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <button
+                    type="button"
+                    className="secondary-btn"
+                    style={{ borderColor: '#f59e0b', color: '#d97706', padding: '8px', fontSize: '0.85rem' }}
+                    onClick={() => onEditListing(selectedListing)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary-btn"
+                    style={{ borderColor: '#ef4444', color: '#ef4444', padding: '8px', fontSize: '0.85rem' }}
+                    onClick={() => {
+                      if (window.confirm('Are you sure you want to delete this listing permanently?')) {
+                        onDeleteListing?.(selectedListing.id)
+                        onBack()
+                      }
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </div>
@@ -449,6 +539,24 @@ export function ListingFormPage({
   const PRESET_COLORS = ['#000000', '#ffffff', '#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#6b7280']
 
   const [isUploading, setIsUploading] = useState(false)
+  const [sellerPhone, setSellerPhone] = useState('')
+  const [stockType, setStockType] = useState<'single' | 'in_stock'>('single')
+  const [stockQuantity, setStockQuantity] = useState<number>(1)
+  const [selectedDeliveryMethods, setSelectedDeliveryMethods] = useState<string[]>(() => {
+    return deliveryOption ? deliveryOption.split(', ') : ['Meetup']
+  })
+
+  const toggleDeliveryMethod = (method: string) => {
+    let updated: string[]
+    if (selectedDeliveryMethods.includes(method)) {
+      updated = selectedDeliveryMethods.filter((m) => m !== method)
+      if (updated.length === 0) updated = [method] // Keep at least one
+    } else {
+      updated = [...selectedDeliveryMethods, method]
+    }
+    setSelectedDeliveryMethods(updated)
+    onDeliveryOptionChange(updated.join(', '))
+  }
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     setErrorText('')
@@ -646,7 +754,7 @@ export function ListingFormPage({
               status: status || 'Available',
               listing_type: listingKind,
               condition: listingKind === 'service' ? 'New' : condition,
-              delivery_option: deliveryOption,
+              delivery_option: selectedDeliveryMethods.join(', '),
               images: uploadedImages,
               available_colors: listingKind === 'service' ? [] : availableColors,
               seller_name: 'You (Preview)',
@@ -662,10 +770,12 @@ export function ListingFormPage({
           />
         </div>
       ) : (
-        <form onSubmit={onSubmit} className="form-stack">
+        <form onSubmit={onSubmit} className="form-stack" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
           {/* IMAGE UPLOAD CONTAINER */}
-          <label>
-            <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>Photos ({uploadedImages.length})</span>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text)' }}>
+              Listing Photos ({uploadedImages.length})
+            </label>
             <div className="image-upload-zone" style={{ marginTop: '4px' }}>
               <input type="file" accept="image/*" multiple onChange={handleFileChange} style={{ display: 'none' }} id="listing-file-input" />
               <label htmlFor="listing-file-input" style={{ cursor: 'pointer' }}>
@@ -683,17 +793,123 @@ export function ListingFormPage({
                 </div>
               ))}
             </div>
-          </label>
+          </div>
 
-          <input value={title} onChange={(event) => onTitleChange(event.target.value)} placeholder="Title" required />
-          <textarea value={description} onChange={(event) => onDescriptionChange(event.target.value)} placeholder="Description" rows={4} />
+          {/* TITLE INPUT */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text)' }}>
+              Listing Title <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            <input
+              value={title}
+              onChange={(event) => onTitleChange(event.target.value)}
+              placeholder="e.g. iPhone 15 Pro Max 256GB - Like New"
+              required
+              style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.92rem' }}
+            />
+          </div>
 
-          <input value={price} onChange={(event) => onPriceChange(event.target.value)} placeholder={listingKind === 'service' ? "Price (e.g. 150 or 50/hour)" : "Price"} required />
+          {/* DESCRIPTION TEXTAREA */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text)' }}>
+              Detailed Description
+            </label>
+            <textarea
+              value={description}
+              onChange={(event) => onDescriptionChange(event.target.value)}
+              placeholder="Describe your item or service, key features, condition details, warranty, etc."
+              rows={4}
+              style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.92rem', fontFamily: 'inherit' }}
+            />
+          </div>
 
-          {/* COLOR PICKER SECTION (Hiden for Services) */}
+          {/* PRICE INPUT */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text)' }}>
+              Price (ZMW) <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            <input
+              value={price}
+              onChange={(event) => onPriceChange(event.target.value)}
+              placeholder={listingKind === 'service' ? "Price (e.g. 150 or 50/hour)" : "e.g. 4500"}
+              required
+              style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.92rem' }}
+            />
+          </div>
+
+          {/* SELLER PHONE NUMBER INPUT */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text)' }}>
+              Seller Contact / WhatsApp Number <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            <input
+              type="tel"
+              value={sellerPhone}
+              onChange={(e) => setSellerPhone(e.target.value)}
+              placeholder="e.g. +260 97 1234567"
+              required
+              style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.92rem' }}
+            />
+          </div>
+
+          {/* STOCK vs SINGLE ITEM TOGGLE (ITEMS ONLY) */}
           {listingKind !== 'service' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '8px 0' }}>
-              <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text)' }}>Available Colors</span>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text)' }}>
+                Stock Availability / Quantity Type
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => { setStockType('single'); setStockQuantity(1); }}
+                  style={{
+                    padding: '12px',
+                    borderRadius: '8px',
+                    border: stockType === 'single' ? '2px solid #2563eb' : '1px solid var(--border)',
+                    background: stockType === 'single' ? 'rgba(37, 99, 235, 0.1)' : 'var(--surface)',
+                    color: 'var(--text)',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Single Item (1 Available)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStockType('in_stock')}
+                  style={{
+                    padding: '12px',
+                    borderRadius: '8px',
+                    border: stockType === 'in_stock' ? '2px solid #2563eb' : '1px solid var(--border)',
+                    background: stockType === 'in_stock' ? 'rgba(37, 99, 235, 0.1)' : 'var(--surface)',
+                    color: 'var(--text)',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  In Stock / Multiple Units
+                </button>
+              </div>
+              {stockType === 'in_stock' && (
+                <div style={{ marginTop: '6px' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Units in stock</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={stockQuantity}
+                    onChange={(e) => setStockQuantity(Number(e.target.value))}
+                    placeholder="Enter stock quantity"
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.9rem' }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* COLOR PICKER SECTION (Hidden for Services) */}
+          {listingKind !== 'service' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, color: 'var(--text)' }}>Available Colors</label>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                 {PRESET_COLORS.map((color) => (
                   <button
@@ -764,41 +980,109 @@ export function ListingFormPage({
             </div>
           )}
 
-          <select value={category} onChange={(event) => onCategoryChange(event.target.value)}>
-            {CATEGORY_OPTIONS.filter((item) => item !== 'All').map((item) => <option key={item}>{item}</option>)}
-          </select>
-          <input value={location} onChange={(event) => onLocationChange(event.target.value)} placeholder="Location" required />
+          {/* CATEGORY SELECT */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text)' }}>
+              Category <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            <select
+              value={category}
+              onChange={(event) => onCategoryChange(event.target.value)}
+              style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.92rem' }}
+            >
+              {CATEGORY_OPTIONS.filter((item) => item !== 'All').map((item) => <option key={item}>{item}</option>)}
+            </select>
+          </div>
 
+          {/* LOCATION INPUT */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text)' }}>
+              Location / City <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            <input
+              value={location}
+              onChange={(event) => onLocationChange(event.target.value)}
+              placeholder="e.g. Lusaka, Kitwe, Ndola"
+              required
+              style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.92rem' }}
+            />
+          </div>
+
+          {/* STATUS SELECT (EDIT MODE ONLY) */}
           {mode === 'edit' && (
-            <select value={status} onChange={(event) => onStatusChange(event.target.value)}>
-              <option>Available</option>
-              <option>Reserved</option>
-              <option>Sold</option>
-            </select>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text)' }}>
+                Listing Status
+              </label>
+              <select
+                value={status}
+                onChange={(event) => onStatusChange(event.target.value)}
+                style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.92rem' }}
+              >
+                <option>Available</option>
+                <option>Reserved</option>
+                <option>Sold</option>
+              </select>
+            </div>
           )}
 
-          {/* Condition Select (Hidden for Services) */}
+          {/* CONDITION SELECT (Hidden for Services) */}
           {listingKind !== 'service' && (
-            <select value={condition} onChange={(event) => onConditionChange(event.target.value)}>
-              {CONDITION_OPTIONS.map((item) => <option key={item}>{item}</option>)}
-            </select>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text)' }}>
+                Item Condition
+              </label>
+              <select
+                value={condition}
+                onChange={(event) => onConditionChange(event.target.value)}
+                style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.92rem' }}
+              >
+                {CONDITION_OPTIONS.map((item) => <option key={item}>{item}</option>)}
+              </select>
+            </div>
           )}
 
-          {/* Delivery Option select */}
-          {listingKind === 'service' ? (
-            <select value={deliveryOption} onChange={(event) => onDeliveryOptionChange(event.target.value)}>
-              <option value="Online/Remote">Online / Remote</option>
-              <option value="At Buyer's Location">At Buyer's Location</option>
-              <option value="At Seller's Location">At Seller's Location</option>
-              <option value="Flexible">Flexible / Negotiable</option>
-            </select>
-          ) : (
-            <select value={deliveryOption} onChange={(event) => onDeliveryOptionChange(event.target.value)}>
-              {DELIVERY_OPTIONS.map((item) => <option key={item}>{item}</option>)}
-            </select>
-          )}
+          {/* MULTI-SELECT DELIVERY & MEETUP CHECKBOXES */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text)' }}>
+              Delivery & Meetup Options (Select all that apply)
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              {(listingKind === 'service'
+                ? ["Online / Remote", "At Buyer's Location", "At Seller's Location", "Flexible / Negotiable"]
+                : ["In-Person Meetup", "Local Delivery", "Courier Shipping", "Pickup Available"]
+              ).map((opt) => {
+                const isChecked = selectedDeliveryMethods.includes(opt)
+                return (
+                  <label
+                    key={opt}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: isChecked ? '1px solid #2563eb' : '1px solid var(--border)',
+                      background: isChecked ? 'rgba(37, 99, 235, 0.08)' : 'var(--surface)',
+                      cursor: 'pointer',
+                      fontSize: '0.88rem',
+                      color: 'var(--text)',
+                      fontWeight: isChecked ? 600 : 400
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => toggleDeliveryMethod(opt)}
+                    />
+                    {opt}
+                  </label>
+                )
+              })}
+            </div>
+          </div>
 
-          <button className="primary-btn" type="submit">{mode === 'create' ? 'Publish listing' : 'Save changes'}</button>
+          <button className="primary-btn" type="submit" style={{ marginTop: '8px' }}>{mode === 'create' ? 'Publish listing' : 'Save changes'}</button>
         </form>
       )}
     </section>

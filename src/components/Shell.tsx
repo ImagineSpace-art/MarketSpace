@@ -1,5 +1,5 @@
 import { useState, useRef, type ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { CATEGORY_OPTIONS } from '../features/marketplace/constants'
 import type { Profile, NotificationItem } from '../types'
@@ -22,6 +22,8 @@ type ShellProps = {
   onListingKindChange: (value: 'all' | 'item' | 'service') => void
   notifications?: NotificationItem[]
   onMarkAllRead?: () => void
+  savedCount?: number
+  unreadChatCount?: number
 }
 
 const MEGA_CATEGORIES: Record<string, { label: string; subcats: string[]; featured: string[]; bannerTitle: string; bannerGradient: string }> = {
@@ -87,6 +89,8 @@ export function Shell({
   onListingKindChange,
   notifications = [],
   onMarkAllRead,
+  savedCount = 0,
+  unreadChatCount = 0,
 }: ShellProps) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
@@ -95,11 +99,21 @@ export function Shell({
   const [searchQuery, setSearchQuery] = useState('')
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const navigate = useNavigate()
+  const location = useLocation()
+
+  const isFilterablePage = location.pathname === '/' || location.pathname === '/stores'
 
   const userNotifications = notifications.filter(
     (n) => !n.user_id || n.user_id === 'all' || (session?.user?.id && n.user_id === session.user.id)
   )
   const unreadCount = userNotifications.filter((n) => n.unread).length
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchQuery.trim()) {
+      navigate(`/?search=${encodeURIComponent(searchQuery.trim())}`)
+    }
+  }
 
   const handleMouseEnterNotif = () => {
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current)
@@ -112,20 +126,8 @@ export function Shell({
     }, 250)
   }
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (searchQuery.trim()) {
-      navigate(`/?search=${encodeURIComponent(searchQuery.trim())}`)
-    }
-  }
-
   return (
     <div className="app-shell">
-      {/* 1. Top Announcement Bar */}
-      <div className="site-promo-bar">
-        <span>Ship faster with tools, frameworks & content for every workflow — 50% off.</span>
-      </div>
-
       {/* 2. Top Header Navigation Bar */}
       <header className="site-header-bar" onMouseLeave={() => setHoveredCategory(null)}>
         {/* Row 1: Brand Logo, Integrated Search, Action Icons */}
@@ -137,7 +139,10 @@ export function Shell({
             </Link>
           </div>
 
-          <form onSubmit={handleSearchSubmit} className="header-search-container">
+          <form
+            className="header-search-container"
+            onSubmit={handleSearchSubmit}
+          >
             <input
               type="text"
               placeholder="Search for items, categories, or stores"
@@ -151,15 +156,17 @@ export function Shell({
           </form>
 
           <div className="header-actions-group">
-            <button
-              className={`filter-toggle-btn ${isDrawerOpen ? 'active' : ''}`}
-              onClick={() => setIsDrawerOpen(!isDrawerOpen)}
-              title="Toggle Filters & Navigation Sidebar"
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', border: '1px solid #333', background: 'none', color: '#fff', padding: '6px 12px', borderRadius: '4px' }}
-            >
-              <span className="material-icons" style={{ fontSize: '18px' }}>tune</span>
-              <span className="desktop-only" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Filters</span>
-            </button>
+            {isFilterablePage && (
+              <button
+                className={`filter-toggle-btn ${isDrawerOpen ? 'active' : ''}`}
+                onClick={() => setIsDrawerOpen(!isDrawerOpen)}
+                title="Toggle Filters & Navigation Sidebar"
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', border: '1px solid #333', background: 'none', color: '#fff', padding: '6px 12px', borderRadius: '4px' }}
+              >
+                <span className="material-icons" style={{ fontSize: '18px' }}>tune</span>
+                <span className="desktop-only" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Filters</span>
+              </button>
+            )}
 
             {/* Notifications Floating Popover Dropdown */}
             <div
@@ -245,11 +252,53 @@ export function Shell({
               <span className="material-icons">settings</span>
             </Link>
 
-            <Link to="/profile/saved-listings" className="header-icon-link" title="Favorites">
+            <Link to="/profile/saved-listings" className="header-icon-link" title="Favorites" style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
               <span className="material-icons">bookmark_border</span>
+              {savedCount > 0 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '-4px',
+                    right: '-4px',
+                    backgroundColor: '#2563eb',
+                    color: 'white',
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    borderRadius: '50%',
+                    width: '16px',
+                    height: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {savedCount}
+                </span>
+              )}
             </Link>
-            <Link to="/inbox" className="header-icon-link" title="Inbox & Cart">
-              <span className="material-icons">shopping_cart</span>
+            <Link to="/inbox" className="header-icon-link" title="Inbox Messages" style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+              <span className="material-icons">chat_bubble_outline</span>
+              {unreadChatCount > 0 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '-4px',
+                    right: '-4px',
+                    backgroundColor: '#ef4444',
+                    color: 'white',
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    borderRadius: '50%',
+                    width: '16px',
+                    height: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {unreadChatCount}
+                </span>
+              )}
             </Link>
 
             {/* Direct Profile Link */}

@@ -117,13 +117,35 @@ export function MessagesPage({
     return chatThreads.filter((thread) => !thread.isArchived)
   }, [chatCategory, chatThreads])
 
+  const [sidebarWidth, setSidebarWidth] = useState(340)
+  const [isResizing, setIsResizing] = useState(false)
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsResizing(true)
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const newWidth = Math.max(260, Math.min(540, moveEvent.clientX - 20))
+      setSidebarWidth(newWidth)
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+  }
+
   return (
     <div className={`messenger-layout ${activeThread ? 'has-active-thread' : 'no-active-thread'}`}>
       {/* Left Pane: Sidebar */}
-      <aside className="threads-sidebar">
+      <aside className="threads-sidebar" style={{ width: `${sidebarWidth}px`, flexShrink: 0 }}>
         <div className="sidebar-header">
           <h2>Inbox</h2>
-          <div className="filter-chips">
+          <div className="filter-chips" style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
             {chatCategories.map((categoryItem) => (
               <button
                 key={categoryItem}
@@ -207,6 +229,21 @@ export function MessagesPage({
           )}
         </div>
       </aside>
+
+      {/* Draggable Resizer Handle */}
+      <div
+        className="resizer-handle desktop-only"
+        onMouseDown={handleMouseDown}
+        title="Drag to resize inbox sidebar width"
+        style={{
+          width: '6px',
+          cursor: 'col-resize',
+          backgroundColor: isResizing ? '#2563eb' : 'rgba(255, 255, 255, 0.08)',
+          transition: 'background-color 0.2s',
+          zIndex: 10,
+          flexShrink: 0
+        }}
+      />
 
       {/* Right Pane: Conversation Area */}
       {activeThread ? (

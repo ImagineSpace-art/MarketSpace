@@ -2279,24 +2279,45 @@ select {
 
 .dashboard-listing-row {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px;
+    flex-direction: column;
+    padding: 14px;
     border: 1px solid var(--border);
-    border-radius: 8px;
-    gap: 16px;
+    border-radius: 12px;
+    gap: 12px;
     background-color: var(--surface);
+    position: relative;
+}
+
+@media (min-width: 640px) {
+    .dashboard-listing-row {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+    }
 }
 
 .listing-row-item {
     flex: 1;
+    min-width: 0;
 }
 
 .listing-row-actions {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
-    justify-content: flex-end;
+    align-items: center;
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+    margin-top: 4px;
+}
+
+@media (min-width: 640px) {
+    .listing-row-actions {
+        border-top: none;
+        padding-top: 0;
+        margin-top: 0;
+        justify-content: flex-end;
+    }
 }
 
 /* Insights */

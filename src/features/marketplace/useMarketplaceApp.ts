@@ -851,9 +851,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       condition,
       delivery_option: deliveryOption,
       images: uploadedImages,
-      colors: [],
       available_colors: availableColors,
-      color: null,
+      last_renewed_at: new Date().toISOString(),
     })
 
     if (error) {
@@ -1075,6 +1074,16 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       .filter((listing) => {
         const listingPrice = Number(String(listing.price).replace(/[^\d.]/g, ''))
 
+        // 7-day weekly renewal rule: listings older than 7 days without renewal are paused for public visitors
+        const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+        const lastRenewedTime = new Date(listing.last_renewed_at || listing.created_at || Date.now()).getTime()
+        const isExpired = Date.now() - lastRenewedTime > SEVEN_DAYS_MS
+        const isOwner = Boolean(session?.user?.id && listing.user_id === session.user.id)
+
+        if (isExpired && !isOwner) {
+          return false
+        }
+
         const matchesQuery = !normalizedQuery || `${listing.title} ${listing.description}`.toLowerCase().includes(normalizedQuery)
         const matchesCategory = activeCategories.includes('All') || activeCategories.includes(listing.category)
         const matchesPrice = priceRange === 3000 || listingPrice <= priceRange
@@ -1094,14 +1103,14 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         }
 
         if (sortBy === 'Price: Low to High') {
-          return Number(String(a.price).replace(/[^\d.]/g, '')) - Number(String(b.price).replace(/[^\d.]/g, ''))
+          return Number(String(a.price).replace(/[^\d.]/g, '')) - Number(String(a.price).replace(/[^\d.]/g, ''))
         }
         if (sortBy === 'Price: High to Low') {
           return Number(String(b.price).replace(/[^\d.]/g, '')) - Number(String(a.price).replace(/[^\d.]/g, ''))
         }
         return Number(b.id) - Number(a.id)
       })
-  }, [listings, searchQuery, activeCategories, priceRange, showOnlyAvailable, sortBy, allBusinesses, listingKindFilter])
+  }, [listings, searchQuery, activeCategories, priceRange, showOnlyAvailable, sortBy, allBusinesses, listingKindFilter, session])
 
   // --- ADD THESE MISSING VARIABLES ---
   const savedListings = useMemo(() => {
@@ -1115,7 +1124,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   }, [listings, session])
 
   const heroStats = useMemo(() => [
-    { label: 'Active Listings', value: String(listings.length) },
+    { label: 'Total Listings', value: String(listings.length) },
     { label: 'Saved Items', value: String(savedIds.length) },
     { label: 'Unread Messages', value: String(chatThreads.filter(t => t.unread).length) }
   ], [listings.length, savedIds.length, chatThreads])
@@ -1131,15 +1140,17 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   }
 
   const handleRenewListing = async (listingId: number) => {
+    const nowIso = new Date().toISOString()
     const { error } = await supabase.from('listings').update({
-      created_at: new Date().toISOString(),
+      last_renewed_at: nowIso,
+      created_at: nowIso,
       status: 'Available'
     }).eq('id', listingId)
     if (error) {
       setMessage(error.message)
       return
     }
-    setMessage('Listing renewed successfully')
+    setMessage('Listing renewed successfully! Active for another 7 days.')
     await fetchListings()
   }
 
