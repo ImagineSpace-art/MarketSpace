@@ -1,5 +1,5 @@
 import { useState, useRef, type ReactNode } from 'react'
-import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { CATEGORY_OPTIONS } from '../features/marketplace/constants'
 import type { Profile, NotificationItem } from '../types'
@@ -24,6 +24,8 @@ type ShellProps = {
   onMarkAllRead?: () => void
   savedCount?: number
   unreadChatCount?: number
+  searchQuery: string
+  onSearchQueryChange: (query: string) => void
 }
 
 const MEGA_CATEGORIES: Record<string, { label: string; subcats: string[]; featured: string[]; bannerTitle: string; bannerGradient: string }> = {
@@ -91,17 +93,15 @@ export function Shell({
   onMarkAllRead,
   savedCount = 0,
   unreadChatCount = 0,
+  searchQuery,
+  onSearchQueryChange,
 }: ShellProps) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null)
   const [mobileCatExpanded, setMobileCatExpanded] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const navigate = useNavigate()
-  const location = useLocation()
-
-  const isFilterablePage = location.pathname === '/' || location.pathname === '/stores'
 
   const userNotifications = notifications.filter(
     (n) => !n.user_id || n.user_id === 'all' || (session?.user?.id && n.user_id === session.user.id)
@@ -110,9 +110,8 @@ export function Shell({
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (searchQuery.trim()) {
-      navigate(`/?search=${encodeURIComponent(searchQuery.trim())}`)
-    }
+    onSearchQueryChange(searchQuery.trim())
+    navigate(`/?search=${encodeURIComponent(searchQuery.trim())}`)
   }
 
   const handleMouseEnterNotif = () => {
@@ -147,7 +146,7 @@ export function Shell({
               type="text"
               placeholder="Search for items, categories, or stores"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => onSearchQueryChange(e.target.value)}
               className="header-search-input"
             />
             <button type="submit" className="header-search-btn" title="Search">
@@ -156,17 +155,6 @@ export function Shell({
           </form>
 
           <div className="header-actions-group">
-            {isFilterablePage && (
-              <button
-                className={`filter-toggle-btn ${isDrawerOpen ? 'active' : ''}`}
-                onClick={() => setIsDrawerOpen(!isDrawerOpen)}
-                title="Toggle Filters & Navigation Sidebar"
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', border: '1px solid #333', background: 'none', color: '#fff', padding: '6px 12px', borderRadius: '4px' }}
-              >
-                <span className="material-icons" style={{ fontSize: '18px' }}>tune</span>
-                <span className="desktop-only" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Filters</span>
-              </button>
-            )}
 
             {/* Notifications Floating Popover Dropdown */}
             <div
@@ -325,7 +313,7 @@ export function Shell({
               type="text"
               placeholder="Search for items, categories, or stores"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => onSearchQueryChange(e.target.value)}
               className="header-search-input"
             />
             <button type="submit" className="header-search-btn" title="Search">

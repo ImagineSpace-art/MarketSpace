@@ -2296,6 +2296,31 @@ select {
     }
 }
 
+@media (max-width: 640px) {
+    .seller-row-desc {
+        display: none !important;
+    }
+}
+
+.mobile-sort-filter-bar {
+    display: none;
+}
+
+@media (max-width: 767px) {
+    .mobile-sort-filter-bar {
+        display: block !important;
+    }
+    .desktop-quick-filters-bar {
+        display: none !important;
+    }
+    .search-grid-layout {
+        grid-template-columns: 1fr !important;
+    }
+    .search-left-sidebar {
+        display: none !important;
+    }
+}
+
 .listing-row-item {
     flex: 1;
     min-width: 0;

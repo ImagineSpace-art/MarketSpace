@@ -16,8 +16,11 @@ export type Listing = {
   images?: string[]
   sponsored?: boolean
   available_colors?: string[]
+  lowest_acceptable_price?: number
+  delivery_paid_by?: 'buyer' | 'seller' | 'split'
   last_renewed_at?: string
   created_at?: string
+  rating?: number
 }
 
 export type Profile = {
@@ -48,6 +51,34 @@ export type BusinessAd = {
   status: 'Active' | 'Paused' | 'Ended'
 }
 
+export type StoreCollection = {
+  id: string
+  name: string
+  description?: string
+  bannerImage?: string
+  listingIds?: number[]
+}
+
+export type StoreCustomerCare = {
+  workingHours?: string
+  phone?: string
+  email?: string
+  address?: string
+  deliveryPolicy?: string
+  returnPolicy?: string
+}
+
+export type ListingReview = {
+  id: string
+  listingId: number
+  reviewerUserId?: string
+  reviewerName: string
+  rating: number
+  comment: string
+  isAnonymous: boolean
+  createdAt: string
+}
+
 export type BusinessProfile = {
   userId: string
   shopName: string
@@ -57,8 +88,14 @@ export type BusinessProfile = {
   whatsapp: string
   logo: string // base64 data url
   cover: string // base64 data url
+  operationType?: 'online' | 'physical' | 'omnichannel'
+  accentColor?: string
+  announcementBar?: string
+  collections?: StoreCollection[]
+  customerCare?: StoreCustomerCare
   catalog: CatalogItem[]
   ads: BusinessAd[]
+  rating?: number
 }
 
 export type MessageRecord = {

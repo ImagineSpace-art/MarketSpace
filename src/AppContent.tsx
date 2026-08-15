@@ -23,7 +23,12 @@ export function AppContent() {
   const app = useMarketplaceApp()
   useEffect(() => {
     window.scrollTo(0, 0)
-  }, [location.pathname])
+    const searchParams = new URLSearchParams(location.search)
+    const query = searchParams.get('search')
+    if (query !== null && query !== app.searchQuery) {
+      app.setSearchQuery(query)
+    }
+  }, [location.pathname, location.search])
 
   const [isProfilePanelOpen, setIsProfilePanelOpen] = useState(false)
   const [showScrollTop, setShowScrollTop] = useState(false)
@@ -187,6 +192,8 @@ export function AppContent() {
         onMarkAllRead={app.markAllRead}
         savedCount={savedIds.length}
         unreadChatCount={app.chatThreads.filter((t) => t.unread).length}
+        searchQuery={app.searchQuery}
+        onSearchQueryChange={app.setSearchQuery}
       >
         {message ? <div className="status-banner">{message}</div> : null}
         <Routes>
@@ -201,6 +208,8 @@ export function AppContent() {
                 toggleSave={toggleSave}
                 distanceFilter={distanceFilter}
                 toggleCategory={toggleCategory}
+                searchQuery={app.searchQuery}
+                allBusinesses={allBusinesses}
               />
             }
           />

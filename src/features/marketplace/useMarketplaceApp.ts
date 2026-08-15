@@ -743,8 +743,20 @@ export function useMarketplaceApp(): MarketplaceAppModel {
 
   const handleSignup = async () => {
     setMessage('')
+    if (!authEmail.trim() || !authPassword.trim()) {
+      setMessage('Please enter a valid email and password.')
+      return
+    }
+
+    // Check if an account with this email already exists
+    const { data: existingProfile } = await supabase.from('profiles').select('user_id').eq('email', authEmail.trim()).maybeSingle()
+    if (existingProfile) {
+      setMessage('An account with this email address already exists. Please log in instead.')
+      return
+    }
+
     const { data, error } = await supabase.auth.signUp({
-      email: authEmail,
+      email: authEmail.trim(),
       password: authPassword,
       options: { data: { username: authUsername } },
     })
@@ -758,12 +770,12 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       await supabase.from('profiles').upsert({
         user_id: data.user.id,
         username: authUsername || authEmail.split('@')[0],
-        email: authEmail,
+        email: authEmail.trim(),
       })
     }
 
     if (!data.session) {
-      setMessage('Account created! Please check your email inbox to confirm your account before logging in.')
+      setMessage('Registration successful! A confirmation email has been sent. Please confirm your email before logging in.')
       setAuthEmail('')
       setAuthPassword('')
       setAuthUsername('')
@@ -1084,7 +1096,12 @@ export function useMarketplaceApp(): MarketplaceAppModel {
           return false
         }
 
-        const matchesQuery = !normalizedQuery || `${listing.title} ${listing.description}`.toLowerCase().includes(normalizedQuery)
+        const listingSellerId = listing.user_id || ''
+        const sellerBusiness = allBusinesses[listingSellerId]
+        const sellerShopName = sellerBusiness?.shopName || ''
+        const sellerShopCat = sellerBusiness?.category || ''
+        const searchText = `${listing.title} ${listing.description} ${listing.category} ${listing.seller_name || ''} ${listing.location} ${sellerShopName} ${sellerShopCat}`.toLowerCase()
+        const matchesQuery = !normalizedQuery || searchText.includes(normalizedQuery)
         const matchesCategory = activeCategories.includes('All') || activeCategories.includes(listing.category)
         const matchesPrice = priceRange === 3000 || listingPrice <= priceRange
         const matchesAvailability = !showOnlyAvailable || (listing.status ?? 'Available') === 'Available'
@@ -1192,6 +1209,10 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         whatsapp: updated.whatsapp,
         logo: updated.logo,
         cover: updated.cover,
+        accent_color: updated.accentColor,
+        announcement_bar: updated.announcementBar,
+        collections: updated.collections || [],
+        customer_care: updated.customerCare || {},
         catalog: updated.catalog,
         ads: updated.ads,
       }, { onConflict: 'user_id' })
@@ -1224,6 +1245,10 @@ export function useMarketplaceApp(): MarketplaceAppModel {
           whatsapp: s.whatsapp,
           logo: s.logo,
           cover: s.cover,
+          accentColor: s.accent_color || s.accentColor || '#2563eb',
+          announcementBar: s.announcement_bar || s.announcementBar || '',
+          collections: s.collections || [],
+          customerCare: s.customer_care || s.customerCare || {},
           catalog: s.catalog || [],
           ads: s.ads || [],
         }

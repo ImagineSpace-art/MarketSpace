@@ -122,74 +122,48 @@ export function AuthPage({
 
             <form onSubmit={handleFormSubmit}>
               {mode === 'signup' && (
-                <input
-                  className="auth-input"
-                  value={authUsername}
-                  onChange={(event) => onAuthUsernameChange(event.target.value)}
-                  placeholder="Username / Full Name"
-                  required
-                />
-              )}
-
-              <input
-                className="auth-input"
-                value={authEmail}
-                onChange={(event) => onAuthEmailChange(event.target.value)}
-                placeholder="Email address"
-                type="email"
-                required
-              />
-
-              {/* Password Input with Show/Hide Toggle */}
-              <div style={{ position: 'relative', width: '100%', marginBottom: '12px' }}>
-                <input
-                  className="auth-input"
-                  value={authPassword}
-                  onChange={(event) => onAuthPasswordChange(event.target.value)}
-                  placeholder="Password"
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  style={{ width: '100%', paddingRight: '42px', marginBottom: 0 }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                    position: 'absolute',
-                    right: '12px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--text-secondary, #888888)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                  title={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  <span className="material-icons" style={{ fontSize: '20px' }}>
-                    {showPassword ? 'visibility_off' : 'visibility'}
-                  </span>
-                </button>
-              </div>
-
-              {/* Confirm Password Field (Sign-Up Mode) */}
-              {mode === 'signup' && (
-                <div style={{ position: 'relative', width: '100%', marginBottom: '12px' }}>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text)' }}>Username / Full Name</span>
                   <input
                     className="auth-input"
-                    value={confirmPassword}
-                    onChange={(event) => setConfirmPassword(event.target.value)}
-                    placeholder="Confirm Password"
-                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={authUsername}
+                    onChange={(event) => onAuthUsernameChange(event.target.value)}
+                    placeholder="e.g. Alex Sikainga"
+                    required
+                    style={{ marginBottom: 0 }}
+                  />
+                </label>
+              )}
+
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '12px' }}>
+                <span style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text)' }}>Email Address</span>
+                <input
+                  className="auth-input"
+                  value={authEmail}
+                  onChange={(event) => onAuthEmailChange(event.target.value)}
+                  placeholder="e.g. someone@example.com"
+                  type="email"
+                  required
+                  style={{ marginBottom: 0 }}
+                />
+              </label>
+
+              {/* Password Input with Show/Hide Toggle */}
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '12px' }}>
+                <span style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text)' }}>Password</span>
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <input
+                    className="auth-input"
+                    value={authPassword}
+                    onChange={(event) => onAuthPasswordChange(event.target.value)}
+                    placeholder="Enter password"
+                    type={showPassword ? 'text' : 'password'}
                     required
                     style={{ width: '100%', paddingRight: '42px', marginBottom: 0 }}
                   />
                   <button
                     type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    onClick={() => setShowPassword(!showPassword)}
                     style={{
                       position: 'absolute',
                       right: '12px',
@@ -203,13 +177,53 @@ export function AuthPage({
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
-                    title={showConfirmPassword ? 'Hide password' : 'Show password'}
+                    title={showPassword ? 'Hide password' : 'Show password'}
                   >
                     <span className="material-icons" style={{ fontSize: '20px' }}>
-                      {showConfirmPassword ? 'visibility_off' : 'visibility'}
+                      {showPassword ? 'visibility_off' : 'visibility'}
                     </span>
                   </button>
                 </div>
+              </label>
+
+              {/* Confirm Password Field (Sign-Up Mode) */}
+              {mode === 'signup' && (
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text)' }}>Confirm Password</span>
+                  <div style={{ position: 'relative', width: '100%' }}>
+                    <input
+                      className="auth-input"
+                      value={confirmPassword}
+                      onChange={(event) => setConfirmPassword(event.target.value)}
+                      placeholder="Re-enter password"
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      required
+                      style={{ width: '100%', paddingRight: '42px', marginBottom: 0 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      style={{
+                        position: 'absolute',
+                        right: '12px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--text-secondary, #888888)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      title={showConfirmPassword ? 'Hide password' : 'Show password'}
+                    >
+                      <span className="material-icons" style={{ fontSize: '20px' }}>
+                        {showConfirmPassword ? 'visibility_off' : 'visibility'}
+                      </span>
+                    </button>
+                  </div>
+                </label>
               )}
 
               {/* Password Strength Real-time Checklist (Sign-Up Mode) */}

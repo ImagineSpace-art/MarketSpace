@@ -40,7 +40,11 @@ export function StoreViewPage({
     onReplyToReview = () => { },
 }: StoreViewPageProps) {
     const navigate = useNavigate()
-    const [activeSubTab, setActiveSubTab] = useState<'catalog' | 'listings' | 'reviews'>('catalog')
+    const brandColor = shop.accentColor || '#2563eb'
+    const collectionsList = shop.collections || []
+    const careInfo = shop.customerCare || {}
+
+    const [activeSubTab, setActiveSubTab] = useState<string>('catalog')
     const [formRating, setFormRating] = useState(0)
 
     const shopListings = listings.filter(l => l.user_id === shop.userId)
@@ -58,13 +62,20 @@ export function StoreViewPage({
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Merchant Top Announcement Ticker Bar */}
+            {shop.announcementBar && (
+                <div style={{ padding: '10px 16px', backgroundColor: brandColor, color: '#ffffff', borderRadius: '8px', fontWeight: 600, fontSize: '0.88rem', textAlign: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+                    {shop.announcementBar}
+                </div>
+            )}
+
             <button className="ghost-btn" style={{ alignSelf: 'flex-start' }} onClick={onBack}>← Back to Stores</button>
 
             <section
                 style={{
                     position: 'relative',
                     overflow: 'hidden',
-                    height: '280px',
+                    minHeight: '260px',
                     borderRadius: '16px',
                     border: '1px solid var(--border)',
                     background: 'var(--surface)',
@@ -88,7 +99,7 @@ export function StoreViewPage({
                         zIndex: 1,
                     }}
                 >
-                    {/* Linear gradient fade towards the right (opaque on the left, transparent on the right) */}
+                    {/* Linear gradient fade towards the right */}
                     <div
                         style={{
                             position: 'absolute',
@@ -96,7 +107,7 @@ export function StoreViewPage({
                             left: 0,
                             width: '100%',
                             height: '100%',
-                            background: 'linear-gradient(to right, var(--surface) 25%, rgba(15, 23, 42, 0.4) 65%, rgba(0, 0, 0, 0) 100%)'
+                            background: 'linear-gradient(to right, var(--surface) 35%, rgba(15, 23, 42, 0.5) 75%, rgba(0, 0, 0, 0.1) 100%)'
                         }}
                     />
                 </div>
@@ -104,23 +115,23 @@ export function StoreViewPage({
                 {/* Content Overlay */}
                 <div style={{ position: 'relative', zIndex: 2, display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '16px' }}>
                     <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                        {/* Always display the image logo */}
-                        <div style={{ width: '80px', height: '80px', borderRadius: '16px', overflow: 'hidden', border: '3px solid var(--surface)', boxShadow: 'var(--shadow)', flexShrink: 0 }}>
+                        {/* Store Logo */}
+                        <div style={{ width: '80px', height: '80px', borderRadius: '16px', overflow: 'hidden', border: `3px solid ${brandColor}`, boxShadow: 'var(--shadow)', flexShrink: 0 }}>
                             <img src={logoImage} alt={shop.shopName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         </div>
                         <div style={{ color: 'var(--text)' }}>
-                            <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 800, textShadow: '0 2px 4px rgba(255,255,255,0.8)' }}>
+                            <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 800 }}>
                                 {shop.shopName}
-                                <span className="badge" style={{ marginLeft: '8px', background: '#10b981', color: 'white', fontSize: '0.75rem', padding: '4px 8px', borderRadius: '6px' }}>Shop</span>
+                                <span className="badge" style={{ marginLeft: '8px', background: brandColor, color: 'white', fontSize: '0.75rem', padding: '4px 8px', borderRadius: '6px' }}>Verified Store</span>
                             </h2>
-                            <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 500 }}>
-                                <span className="material-icons" style={{ fontSize: '18px' }}>storefront</span> {shop.category} |
-                                <span className="material-icons" style={{ fontSize: '18px' }}>location_on</span> {shop.address}
+                            <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 500, flexWrap: 'wrap' }}>
+                                <span className="material-icons" style={{ fontSize: '18px', color: brandColor }}>storefront</span> {shop.category} |
+                                <span className="material-icons" style={{ fontSize: '18px', color: brandColor }}>location_on</span> {shop.address}
                             </p>
                         </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px', flexWrap: 'wrap' }}>
                         <button
                             className="secondary-btn compact-btn"
                             onClick={() => navigate(`/seller/${shop.userId}`)}
@@ -141,30 +152,25 @@ export function StoreViewPage({
                                 <button
                                     className={followingIds.includes(shop.userId) ? "secondary-btn compact-btn" : "primary-btn compact-btn"}
                                     onClick={() => onToggleFollowStore(shop.userId)}
-                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '10px 16px' }}
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '10px 16px', backgroundColor: followingIds.includes(shop.userId) ? undefined : brandColor }}
                                 >
                                     <span className="material-icons" style={{ fontSize: '18px' }}>
                                         {followingIds.includes(shop.userId) ? 'person_remove' : 'person_add'}
                                     </span>
-                                    {followingIds.includes(shop.userId) ? 'Unfollow' : 'Follow'}
+                                    {followingIds.includes(shop.userId) ? 'Unfollow' : 'Follow Store'}
                                 </button>
 
                                 <button
                                     className="secondary-btn compact-btn"
                                     onClick={() => onToggleNotifyStore(shop.userId)}
                                     title={notifyStoreIds.includes(shop.userId) ? "Mute Notifications" : "Get Store Notifications"}
-                                    style={{ minWidth: '40px', padding: '10px 8px', color: notifyStoreIds.includes(shop.userId) ? 'var(--primary)' : 'var(--text-muted)', background: 'var(--surface)' }}
+                                    style={{ minWidth: '40px', padding: '10px 8px', color: notifyStoreIds.includes(shop.userId) ? brandColor : 'var(--text-muted)', background: 'var(--surface)' }}
                                 >
                                     <span className="material-icons" style={{ fontSize: '20px' }}>
                                         {notifyStoreIds.includes(shop.userId) ? 'notifications_active' : 'notifications_none'}
                                     </span>
                                 </button>
                             </>
-                        )}
-                        {isOwner && (
-                            <span className="badge" style={{ background: 'var(--primary)', color: 'white', padding: '8px 16px', fontSize: '0.85rem', fontWeight: 600, border: '2px solid var(--surface)', boxShadow: 'var(--shadow)' }}>
-                                Store Owner View
-                            </span>
                         )}
                     </div>
                 </div>
@@ -176,11 +182,46 @@ export function StoreViewPage({
                 </div>
             )}
 
-            {/* Subtab selection */}
+            {/* Dynamic Store Subtabs (Home Catalog, Active Listings, Departments, Customer Care, Reviews) */}
             <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', paddingBottom: '8px', gap: '8px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                <button className={`dashboard-tab-btn ${activeSubTab === 'catalog' ? 'active' : ''}`} onClick={() => setActiveSubTab('catalog')}>Catalog Products</button>
-                <button className={`dashboard-tab-btn ${activeSubTab === 'listings' ? 'active' : ''}`} onClick={() => setActiveSubTab('listings')}>Active Listings ({shopListings.length})</button>
-                <button className={`dashboard-tab-btn ${activeSubTab === 'reviews' ? 'active' : ''}`} onClick={() => setActiveSubTab('reviews')}>Reviews & Ratings ({reviewsList.length})</button>
+                <button
+                    className={`dashboard-tab-btn ${activeSubTab === 'catalog' ? 'active' : ''}`}
+                    onClick={() => setActiveSubTab('catalog')}
+                    style={{ borderColor: activeSubTab === 'catalog' ? brandColor : undefined, color: activeSubTab === 'catalog' ? brandColor : undefined }}
+                >
+                    Home Catalog
+                </button>
+                <button
+                    className={`dashboard-tab-btn ${activeSubTab === 'listings' ? 'active' : ''}`}
+                    onClick={() => setActiveSubTab('listings')}
+                    style={{ borderColor: activeSubTab === 'listings' ? brandColor : undefined, color: activeSubTab === 'listings' ? brandColor : undefined }}
+                >
+                    Listings ({shopListings.length})
+                </button>
+                {collectionsList.map((col) => (
+                    <button
+                        key={col.id}
+                        className={`dashboard-tab-btn ${activeSubTab === `col-${col.id}` ? 'active' : ''}`}
+                        onClick={() => setActiveSubTab(`col-${col.id}`)}
+                        style={{ borderColor: activeSubTab === `col-${col.id}` ? brandColor : undefined, color: activeSubTab === `col-${col.id}` ? brandColor : undefined }}
+                    >
+                        {col.name}
+                    </button>
+                ))}
+                <button
+                    className={`dashboard-tab-btn ${activeSubTab === 'care' ? 'active' : ''}`}
+                    onClick={() => setActiveSubTab('care')}
+                    style={{ borderColor: activeSubTab === 'care' ? brandColor : undefined, color: activeSubTab === 'care' ? brandColor : undefined }}
+                >
+                    Customer Care & Policies
+                </button>
+                <button
+                    className={`dashboard-tab-btn ${activeSubTab === 'reviews' ? 'active' : ''}`}
+                    onClick={() => setActiveSubTab('reviews')}
+                    style={{ borderColor: activeSubTab === 'reviews' ? brandColor : undefined, color: activeSubTab === 'reviews' ? brandColor : undefined }}
+                >
+                    Reviews ({reviewsList.length})
+                </button>
             </div>
 
             {/* Tab render */}
@@ -237,6 +278,112 @@ export function StoreViewPage({
                             ))}
                         </div>
                     )}
+                </section>
+            )}
+
+            {/* Custom Store Collection / Department Tab Render */}
+            {activeSubTab.startsWith('col-') && (() => {
+                const colId = activeSubTab.replace('col-', '')
+                const targetCol = collectionsList.find(c => c.id === colId)
+                const colTitle = targetCol?.name || 'Department'
+                
+                return (
+                    <section className="section-card">
+                        <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: '12px', marginBottom: '16px' }}>
+                            <h3 style={{ margin: 0, color: brandColor }}>{colTitle} Department</h3>
+                            <p style={{ margin: '4px 0 0', fontSize: '0.86rem', color: 'var(--text-secondary)' }}>
+                                Browse items in {shop.shopName}'s {colTitle} collection.
+                            </p>
+                        </div>
+                        {shopListings.length === 0 ? (
+                            <p style={{ color: 'var(--text-muted)' }}>No products in this department yet.</p>
+                        ) : (
+                            <div className="marketplace-listing-grid">
+                                {shopListings.map(listing => (
+                                    <ListingCard
+                                        key={listing.id}
+                                        listing={listing}
+                                        saved={savedIds.includes(String(listing.id))}
+                                        onOpen={onOpenListing}
+                                        onToggleSave={onToggleSave}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </section>
+                )
+            })()}
+
+            {/* Customer Care & Policies Tab Render */}
+            {activeSubTab === 'care' && (
+                <section className="section-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
+                        <h3 style={{ margin: 0, color: brandColor }}>Customer Care & Store Policies</h3>
+                        <p style={{ margin: '4px 0 0', fontSize: '0.86rem', color: 'var(--text-secondary)' }}>
+                            Operating hours, contact channels, and buyer guarantees for {shop.shopName}.
+                        </p>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                        {/* 1. Working Hours & Location */}
+                        <div style={{ padding: '16px', background: 'var(--panel)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                <span className="material-icons" style={{ color: brandColor }}>schedule</span>
+                                <h4 style={{ margin: 0 }}>Business Hours & Location</h4>
+                            </div>
+                            <p style={{ fontSize: '0.88rem', margin: '4px 0', color: 'var(--text)' }}>
+                                <strong>Hours:</strong> {careInfo.workingHours || 'Mon - Sat: 08:00 - 18:00'}
+                            </p>
+                            <p style={{ fontSize: '0.88rem', margin: '4px 0', color: 'var(--text)' }}>
+                                <strong>Address:</strong> {shop.address}
+                            </p>
+                        </div>
+
+                        {/* 2. Delivery Guidelines */}
+                        <div style={{ padding: '16px', background: 'var(--panel)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                <span className="material-icons" style={{ color: brandColor }}>local_shipping</span>
+                                <h4 style={{ margin: 0 }}>Delivery Terms</h4>
+                            </div>
+                            <p style={{ fontSize: '0.88rem', margin: 0, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                                {careInfo.deliveryPolicy || 'Same-day local delivery available in Lusaka for orders placed before 14:00.'}
+                            </p>
+                        </div>
+
+                        {/* 3. Returns & Guarantee */}
+                        <div style={{ padding: '16px', background: 'var(--panel)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                <span className="material-icons" style={{ color: brandColor }}>verified</span>
+                                <h4 style={{ margin: 0 }}>Return & Exchange Guarantee</h4>
+                            </div>
+                            <p style={{ fontSize: '0.88rem', margin: 0, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                                {careInfo.returnPolicy || '3-day inspection & return guarantee for defective products.'}
+                            </p>
+                        </div>
+
+                        {/* 4. Support Contact Channels */}
+                        <div style={{ padding: '16px', background: 'var(--panel)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                <span className="material-icons" style={{ color: brandColor }}>support_agent</span>
+                                <h4 style={{ margin: 0 }}>Direct Support Line</h4>
+                            </div>
+                            {shop.whatsapp && (
+                                <p style={{ fontSize: '0.88rem', margin: '4px 0' }}>
+                                    <strong>WhatsApp:</strong> <a href={`https://wa.me/${shop.whatsapp.replace(/[^\d]/g, '')}`} target="_blank" rel="noreferrer" style={{ color: brandColor, textDecoration: 'none' }}>{shop.whatsapp}</a>
+                                </p>
+                            )}
+                            {careInfo.phone && (
+                                <p style={{ fontSize: '0.88rem', margin: '4px 0' }}>
+                                    <strong>Phone:</strong> {careInfo.phone}
+                                </p>
+                            )}
+                            {careInfo.email && (
+                                <p style={{ fontSize: '0.88rem', margin: '4px 0' }}>
+                                    <strong>Email:</strong> {careInfo.email}
+                                </p>
+                            )}
+                        </div>
+                    </div>
                 </section>
             )}
 

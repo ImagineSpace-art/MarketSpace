@@ -99,7 +99,6 @@ export function ProfilePage({
     userEmail,
     myListings,
     savedListings,
-    savedIds,
     businessProfile,
     onEditListing,
     onRenewListing,
@@ -379,9 +378,18 @@ export function ProfilePage({
                                     )}
                                     <div>
                                         <h2 style={{ fontSize: '1.25rem', margin: 0 }}>Shop Manager: {businessProfile.shopName}</h2>
-                                        <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Store Tools & Insights</p>
+                                        <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Store Tools & Insights</p>
                                     </div>
                                 </div>
+                                <button
+                                    type="button"
+                                    className="primary-btn compact-btn"
+                                    onClick={() => navigate(`/store/${businessProfile.userId}`)}
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px' }}
+                                >
+                                    <span className="material-icons" style={{ fontSize: '18px' }}>storefront</span>
+                                    Preview Storefront
+                                </button>
                             </div>
 
                             {/* Tab controls */}
@@ -792,16 +800,33 @@ export function ProfilePage({
                                             return l.status !== 'Sold' && l.status !== 'Draft' && l.status !== 'Drafts'
                                         })
                                         .map((listing) => (
-                                            <div key={listing.id} className="dashboard-listing-row">
-                                                <div className="listing-row-item">
-                                                    <ListingCard
-                                                        listing={listing}
-                                                        saved={savedIds.includes(String(listing.id))}
-                                                        onOpen={onOpenListing}
-                                                        onToggleSave={onToggleSave}
-                                                    />
+                                            <div key={listing.id} className="dashboard-listing-row" style={{ display: 'flex', flexDirection: 'column', padding: '14px', background: 'var(--surface)', borderRadius: '12px', border: '1px solid var(--border)', gap: '12px' }}>
+                                                <div style={{ display: 'flex', gap: '14px', alignItems: 'center', cursor: 'pointer' }} onClick={() => onOpenListing(listing)}>
+                                                    {listing.images && listing.images.length > 0 ? (
+                                                        <img src={listing.images[0]} alt={listing.title} style={{ width: '72px', height: '72px', borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }} />
+                                                    ) : (
+                                                        <div style={{ width: '72px', height: '72px', borderRadius: '8px', background: 'var(--border)', display: 'grid', placeItems: 'center', flexShrink: 0, color: 'var(--text-muted)' }}>
+                                                            <span className="material-icons">photo_camera</span>
+                                                        </div>
+                                                    )}
+
+                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                        <h3 style={{ margin: '0 0 4px 0', fontSize: '0.98rem', fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                            {listing.title}
+                                                        </h3>
+                                                        <p className="seller-row-desc" style={{ margin: '0 0 6px 0', fontSize: '0.82rem', color: 'var(--text-secondary)', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                                            {listing.description}
+                                                        </p>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', fontSize: '0.86rem' }}>
+                                                            <strong style={{ color: 'var(--primary)', fontSize: '0.95rem' }}>ZMW {listing.price}</strong>
+                                                            <span style={{ fontSize: '0.78rem', background: 'var(--panel)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                                                                {listing.category} • {listing.location}
+                                                            </span>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div className="listing-row-actions">
+
+                                                <div className="listing-row-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
                                                     <button className="secondary-btn compact-btn" onClick={() => onEditListing(listing)}>Edit</button>
                                                     <button className="secondary-btn compact-btn" onClick={() => onUpdateStatus(listing.id, listing.status === 'Sold' ? 'Available' : 'Sold')}>
                                                         {listing.status === 'Sold' ? 'Restock' : 'Mark Sold'}

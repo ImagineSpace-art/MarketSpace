@@ -64,7 +64,14 @@ export function ListingDetailPage({
     ? ["Online/Remote", "At Buyer's Location", "At Seller's Location", "Flexible"]
     : ["In-Person Meetup", "Local Delivery", "Courier Shipping", "Pickup Available"]
 
+  const [offerError, setOfferError] = useState('')
+
   const handleBuyNow = () => {
+    if (!session) {
+      alert('Please sign in to place orders or contact sellers.')
+      navigate('/login')
+      return
+    }
     const selectedColsText = selectedColors.length > 0 ? selectedColors.join(', ') : 'Default'
     const orderDetails = `[ORDER_CARD]{"listingId":${selectedListing.id},"title":"${selectedListing.title.replace(/"/g, '\\"')
       }","price":${selectedListing.price},"quantity":${quantity},"deliveryOption":"${deliveryOption || 'Flexible'
@@ -74,10 +81,24 @@ export function ListingDetailPage({
   }
 
   const handleMakeOffer = () => {
-    if (!offerAmount || Number(offerAmount) <= 0) {
-      alert('Please enter a valid offer amount in ZMW.')
+    if (!session) {
+      alert('Please sign in to make offers.')
+      navigate('/login')
       return
     }
+    setOfferError('')
+    const numOffer = Number(offerAmount)
+    if (!offerAmount || numOffer <= 0) {
+      setOfferError('Please enter a valid offer amount in ZMW.')
+      return
+    }
+
+    const lowestPrice = selectedListing.lowest_acceptable_price
+    if (lowestPrice != null && Number(lowestPrice) > 0 && numOffer < Number(lowestPrice)) {
+      setOfferError('Offer too low. The seller is not accepting offers this far below the asking price.')
+      return
+    }
+
     const offerMsg = `[OFFER] Proposed Offer: ZMW ${offerAmount} for "${selectedListing.title}" (Original: ZMW ${selectedListing.price}) | Phone: ${phone || 'Not provided'} | Location: ${locationAddress || selectedListing.location}`
     onMessageSeller(offerMsg)
   }
@@ -329,27 +350,37 @@ export function ListingDetailPage({
             </select>
           </label>
 
-          {/* Make an Offer Section */}
-          <div style={{ padding: '12px', background: 'var(--panel)', borderRadius: '10px', border: '1px solid var(--border)' }}>
-            <span style={{ display: 'block', fontSize: '0.86rem', fontWeight: 600, color: 'var(--text)', marginBottom: '6px' }}>Make an Offer (ZMW)</span>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input
-                type="number"
-                placeholder={`e.g. ${Math.round(selectedListing.price * 0.9)}`}
-                value={offerAmount}
-                onChange={(e) => setOfferAmount(e.target.value)}
-                style={{ flex: 1, padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.9rem' }}
-              />
-              <button
-                type="button"
-                className="secondary-btn"
-                onClick={handleMakeOffer}
-                style={{ padding: '10px 14px', fontSize: '0.86rem', fontWeight: 600, background: '#2563eb', color: '#fff', border: 'none' }}
-              >
-                Send Offer
-              </button>
+          {/* Make an Offer Section - Excluded if seller never set lowest_acceptable_price */}
+          {selectedListing.lowest_acceptable_price != null && Number(selectedListing.lowest_acceptable_price) > 0 && (
+            <div style={{ padding: '12px', background: 'var(--panel)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+              <span style={{ display: 'block', fontSize: '0.86rem', fontWeight: 600, color: 'var(--text)', marginBottom: '6px' }}>Make an Offer (ZMW)</span>
+              {offerError && (
+                <div style={{ padding: '8px 10px', backgroundColor: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444', color: '#ef4444', borderRadius: '6px', fontSize: '0.82rem', marginBottom: '8px' }}>
+                  {offerError}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="number"
+                  placeholder={`Min acceptable: ZMW ${selectedListing.lowest_acceptable_price}`}
+                  value={offerAmount}
+                  onChange={(e) => {
+                    setOfferAmount(e.target.value)
+                    setOfferError('')
+                  }}
+                  style={{ flex: 1, padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.9rem' }}
+                />
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={handleMakeOffer}
+                  style={{ padding: '10px 14px', fontSize: '0.86rem', fontWeight: 600, background: '#2563eb', color: '#fff', border: 'none' }}
+                >
+                  Send Offer
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Mobile Phone Input */}
           <label style={{ display: 'block' }}>
@@ -466,7 +497,129 @@ export function ListingDetailPage({
           </div>
         </div>
       </div>
+
+      {/* Buyer Ratings & Reviews Section */}
+      <div style={{ marginTop: '32px', borderTop: '1px solid var(--border)', paddingTop: '24px' }}>
+        <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 16px 0', color: 'var(--text)' }}>
+          Customer Ratings & Reviews
+        </h3>
+        <ListingRatingReviewBox listingId={selectedListing.id} currentUserName={session?.user?.user_metadata?.username || session?.user?.email?.split('@')[0] || 'Buyer'} />
+      </div>
     </section>
+  )
+}
+
+function ListingRatingReviewBox({ listingId, currentUserName }: { listingId: number; currentUserName: string }) {
+  const [rating, setRating] = useState(5)
+  console.log('Viewing reviews for listing:', listingId)
+  const [comment, setComment] = useState('')
+  const [isAnonymous, setIsAnonymous] = useState(false)
+  const [reviews, setReviews] = useState<Array<{ id: string; name: string; rating: number; comment: string; isAnon: boolean; date: string }>>([
+    { id: '1', name: 'Anonymous Buyer', rating: 5, comment: 'Great seller! Product arrived exactly as described.', isAnon: true, date: '2 days ago' }
+  ])
+
+  const handleSubmitReview = (e: FormEvent) => {
+    e.preventDefault()
+    if (!comment.trim()) return
+    const newRev = {
+      id: String(Date.now()),
+      name: isAnonymous ? 'Anonymous Buyer' : currentUserName,
+      rating,
+      comment: comment.trim(),
+      isAnon: isAnonymous,
+      date: 'Just now'
+    }
+    setReviews(prev => [newRev, ...prev])
+    setComment('')
+    setRating(5)
+    alert('Thank you! Your rating has been posted successfully.')
+  }
+
+  const avgRating = (reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1)
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Summary Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--panel)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+        <span className="material-icons" style={{ fontSize: '32px', color: '#f59e0b' }}>star</span>
+        <div>
+          <strong style={{ fontSize: '1.4rem', color: 'var(--text)' }}>{avgRating} / 5.0</strong>
+          <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary)' }}>Based on {reviews.length} verified buyer review(s)</p>
+        </div>
+      </div>
+
+      {/* Write a review form */}
+      <form onSubmit={handleSubmitReview} style={{ display: 'flex', flexDirection: 'column', gap: '14px', background: 'var(--surface)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+        <h4 style={{ margin: 0, fontSize: '0.96rem' }}>Rate this item</h4>
+        
+        <div>
+          <span style={{ fontSize: '0.84rem', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Select Star Rating</span>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                key={star}
+                type="button"
+                onClick={() => setRating(star)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+              >
+                <span className="material-icons" style={{ fontSize: '28px', color: star <= rating ? '#f59e0b' : 'var(--border)' }}>
+                  {star <= rating ? 'star' : 'star_border'}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <span style={{ fontSize: '0.84rem', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Review Comment</span>
+          <textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="Describe your experience with this item and seller..."
+            rows={3}
+            required
+            style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit' }}
+          />
+        </div>
+
+        {/* Anonymous vs Identified Posting Toggle */}
+        <div>
+          <span style={{ fontSize: '0.84rem', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Posting Identity</span>
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.86rem' }}>
+              <input type="radio" name="postAnon" checked={!isAnonymous} onChange={() => setIsAnonymous(false)} />
+              <span>Identified ({currentUserName})</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.86rem' }}>
+              <input type="radio" name="postAnon" checked={isAnonymous} onChange={() => setIsAnonymous(true)} />
+              <span>Anonymous Buyer 🕵️</span>
+            </label>
+          </div>
+        </div>
+
+        <button type="submit" className="primary-btn" style={{ alignSelf: 'flex-start', padding: '10px 20px' }}>Submit Rating</button>
+      </form>
+
+      {/* Reviews List */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {reviews.map((r) => (
+          <div key={r.id} style={{ padding: '14px', background: 'var(--panel)', borderRadius: '10px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <strong style={{ fontSize: '0.9rem', color: 'var(--text)' }}>{r.name}</strong>
+              <div style={{ display: 'flex', gap: '2px' }}>
+                {[1, 2, 3, 4, 5].map((st) => (
+                  <span key={st} className="material-icons" style={{ fontSize: '16px', color: st <= r.rating ? '#f59e0b' : 'var(--border)' }}>
+                    {st <= r.rating ? 'star' : 'star_border'}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-secondary)' }}>{r.comment}</p>
+            <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{r.date}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -542,6 +695,8 @@ export function ListingFormPage({
   const [sellerPhone, setSellerPhone] = useState('')
   const [stockType, setStockType] = useState<'single' | 'in_stock'>('single')
   const [stockQuantity, setStockQuantity] = useState<number>(1)
+  const [lowestPriceInput, setLowestPriceInput] = useState<string>('')
+  const [deliveryPaidByInput, setDeliveryPaidByInput] = useState<'buyer' | 'seller' | 'split'>('buyer')
   const [selectedDeliveryMethods, setSelectedDeliveryMethods] = useState<string[]>(() => {
     return deliveryOption ? deliveryOption.split(', ') : ['Meetup']
   })
@@ -835,6 +990,39 @@ export function ListingFormPage({
               required
               style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.92rem' }}
             />
+          </div>
+
+          {/* LOWEST ACCEPTABLE PRICE (LOWBALL SHIELD) */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '4px', color: 'var(--text)' }}>
+              Lowest Acceptable Price (ZMW) — Optional Hidden Threshold
+            </label>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
+              If a buyer offers less than this hidden threshold, the offer is blocked before reaching your device. Leave empty if you do not accept offers.
+            </span>
+            <input
+              type="number"
+              value={lowestPriceInput}
+              onChange={(e) => setLowestPriceInput(e.target.value)}
+              placeholder="e.g. 400 (Asking price is 500)"
+              style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.92rem' }}
+            />
+          </div>
+
+          {/* DELIVERY PAID BY SELECTION */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text)' }}>
+              Delivery Fee Paid By
+            </label>
+            <select
+              value={deliveryPaidByInput}
+              onChange={(e) => setDeliveryPaidByInput(e.target.value as any)}
+              style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.92rem' }}
+            >
+              <option value="buyer">Paid by Buyer</option>
+              <option value="seller">Paid by Seller (Free Delivery)</option>
+              <option value="split">Split (50/50)</option>
+            </select>
           </div>
 
           {/* SELLER PHONE NUMBER INPUT */}

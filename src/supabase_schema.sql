@@ -29,10 +29,27 @@ CREATE TABLE IF NOT EXISTS public.stores (
     whatsapp TEXT,
     logo TEXT,
     cover TEXT,
+    accent_color TEXT DEFAULT '#2563eb',
+    announcement_bar TEXT,
+    collections JSONB DEFAULT '[]'::jsonb,
+    customer_care JSONB DEFAULT '{}'::jsonb,
     catalog JSONB DEFAULT '[]'::jsonb,
     ads JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Migration for existing stores table:
+ALTER TABLE public.stores
+  ADD COLUMN IF NOT EXISTS operation_type TEXT DEFAULT 'omnichannel',
+  ADD COLUMN IF NOT EXISTS accent_color TEXT DEFAULT '#2563eb',
+  ADD COLUMN IF NOT EXISTS announcement_bar TEXT,
+  ADD COLUMN IF NOT EXISTS collections JSONB DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS customer_care JSONB DEFAULT '{}'::jsonb;
+
+-- Migration for listings table:
+ALTER TABLE public.listings
+  ADD COLUMN IF NOT EXISTS lowest_acceptable_price NUMERIC,
+  ADD COLUMN IF NOT EXISTS delivery_paid_by TEXT DEFAULT 'buyer';
 
 -- 3. LISTINGS TABLE (Products & Services - Belongs to User, Optionally to Store)
 CREATE TABLE IF NOT EXISTS public.listings (
