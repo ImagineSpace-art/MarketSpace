@@ -26,8 +26,12 @@
     box-sizing: border-box;
 }
 
+html,
 body {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(150, 150, 150, 0.5) transparent;
     margin: 0;
+    overflow-x: hidden;
     min-height: 100%;
     background: var(--bg);
     color: var(--text);
@@ -316,19 +320,6 @@ select {
     background: linear-gradient(135deg, #fef3c7, #f59e0b);
 }
 
-.card-size-control {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    align-items: center;
-    gap: 8px;
-    color: var(--text-secondary);
-    font-size: 0.88rem;
-}
-
-.card-size-control input {
-    accent-color: #1877f2;
-}
-
 .marketplace-categories {
     display: flex;
     gap: 8px;
@@ -372,7 +363,7 @@ select {
 
 .marketplace-listing-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(var(--card-size, 180px), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
     gap: 10px;
     align-items: start;
 }
@@ -2310,12 +2301,15 @@ select {
     .mobile-sort-filter-bar {
         display: block !important;
     }
+
     .desktop-quick-filters-bar {
         display: none !important;
     }
+
     .search-grid-layout {
         grid-template-columns: 1fr !important;
     }
+
     .search-left-sidebar {
         display: none !important;
     }
@@ -3017,10 +3011,6 @@ body {
     border-bottom-color: #1967d2 !important;
 }
 
-.category-bar-link.highlight-sale {
-    color: #ef4444 !important;
-}
-
 /* Expanded Mega-Menu Dropdown */
 .mega-dropdown {
     position: absolute;
@@ -3191,8 +3181,8 @@ body {
 }
 
 .horizontal-scroll-rail .listing-card {
-    min-width: 270px;
-    max-width: 290px;
+    min-width: 180px;
+    max-width: 200px;
     flex-shrink: 0;
     scroll-snap-align: start;
 }
@@ -3244,7 +3234,7 @@ body {
         .header-brand-group {
             width: 100%;
             display: flex;
-            justify-content: flex-start;
+            justify-content: space-between;
             align-items: center;
             padding-bottom: 4px;
         }

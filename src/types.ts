@@ -6,7 +6,6 @@ export type Listing = {
   description: string
   price: number
   category: string
-  location: string
   status?: string
   listing_type?: string
   condition?: string
@@ -21,6 +20,7 @@ export type Listing = {
   last_renewed_at?: string
   created_at?: string
   rating?: number
+  renewal_frequency?: 'daily' | 'weekly' | 'biweekly' | 'monthly'
 }
 
 export type Profile = {

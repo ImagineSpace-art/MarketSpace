@@ -1,7 +1,6 @@
 import { useState, useRef, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
-import { CATEGORY_OPTIONS } from '../features/marketplace/constants'
 import type { Profile, NotificationItem } from '../types'
 
 type ShellProps = {
@@ -77,18 +76,8 @@ export function Shell({
   children,
   session,
   activeCategories,
-  priceRange,
-  distanceFilter,
-  sortBy,
-  showOnlyAvailable,
   onCategoryToggle,
-  onPriceRangeChange,
-  onDistanceChange,
-  onSortChange,
-  onAvailableToggle,
   profile,
-  listingKindFilter,
-  onListingKindChange,
   notifications = [],
   onMarkAllRead,
   savedCount = 0,
@@ -96,7 +85,6 @@ export function Shell({
   searchQuery,
   onSearchQueryChange,
 }: ShellProps) {
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null)
   const [mobileCatExpanded, setMobileCatExpanded] = useState<string | null>(null)
@@ -136,6 +124,31 @@ export function Shell({
               <span className="header-brand-icon">❖</span>
               <span className="header-brand-name">MarketSpace</span>
             </Link>
+            <Link
+              to="/stores"
+              className="header-stores-btn"
+              title="Stores Directory"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                backgroundColor: '#1967d2',
+                color: '#ffffff',
+                border: '1.5px solid #ffffff',
+                borderRadius: '6px',
+                padding: '5px 12px',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                textDecoration: 'none',
+                whiteSpace: 'nowrap',
+                marginLeft: 'auto',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <span className="material-icons" style={{ fontSize: '16px' }}>storefront</span>
+              <span>Browse Stores</span>
+            </Link>
           </div>
 
           <form
@@ -155,7 +168,6 @@ export function Shell({
           </form>
 
           <div className="header-actions-group">
-
             {/* Notifications Floating Popover Dropdown */}
             <div
               className="header-notifications-wrapper"
@@ -236,10 +248,6 @@ export function Shell({
               )}
             </div>
 
-            <Link to="/settings" className="header-icon-link" title="Settings">
-              <span className="material-icons">settings</span>
-            </Link>
-
             <Link to="/profile/saved-listings" className="header-icon-link" title="Favorites" style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
               <span className="material-icons">bookmark_border</span>
               {savedCount > 0 && (
@@ -287,6 +295,10 @@ export function Shell({
                   {unreadChatCount}
                 </span>
               )}
+            </Link>
+
+            <Link to="/settings" className="header-icon-link" title="Settings">
+              <span className="material-icons">settings</span>
             </Link>
 
             {/* Direct Profile Link */}
@@ -345,9 +357,6 @@ export function Shell({
               </span>
             </button>
           ))}
-
-          <Link to="/stores" className="category-bar-link" onMouseEnter={() => setHoveredCategory(null)}>Stores</Link>
-          <Link to="/profile/saved-listings" className="category-bar-link highlight-sale" onMouseEnter={() => setHoveredCategory(null)}>Sale</Link>
         </nav>
 
         {/* Mobile Expandable Category Sub-menu Drawer */}
@@ -459,119 +468,7 @@ export function Shell({
       </div>
 
       {/* Main Content Pane with Push Sidebar */}
-      <div className={`content-grid full-width ${isDrawerOpen ? 'sidebar-pushed' : ''}`}>
-        <aside className={`push-sidebar ${isDrawerOpen ? 'expanded' : 'collapsed'}`}>
-          <div className="push-sidebar-inner">
-            <div className="sidebar-header-row">
-              <h3>
-                <span className="material-icons">filter_list</span> Filters & Navigation
-              </h3>
-              <button
-                className="ghost-btn"
-                onClick={() => setIsDrawerOpen(false)}
-                title="Collapse Sidebar"
-              >
-                <span className="material-icons">close</span>
-              </button>
-            </div>
-
-            <div className="push-sidebar-content">
-              <div className="sidebar-card">
-                <p className="eyebrow">Quick Navigation</p>
-                <Link to="/" className="nav-btn">Home Feed</Link>
-                <Link to="/stores" className="nav-btn">Stores Directory</Link>
-                <Link to="/inbox" className="nav-btn">Inbox Messages</Link>
-                <Link to="/profile" className="nav-btn">Account Profile</Link>
-              </div>
-
-              <div className="sidebar-card">
-                <p className="eyebrow">Listing Kind</p>
-                <button
-                  className={`nav-btn ${listingKindFilter === 'all' ? 'active' : ''}`}
-                  onClick={() => onListingKindChange('all')}
-                >
-                  All Types
-                </button>
-                <button
-                  className={`nav-btn ${listingKindFilter === 'item' ? 'active' : ''}`}
-                  onClick={() => onListingKindChange('item')}
-                >
-                  Items Only
-                </button>
-                <button
-                  className={`nav-btn ${listingKindFilter === 'service' ? 'active' : ''}`}
-                  onClick={() => onListingKindChange('service')}
-                >
-                  Services Only
-                </button>
-              </div>
-
-              <div className="sidebar-card">
-                <p className="eyebrow">Categories</p>
-                {CATEGORY_OPTIONS.map((categoryValue) => (
-                  <button
-                    key={categoryValue}
-                    className={`nav-btn ${activeCategories.includes(categoryValue) ? 'active' : ''}`}
-                    onClick={() => onCategoryToggle(categoryValue)}
-                  >
-                    {categoryValue}
-                  </button>
-                ))}
-              </div>
-
-              <div className="sidebar-card">
-                <p className="eyebrow">Price Limit</p>
-                <div className="slider-container" style={{ padding: '8px 0' }}>
-                  <input
-                    type="range"
-                    min="100"
-                    max="3000"
-                    step="100"
-                    value={priceRange}
-                    onChange={(event) => onPriceRangeChange(Number(event.target.value))}
-                    style={{ width: '100%', cursor: 'pointer' }}
-                  />
-                  <div style={{ marginTop: '8px', fontSize: '0.9rem', fontWeight: 'bold' }}>
-                    {priceRange === 3000 ? 'Any price' : `Under ZMW ${priceRange}`}
-                  </div>
-                </div>
-                <button className={`nav-btn ${sortBy === 'Price: Low to High' ? 'active' : ''}`} onClick={() => onSortChange('Price: Low to High')}>Price asc</button>
-                <button className={`nav-btn ${sortBy === 'Price: High to Low' ? 'active' : ''}`} onClick={() => onSortChange('Price: High to Low')}>Price desc</button>
-                <button className={`nav-btn ${showOnlyAvailable ? 'active' : ''}`} onClick={onAvailableToggle}>Available only</button>
-              </div>
-
-              <div className="sidebar-card">
-                <p className="eyebrow">Distance Limit</p>
-                <div className="slider-container" style={{ padding: '8px 0' }}>
-                  <input
-                    type="range"
-                    min="5"
-                    max="100"
-                    step="5"
-                    value={distanceFilter}
-                    onChange={(event) => onDistanceChange(Number(event.target.value))}
-                    style={{ width: '100%', cursor: 'pointer' }}
-                  />
-                  <div style={{ marginTop: '8px', fontSize: '0.9rem', fontWeight: 'bold' }}>
-                    {distanceFilter === 100 ? 'Any distance' : `Within ${distanceFilter} km`}
-                  </div>
-                </div>
-              </div>
-
-              <div className="sidebar-card compact-card">
-                <p className="eyebrow">Seller Tools</p>
-                <Link
-                  to="/profile/create"
-                  className="primary-btn"
-                  style={{ textDecoration: 'none', display: 'block', textAlign: 'center' }}
-                >
-                  Post Listing
-                </Link>
-              </div>
-            </div>
-          </div>
-        </aside>
-
+      <div className={`content-grid full-width`}>
         <main className="main-panel">{children}</main>
       </div>
 

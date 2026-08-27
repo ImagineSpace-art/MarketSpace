@@ -183,3 +183,7 @@ BEGIN
     DELETE FROM auth.users WHERE id = auth.uid();
 END;
 $$;
+
+-- Migration: Add renewal_frequency column to listings table
+ALTER TABLE public.listings ADD COLUMN IF NOT EXISTS renewal_frequency VARCHAR(20) DEFAULT 'weekly';
+

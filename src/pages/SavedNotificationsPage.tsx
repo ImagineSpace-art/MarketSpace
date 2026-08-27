@@ -14,7 +14,7 @@ export function SavedItemsPage({ savedListings, onOpenListing, onToggleSave }: S
       <div className="section-header">
         <div>
           <p className="eyebrow">Saved items</p>
-          <h2>Your watchlist</h2>
+          <h2>Your wishlist</h2>
         </div>
       </div>
       {savedListings.length === 0 ? <p>No saved items yet. Tap save on a listing to keep it here.</p> : (

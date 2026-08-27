@@ -94,8 +94,6 @@ export interface MarketplaceAppModel {
   setPrice: Dispatch<SetStateAction<string>>
   category: string
   setCategory: Dispatch<SetStateAction<string>>
-  location: string
-  setLocation: Dispatch<SetStateAction<string>>
   status: string
   setStatus: Dispatch<SetStateAction<string>>
   listingType: string
@@ -104,6 +102,8 @@ export interface MarketplaceAppModel {
   setCondition: Dispatch<SetStateAction<string>>
   deliveryOption: string
   setDeliveryOption: Dispatch<SetStateAction<string>>
+  renewalFrequency: 'daily' | 'weekly' | 'biweekly' | 'monthly'
+  setRenewalFrequency: Dispatch<SetStateAction<'daily' | 'weekly' | 'biweekly' | 'monthly'>>
   canMessage: boolean
   setCanMessage: Dispatch<SetStateAction<boolean>>
   userEmail: string
@@ -138,8 +138,6 @@ export interface MarketplaceAppModel {
   handleRenewListing: (listingId: number) => Promise<void>
   handleUpdateListingStatus: (listingId: number, status: string) => Promise<void>
   handleUploadAvatar: (base64: string) => Promise<void>
-  cardSize: number
-  setCardSize: Dispatch<SetStateAction<number>>
   handleStartChat: (listing: Listing, customMessage?: string) => Promise<void>
   availableColors: string[]
   setAvailableColors: Dispatch<SetStateAction<string[]>>
@@ -269,23 +267,15 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   const [description, setDescription] = useState('')
   const [price, setPrice] = useState<string>('3000')
   const [category, setCategory] = useState('Electronics')
-  const [location, setLocation] = useState('Lusaka')
   const [status, setStatus] = useState('Available')
   const [listingType, setListingType] = useState('single')
   const [condition, setCondition] = useState('Used - Good')
-  const [deliveryOption, setDeliveryOption] = useState('Meetup')
-  const [canMessage, setCanMessage] = useState(true)
+  const [deliveryOption, setDeliveryOption] = useState('In-Person Meetup')
+  const [uploadedImages, setUploadedImages] = useState<string[]>([])
   const [availableColors, setAvailableColors] = useState<string[]>([])
+  const [renewalFrequency, setRenewalFrequency] = useState<'daily' | 'weekly' | 'biweekly' | 'monthly'>('weekly')
   const [listingKindFilter, setListingKindFilter] = useState<'all' | 'item' | 'service'>('all')
-  const [cardSize, setCardSize] = useState<number>(() => {
-    if (typeof window === 'undefined') return 180
-    const stored = window.localStorage.getItem('marketspace-card-size')
-    return stored ? Number(stored) || 180 : 180
-  })
-
-  useEffect(() => {
-    window.localStorage.setItem('marketspace-card-size', String(cardSize))
-  }, [cardSize])
+  const [canMessage, setCanMessage] = useState(true)
 
   useEffect(() => {
     if (message) {
@@ -299,7 +289,6 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null)
   const [allBusinesses, setAllBusinesses] = useState<Record<string, BusinessProfile>>({})
   const [selectedStore, setSelectedStore] = useState<BusinessProfile | null>(null)
-  const [uploadedImages, setUploadedImages] = useState<string[]>([])
 
   const [followingIds, setFollowingIds] = useState<string[]>(() => {
     if (typeof window === 'undefined') return []
@@ -835,7 +824,6 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setDescription('')
     setPrice('0')
     setCategory('Electronics')
-    setLocation('Lusaka')
     setStatus('Available')
     setListingType('single')
     setCondition('Used - Good')
@@ -857,13 +845,13 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       description,
       price: Number(price) || 0,
       category,
-      location,
       status,
       listing_type: listingType,
       condition,
       delivery_option: deliveryOption,
       images: uploadedImages,
       available_colors: availableColors,
+      renewal_frequency: renewalFrequency,
       last_renewed_at: new Date().toISOString(),
     })
 
@@ -887,13 +875,13 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       description,
       price: Number(price) || 0,
       category,
-      location,
       status,
       listing_type: listingType,
       condition,
       delivery_option: deliveryOption,
       images: uploadedImages,
       available_colors: availableColors,
+      renewal_frequency: renewalFrequency,
     }).eq('id', editingListing.id)
 
     if (error) {
@@ -919,13 +907,13 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setDescription(listing.description)
     setPrice(String(listing.price))
     setCategory(listing.category)
-    setLocation(listing.location)
     setStatus(listing.status ?? 'Available')
     setListingType(listing.listing_type ?? 'single')
     setCondition(listing.condition ?? 'Used - Good')
     setDeliveryOption(listing.delivery_option ?? 'Meetup')
     setUploadedImages(listing.images ?? [])
     setAvailableColors(listing.available_colors ?? [])
+    setRenewalFrequency(listing.renewal_frequency ?? 'weekly')
     navigate(`/edit/${listing.id}`)
   }
 
@@ -1086,13 +1074,14 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       .filter((listing) => {
         const listingPrice = Number(String(listing.price).replace(/[^\d.]/g, ''))
 
-        // 7-day weekly renewal rule: listings older than 7 days without renewal are paused for public visitors
-        const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+        // Dynamic Renewal Frequency Rule: listings older than their renewal interval are paused from the homepage for ALL users
+        const DAY_MS = 24 * 60 * 60 * 1000
+        const freq = listing.renewal_frequency ?? 'weekly'
+        const expiryIntervalMs = freq === 'daily' ? DAY_MS : freq === 'biweekly' ? 14 * DAY_MS : freq === 'monthly' ? 30 * DAY_MS : 7 * DAY_MS
         const lastRenewedTime = new Date(listing.last_renewed_at || listing.created_at || Date.now()).getTime()
-        const isExpired = Date.now() - lastRenewedTime > SEVEN_DAYS_MS
-        const isOwner = Boolean(session?.user?.id && listing.user_id === session.user.id)
+        const isExpired = Date.now() - lastRenewedTime > expiryIntervalMs
 
-        if (isExpired && !isOwner) {
+        if (isExpired) {
           return false
         }
 
@@ -1100,7 +1089,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         const sellerBusiness = allBusinesses[listingSellerId]
         const sellerShopName = sellerBusiness?.shopName || ''
         const sellerShopCat = sellerBusiness?.category || ''
-        const searchText = `${listing.title} ${listing.description} ${listing.category} ${listing.seller_name || ''} ${listing.location} ${sellerShopName} ${sellerShopCat}`.toLowerCase()
+        const searchText = `${listing.title} ${listing.description} ${listing.category} ${listing.seller_name || ''} ${sellerShopName} ${sellerShopCat}`.toLowerCase()
         const matchesQuery = !normalizedQuery || searchText.includes(normalizedQuery)
         const matchesCategory = activeCategories.includes('All') || activeCategories.includes(listing.category)
         const matchesPrice = priceRange === 3000 || listingPrice <= priceRange
@@ -1327,8 +1316,6 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setPrice,
     category,
     setCategory,
-    location,
-    setLocation,
     status,
     setStatus,
     listingType,
@@ -1371,11 +1358,11 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     handleRenewListing,
     handleUpdateListingStatus,
     handleUploadAvatar,
-    cardSize,
-    setCardSize,
     handleStartChat,
     availableColors,
     setAvailableColors,
+    renewalFrequency,
+    setRenewalFrequency,
     listingKindFilter,
     setListingKindFilter,
     followingIds,

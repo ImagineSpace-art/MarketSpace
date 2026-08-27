@@ -81,7 +81,6 @@ export function AppContent() {
     description,
     price,
     category,
-    location: formLocation,
     status,
     listingType,
     condition,
@@ -99,7 +98,6 @@ export function AppContent() {
     setDescription,
     setPrice,
     setCategory,
-    setLocation,
     setStatus,
     setListingType,
     setCondition,
@@ -127,8 +125,6 @@ export function AppContent() {
     handleRenewListing,
     handleUpdateListingStatus,
     handleUploadAvatar,
-    cardSize,
-    setCardSize,
     handleStartChat,
     availableColors,
     setAvailableColors,
@@ -242,7 +238,6 @@ export function AppContent() {
                 description={description}
                 price={price}
                 category={category}
-                location={formLocation}
                 status={status}
                 listingType={listingType}
                 condition={condition}
@@ -253,13 +248,14 @@ export function AppContent() {
                 onDescriptionChange={setDescription}
                 onPriceChange={setPrice}
                 onCategoryChange={setCategory}
-                onLocationChange={setLocation}
                 onStatusChange={setStatus}
                 onListingTypeChange={setListingType}
                 onConditionChange={setCondition}
                 onDeliveryOptionChange={setDeliveryOption}
                 availableColors={availableColors}
                 onAvailableColorsChange={setAvailableColors}
+                renewalFrequency={app.renewalFrequency}
+                onRenewalFrequencyChange={app.setRenewalFrequency}
               />
             }
           />
@@ -355,9 +351,7 @@ export function AppContent() {
                 onLogout={handleLogout}
                 onOpenDashboardPanel={() => setIsProfilePanelOpen(true)}
                 theme={theme}
-                locationString={formLocation}
-                cardSize={cardSize}
-                onCardSizeChange={setCardSize}
+                locationString="Lusaka"
                 onToggleTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')}
                 onGoHome={() => navigate('/')}
                 notifications={notifications}
@@ -380,7 +374,6 @@ export function AppContent() {
                   description,
                   price,
                   category,
-                  location: formLocation,
                   status,
                   listingType,
                   condition,
@@ -392,13 +385,14 @@ export function AppContent() {
                   onDescriptionChange: setDescription,
                   onPriceChange: setPrice,
                   onCategoryChange: setCategory,
-                  onLocationChange: setLocation,
                   onStatusChange: setStatus,
                   onListingTypeChange: setListingType,
                   onConditionChange: setCondition,
                   onDeliveryOptionChange: setDeliveryOption,
                   availableColors,
                   onAvailableColorsChange: setAvailableColors,
+                  renewalFrequency: app.renewalFrequency,
+                  onRenewalFrequencyChange: app.setRenewalFrequency,
                 }}
                 storeSetupProps={{
                   userId: session ? session.user.id : '',
@@ -413,7 +407,7 @@ export function AppContent() {
               session ? (
                 <SettingsPage
                   theme={theme}
-                  location={formLocation}
+                  location="Lusaka"
                   onToggleTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')}
                   onGoHome={() => navigate('/')}
                   notificationsConfig={app.notificationsConfig}
@@ -619,7 +613,6 @@ function ListingEditRoute({
   description,
   price,
   category,
-  location,
   status,
   listingType,
   condition,
@@ -630,13 +623,14 @@ function ListingEditRoute({
   onDescriptionChange,
   onPriceChange,
   onCategoryChange,
-  onLocationChange,
   onStatusChange,
   onListingTypeChange,
   onConditionChange,
   onDeliveryOptionChange,
   availableColors,
   onAvailableColorsChange,
+  renewalFrequency,
+  onRenewalFrequencyChange,
 }: {
   listings: Listing[]
   loading: boolean
@@ -646,7 +640,6 @@ function ListingEditRoute({
   description: string
   price: string
   category: string
-  location: string
   status: string
   listingType: string
   condition: string
@@ -657,13 +650,14 @@ function ListingEditRoute({
   onDescriptionChange: (value: string) => void
   onPriceChange: (value: string) => void
   onCategoryChange: (value: string) => void
-  onLocationChange: (value: string) => void
   onStatusChange: (value: string) => void
   onListingTypeChange: (value: string) => void
   onConditionChange: (value: string) => void
   onDeliveryOptionChange: (value: string) => void
   availableColors: string[]
   onAvailableColorsChange: (colors: string[]) => void
+  renewalFrequency?: 'daily' | 'weekly' | 'biweekly' | 'monthly'
+  onRenewalFrequencyChange?: (val: 'daily' | 'weekly' | 'biweekly' | 'monthly') => void
 }) {
   const { id } = useParams()
   const listing = listings.find((l: Listing) => String(l.id) === id)
@@ -680,7 +674,6 @@ function ListingEditRoute({
       description={description}
       price={price}
       category={category}
-      location={location}
       status={status}
       listingType={listingType}
       condition={condition}
@@ -691,21 +684,22 @@ function ListingEditRoute({
       onDescriptionChange={onDescriptionChange}
       onPriceChange={onPriceChange}
       onCategoryChange={onCategoryChange}
-      onLocationChange={onLocationChange}
       onStatusChange={onStatusChange}
       onListingTypeChange={onListingTypeChange}
       onConditionChange={onConditionChange}
       onDeliveryOptionChange={onDeliveryOptionChange}
       availableColors={availableColors}
       onAvailableColorsChange={onAvailableColorsChange}
+      renewalFrequency={renewalFrequency}
+      onRenewalFrequencyChange={onRenewalFrequencyChange}
     />
   )
 }
 
 function StoreViewRoute({ stores, businessProfile, allBusinesses, listings, navigate, handleStartChat, openListing, toggleSave, savedIds, loading, followingIds, notifyStoreIds, toggleFollowStore, toggleNotifyStore, session, storeReviews, addStoreReview, replyToStoreReview }: any) {
   const { userId } = useParams()
-  
-  const regStore: BusinessProfile | null = 
+
+  const regStore: BusinessProfile | null =
     (businessProfile?.userId === userId ? businessProfile : null) ||
     allBusinesses[userId || ''] ||
     Object.values(allBusinesses).find((b: any) => b.userId === userId) ||

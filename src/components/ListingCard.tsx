@@ -36,7 +36,6 @@ export function ListingCard({ listing, saved = false, onOpen, onToggleSave }: Li
       </button>
 
       <div className="listing-top-row" style={{ top: listing.sponsored ? '32px' : '10px', right: '10px', display: 'flex', gap: '6px', alignItems: 'center' }}>
-        <span className="chip" style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '4px' }}>{listing.category}</span>
         <button className="icon-btn" onClick={() => onToggleSave?.(Number(listing.id))} title={saved ? 'Remove Bookmark' : 'Bookmark Listing'}>
           <span className="material-icons" style={{ fontSize: '18px', color: saved ? '#ef4444' : 'inherit' }}>
             {saved ? 'bookmark' : 'bookmark_border'}
@@ -52,7 +51,6 @@ export function ListingCard({ listing, saved = false, onOpen, onToggleSave }: Li
           </p>
         )}
         <div className="meta-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0', fontSize: '0.85rem' }}>
-          <span style={{ color: 'var(--text-muted)' }}>{listing.location}</span>
           <strong style={{ color: 'var(--primary)', fontSize: '1.05rem' }}>{formatZMWPrice(listing.price)}</strong>
         </div>
         <div className="meta-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>

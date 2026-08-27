@@ -103,7 +103,7 @@ export function HomePage({
 
   // Extract unique sellers & stores list directly from database records
   const uniqueSellersMap = new Map<string, string>()
-  
+
   // 1. Add stores registered in database stores table
   Object.entries(allBusinesses || {}).forEach(([userId, biz]) => {
     if (userId && biz.shopName) {
@@ -536,7 +536,7 @@ export function HomePage({
           {activeFiltersCount > 0 && (
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '20px', padding: '10px 14px', background: 'var(--panel)', borderRadius: '10px', border: '1px solid var(--border)' }}>
               <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Active Filters:</span>
-              
+
               {priceMax < 3000 && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 10px', borderRadius: '16px', background: 'var(--surface)', border: '1px solid var(--border)', fontSize: '0.78rem', color: 'var(--text)' }}>
                   Under ZMW {priceMax}
@@ -672,12 +672,21 @@ export function HomePage({
       ) : (
         /* ---------------- NORMAL HOMEPAGE VIEW ---------------- */
         <div>
-          {/* Sliding Left-to-Right Advertising Hero Carousel */}
-          <div style={{ position: 'relative', width: '100%', overflow: 'hidden', borderRadius: '16px', border: '1px solid var(--border)', marginBottom: '32px', boxShadow: '0 8px 30px rgba(0, 0, 0, 0.3)' }}>
+          {/* Full-Bleed Sticky Background Underlay Hero Banner */}
+          <div style={{
+            position: 'sticky',
+            top: '60px',
+            width: '100vw',
+            overflow: 'hidden',
+            height: '420px',
+            marginTop: '-24px',
+            zIndex: 1,
+          }}>
             <div
               style={{
                 display: 'flex',
                 width: `${promoSlides.length * 100}%`,
+                height: '100%',
                 transform: `translateX(-${(currentSlide * 100) / promoSlides.length}%)`,
                 transition: 'transform 0.6s cubic-bezier(0.25, 1, 0.5, 1)',
               }}
@@ -688,23 +697,28 @@ export function HomePage({
                   style={{
                     width: `${100 / promoSlides.length}%`,
                     position: 'relative',
-                    height: '320px',
+                    height: '100%',
                     backgroundImage: `url(${slide.image})`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     display: 'flex',
                     alignItems: 'center',
-                    padding: '0 48px',
+                    padding: '0 max(28px, calc((100vw - 1200px) / 2))',
                     boxSizing: 'border-box',
                   }}
                 >
-                  <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'linear-gradient(90deg, rgba(15, 23, 42, 0.9) 0%, rgba(15, 23, 42, 0.55) 60%, rgba(15, 23, 42, 0.2) 100%)' }} />
+                  {/* Left Side Contrast Overlay */}
+                  <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'linear-gradient(90deg, rgba(15, 23, 42, 0.85) 0%, rgba(15, 23, 42, 0.5) 55%, rgba(15, 23, 42, 0.15) 100%)' }} />
 
-                  <div style={{ position: 'relative', zIndex: 5, maxWidth: '520px', color: '#ffffff' }}>
-                    <span style={{ display: 'inline-block', padding: '4px 12px', backgroundColor: '#2563eb', color: '#ffffff', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>
+                  {/* Amazon-Style Bottom Gradient Fade into Page Background */}
+                  <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '220px', background: 'linear-gradient(to bottom, transparent 0%, rgba(11, 15, 23, 0.4) 40%, var(--bg) 100%)', pointerEvents: 'none', zIndex: 4 }} />
+
+                  {/* Banner Content */}
+                  <div style={{ position: 'relative', zIndex: 5, maxWidth: '560px', color: '#ffffff', marginBottom: '80px' }}>
+                    <span style={{ display: 'inline-block', padding: '5px 14px', backgroundColor: '#2563eb', color: '#ffffff', borderRadius: '14px', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>
                       {slide.badge}
                     </span>
-                    <h2 style={{ fontSize: '1.9rem', fontWeight: 800, margin: '0 0 16px 0', lineHeight: 1.3 }}>
+                    <h2 style={{ fontSize: '2.1rem', fontWeight: 800, margin: '0 0 16px 0', lineHeight: 1.25, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
                       {slide.title}
                     </h2>
                     {slide.cat ? (
@@ -712,7 +726,7 @@ export function HomePage({
                         type="button"
                         onClick={() => toggleCategory(slide.cat!)}
                         className="primary-btn"
-                        style={{ padding: '12px 24px', fontSize: '0.92rem', fontWeight: 700, cursor: 'pointer' }}
+                        style={{ padding: '12px 26px', fontSize: '0.92rem', fontWeight: 700, cursor: 'pointer' }}
                       >
                         {slide.buttonText}
                       </button>
@@ -720,7 +734,7 @@ export function HomePage({
                       <Link
                         to={slide.link!}
                         className="primary-btn"
-                        style={{ padding: '12px 24px', fontSize: '0.92rem', fontWeight: 700, textDecoration: 'none', display: 'inline-block' }}
+                        style={{ padding: '12px 26px', fontSize: '0.92rem', fontWeight: 700, textDecoration: 'none', display: 'inline-block' }}
                       >
                         {slide.buttonText}
                       </Link>
@@ -730,8 +744,8 @@ export function HomePage({
               ))}
             </div>
 
-            {/* Indicator Dots */}
-            <div style={{ position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '8px', zIndex: 10 }}>
+            {/* Carousel Navigation Indicator Dots */}
+            <div style={{ position: 'absolute', bottom: '150px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '8px', zIndex: 10 }}>
               {promoSlides.map((_, idx) => (
                 <button
                   key={idx}
@@ -741,7 +755,7 @@ export function HomePage({
                     width: idx === currentSlide ? '24px' : '8px',
                     height: '8px',
                     borderRadius: '4px',
-                    backgroundColor: idx === currentSlide ? '#2563eb' : 'rgba(255, 255, 255, 0.4)',
+                    backgroundColor: idx === currentSlide ? '#2563eb' : 'rgba(255, 255, 255, 0.5)',
                     border: 'none',
                     cursor: 'pointer',
                     transition: 'all 0.3s'
@@ -751,8 +765,16 @@ export function HomePage({
             </div>
           </div>
 
-          {/* Section Rails */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '36px' }}>
+          {/* Amazon-Style Overlapping Elevated Content Sheet (Scrolls Over Faded Hero Background) */}
+          <div style={{
+            position: 'relative',
+            zIndex: 10,
+            marginTop: '-140px',
+            paddingTop: '20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '36px'
+          }}>
             {/* SECTION 1: TODAY'S PICKS */}
             {latestListings.length > 0 && (
               <section className="marketplace-feed">

@@ -1,8 +1,7 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import type { Listing, Profile, BusinessProfile, PaymentMethodItem, NotificationConfig } from '../types'
-import { ListingCard } from '../components/ListingCard'
-import { NotificationsPage } from './SavedNotificationsPage'
+import { SavedItemsPage, NotificationsPage } from './SavedNotificationsPage'
 import { ListingFormPage } from './ListingPage'
 import { StoreSetupPage } from './StoreSetupPage'
 import type { NotificationItem } from '../features/marketplace/useMarketplaceApp'
@@ -31,8 +30,6 @@ type ProfilePageProps = {
     activeSection: 'dashboard' | 'settings' | 'notifications' | 'create' | 'business-setup' | 'store-dashboard' | 'saved-listings'
     theme: 'light' | 'dark'
     locationString: string
-    cardSize: number
-    onCardSizeChange: (size: number) => void
     onToggleTheme: () => void
     onGoHome: () => void
 
@@ -46,7 +43,6 @@ type ProfilePageProps = {
         description: string
         price: string
         category: string
-        location: string
         status: string
         listingType: string
         condition: string
@@ -58,7 +54,6 @@ type ProfilePageProps = {
         onDescriptionChange: (v: string) => void
         onPriceChange: (v: string) => void
         onCategoryChange: (v: string) => void
-        onLocationChange: (v: string) => void
         onStatusChange: (v: string) => void
         onListingTypeChange: (v: string) => void
         onConditionChange: (v: string) => void
@@ -79,8 +74,8 @@ type ProfilePageProps = {
     onToggleFollowStore?: (storeId: string) => void
     onToggleNotifyStore?: (storeId: string) => void
 
-    currency?: 'ZMW' | 'USD' | 'EUR'
-    setCurrency?: (c: 'ZMW' | 'USD' | 'EUR') => void
+    currency?: 'ZMW'
+    setCurrency?: (c: 'ZMW') => void
     notificationsConfig?: NotificationConfig
     setNotificationsConfig?: React.Dispatch<React.SetStateAction<NotificationConfig>>
     blockedUserIds?: string[]
@@ -116,7 +111,7 @@ export function ProfilePage({
     storeSetupProps,
     allBusinesses = {},
     followingIds = [],
-    onToggleFollowStore = () => {},
+    onToggleFollowStore = () => { },
 }: ProfilePageProps) {
     const displayName = profile?.username || (userEmail && userEmail !== 'Guest' ? userEmail.split('@')[0] : 'User Profile')
     const navigate = useNavigate()
@@ -125,10 +120,10 @@ export function ProfilePage({
     const [sellerTab, setSellerTab] = useState<'active' | 'sold' | 'drafts'>('active')
 
     // Catalog Item creation states
-    const [catName, setCatName] = useState('')
-    const [catPrice, setCatPrice] = useState('')
-    const [catDesc, setCatDesc] = useState('')
-    const [catImage, setCatImage] = useState('')
+    const [catalogName, setCatName] = useState('')
+    const [catalogPrice, setCatPrice] = useState('')
+    const [catalogDescription, setCatDesc] = useState('')
+    const [catalogImage, setCatImage] = useState('')
 
     // Ads creation states
     const [adListingId, setAdListingId] = useState<number>(myListings[0]?.id || 0)
@@ -149,13 +144,13 @@ export function ProfilePage({
 
     const handleAddCatalogItem = (e: FormEvent) => {
         e.preventDefault()
-        if (!businessProfile || !catName || !catPrice) return
+        if (!businessProfile || !catalogName || !catalogPrice) return
         const newItem = {
             id: String(Date.now()),
-            name: catName,
-            price: catPrice,
-            description: catDesc,
-            image: catImage
+            name: catalogName,
+            price: catalogPrice,
+            description: catalogDescription,
+            image: catalogImage
         }
         void storeSetupProps.onSave({
             ...businessProfile,
@@ -229,6 +224,8 @@ export function ProfilePage({
         { path: '/profile/create', label: 'Create new listing', icon: 'add_circle', isPrimary: true },
         { path: '/profile', label: 'Seller dashboard', icon: 'dashboard', exact: true },
         { path: '/profile/store-dashboard', label: 'Store dashboard', icon: 'storefront' },
+        { path: '/profile/saved-listings', label: 'Saved listings', icon: 'bookmark' },
+        { path: '/profile/notifications', label: 'Notifications', icon: 'notifications' },
     ]
 
     return (
@@ -242,17 +239,17 @@ export function ProfilePage({
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span className="material-icons" style={{ fontSize: '20px', color: '#1967d2' }}>
                             {activeSection === 'settings' ? 'settings' :
-                             activeSection === 'create' ? 'add_circle' :
-                             activeSection === 'store-dashboard' ? 'storefront' :
-                             activeSection === 'saved-listings' ? 'bookmark' :
-                             activeSection === 'notifications' ? 'notifications' : 'dashboard'}
+                                activeSection === 'create' ? 'add_circle' :
+                                    activeSection === 'store-dashboard' ? 'storefront' :
+                                        activeSection === 'saved-listings' ? 'bookmark' :
+                                            activeSection === 'notifications' ? 'notifications' : 'dashboard'}
                         </span>
                         <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>
                             {activeSection === 'settings' ? 'Settings Menu' :
-                             activeSection === 'create' ? 'Create New Listing' :
-                             activeSection === 'store-dashboard' ? 'Store Dashboard' :
-                             activeSection === 'saved-listings' ? 'Saved Listings' :
-                             activeSection === 'notifications' ? 'Notifications' : 'Seller Dashboard'}
+                                activeSection === 'create' ? 'Create New Listing' :
+                                    activeSection === 'store-dashboard' ? 'Store Dashboard' :
+                                        activeSection === 'saved-listings' ? 'Saved Listings' :
+                                            activeSection === 'notifications' ? 'Notifications' : 'Seller Dashboard'}
                         </span>
                     </div>
                     <span className="material-icons" style={{ fontSize: '22px' }}>
@@ -343,7 +340,6 @@ export function ProfilePage({
                         description={createListingProps.description}
                         price={createListingProps.price}
                         category={createListingProps.category}
-                        location={createListingProps.location}
                         status={createListingProps.status}
                         listingType={createListingProps.listingType}
                         condition={createListingProps.condition}
@@ -356,7 +352,6 @@ export function ProfilePage({
                         onDescriptionChange={createListingProps.onDescriptionChange}
                         onPriceChange={createListingProps.onPriceChange}
                         onCategoryChange={createListingProps.onCategoryChange}
-                        onLocationChange={createListingProps.onLocationChange}
                         onStatusChange={createListingProps.onStatusChange}
                         onListingTypeChange={createListingProps.onListingTypeChange}
                         onConditionChange={createListingProps.onConditionChange}
@@ -478,8 +473,8 @@ export function ProfilePage({
                                                 <div className="image-upload-zone" style={{ padding: '14px', marginTop: '4px', border: '2px dashed var(--border)', borderRadius: '8px' }}>
                                                     <input type="file" accept="image/*" onChange={handleCatImageChange} style={{ display: 'none' }} id="catalog-image-input" />
                                                     <label htmlFor="catalog-image-input" style={{ cursor: 'pointer', display: 'flex', gap: '10px', alignItems: 'center' }}>
-                                                        {catImage ? (
-                                                            <img src={catImage} alt="Product" style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'cover' }} />
+                                                        {catalogImage ? (
+                                                            <img src={catalogImage} alt="Product" style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'cover' }} />
                                                         ) : (
                                                             <div className="upload-icon"><span className="material-icons">add_a_photo</span></div>
                                                         )}
@@ -488,9 +483,9 @@ export function ProfilePage({
                                                 </div>
                                             </label>
 
-                                            <input value={catName} onChange={e => setCatName(e.target.value)} placeholder="Product Name (e.g. Vanilla Wedding Cake)" required style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
-                                            <input value={catPrice} onChange={e => setCatPrice(e.target.value)} placeholder="Price (e.g. ZMW 450)" required style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
-                                            <textarea value={catDesc} onChange={e => setCatDesc(e.target.value)} placeholder="Description (e.g. Double layered sponge with buttercream)" rows={2} style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit' }} />
+                                            <input value={catalogName} onChange={e => setCatName(e.target.value)} placeholder="Product Name (e.g. Vanilla Wedding Cake)" required style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
+                                            <input value={catalogPrice} onChange={e => setCatPrice(e.target.value)} placeholder="Price (e.g. ZMW 450)" required style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
+                                            <textarea value={catalogDescription} onChange={e => setCatDesc(e.target.value)} placeholder="Description (e.g. Double layered sponge with buttercream)" rows={2} style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit' }} />
 
                                             <button className="primary-btn" type="submit" style={{ padding: '10px', borderRadius: '8px' }}>Add Product</button>
                                         </form>
@@ -539,9 +534,9 @@ export function ProfilePage({
                                         <form onSubmit={handleLaunchAd} className="form-stack" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                             <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                                 <span style={{ fontSize: '0.84rem', fontWeight: 600 }}>Select Listing to Boost</span>
-                                                <select 
-                                                    value={adListingId} 
-                                                    onChange={e => setAdListingId(Number(e.target.value))} 
+                                                <select
+                                                    value={adListingId}
+                                                    onChange={e => setAdListingId(Number(e.target.value))}
                                                     required
                                                     style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }}
                                                 >
@@ -554,11 +549,11 @@ export function ProfilePage({
 
                                             <input value={adTitle} onChange={e => setAdTitle(e.target.value)} placeholder="Custom Ad Slogan (e.g. Lusaka's Finest Tutors - 10% Off!)" style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
                                             <input value={adBudget} onChange={e => setAdBudget(e.target.value)} placeholder="Budget in ZMW (e.g. 150)" required style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
-                                            
+
                                             <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                                 <span style={{ fontSize: '0.84rem', fontWeight: 600 }}>Campaign Duration</span>
-                                                <select 
-                                                    value={adDuration} 
+                                                <select
+                                                    value={adDuration}
                                                     onChange={e => setAdDuration(e.target.value)}
                                                     style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }}
                                                 >
@@ -675,29 +670,11 @@ export function ProfilePage({
                         </section>
                     )
                 ) : activeSection === 'saved-listings' ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        <h3>Saved listings ({savedListings.length})</h3>
-                        {savedListings.length === 0 ? (
-                            <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>No saved listings. Tap the Wishlist button on any listing to save it.</p>
-                        ) : (
-                            <div className="dashboard-listing-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '16px' }}>
-                                {savedListings.map((listing) => (
-                                    <div key={listing.id} className="listing-card-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                        <ListingCard
-                                            listing={listing}
-                                            saved={true}
-                                            onOpen={onOpenListing}
-                                            onToggleSave={onToggleSave}
-                                        />
-                                        <button className="secondary-btn compact-btn delete-btn" onClick={() => onToggleSave(Number(listing.id))} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', width: '100%' }}>
-                                            <span className="material-icons" style={{ fontSize: '16px' }}>bookmark_remove</span>
-                                            Unsave / Remove
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                    <SavedItemsPage
+                        savedListings={savedListings}
+                        onOpenListing={onOpenListing}
+                        onToggleSave={onToggleSave}
+                    />
                 ) : activeSection === 'business-setup' ? (
                     <StoreSetupPage
                         userId={storeSetupProps.userId}
@@ -817,11 +794,43 @@ export function ProfilePage({
                                                         <p className="seller-row-desc" style={{ margin: '0 0 6px 0', fontSize: '0.82rem', color: 'var(--text-secondary)', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                                                             {listing.description}
                                                         </p>
-                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', fontSize: '0.86rem' }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', fontSize: '0.86rem', marginTop: '6px', flexWrap: 'wrap' }}>
                                                             <strong style={{ color: 'var(--primary)', fontSize: '0.95rem' }}>ZMW {listing.price}</strong>
-                                                            <span style={{ fontSize: '0.78rem', background: 'var(--panel)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
-                                                                {listing.category} • {listing.location}
-                                                            </span>
+                                                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                                                {(() => {
+                                                                    const now = Date.now()
+                                                                    const DAY_MS = 24 * 60 * 60 * 1000
+                                                                    const freq = listing.renewal_frequency ?? 'weekly'
+                                                                    const interval = freq === 'daily' ? DAY_MS : freq === 'biweekly' ? 14 * DAY_MS : freq === 'monthly' ? 30 * DAY_MS : 7 * DAY_MS
+                                                                    const lastRenewed = new Date(listing.last_renewed_at || listing.created_at || now).getTime()
+                                                                    const remainingMs = interval - (now - lastRenewed)
+
+                                                                    if (remainingMs <= 0) {
+                                                                        return (
+                                                                            <span style={{ fontSize: '0.75rem', padding: '3px 8px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.4)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                                                <span className="material-icons" style={{ fontSize: '13px' }}>error_outline</span>
+                                                                                Expired — Paused on Homepage
+                                                                            </span>
+                                                                        )
+                                                                    }
+
+                                                                    const hoursRemaining = Math.floor(remainingMs / (1000 * 60 * 60))
+                                                                    const daysRemaining = Math.floor(hoursRemaining / 24)
+                                                                    const remainingHoursMod = hoursRemaining % 24
+                                                                    const timeStr = daysRemaining > 0 ? `${daysRemaining}d ${remainingHoursMod}h left` : `${hoursRemaining}h left`
+                                                                    const isWarning = hoursRemaining < 48
+
+                                                                    return (
+                                                                        <span style={{ fontSize: '0.75rem', padding: '3px 8px', borderRadius: '12px', background: isWarning ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.12)', color: isWarning ? '#f59e0b' : '#10b981', border: isWarning ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid rgba(16, 185, 129, 0.3)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                                            <span className="material-icons" style={{ fontSize: '13px' }}>schedule</span>
+                                                                            {isWarning ? `Expires Soon: ${timeStr}` : `Expires in ${timeStr}`}
+                                                                        </span>
+                                                                    )
+                                                                })()}
+                                                                <span style={{ fontSize: '0.78rem', background: 'var(--panel)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                                                                    {listing.category}
+                                                                </span>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -831,7 +840,7 @@ export function ProfilePage({
                                                     <button className="secondary-btn compact-btn" onClick={() => onUpdateStatus(listing.id, listing.status === 'Sold' ? 'Available' : 'Sold')}>
                                                         {listing.status === 'Sold' ? 'Restock' : 'Mark Sold'}
                                                     </button>
-                                                    <button className="secondary-btn compact-btn" onClick={() => onRenewListing(listing.id)}>Renew</button>
+                                                    <button className="primary-btn compact-btn" onClick={() => onRenewListing(listing.id)}>Renew Listing</button>
                                                     <button className="ghost-btn compact-btn delete-btn" onClick={() => onDeleteListing(listing.id)}>
                                                         <span className="material-icons">delete</span>
                                                     </button>

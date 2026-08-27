@@ -99,7 +99,7 @@ export function ListingDetailPage({
       return
     }
 
-    const offerMsg = `[OFFER] Proposed Offer: ZMW ${offerAmount} for "${selectedListing.title}" (Original: ZMW ${selectedListing.price}) | Phone: ${phone || 'Not provided'} | Location: ${locationAddress || selectedListing.location}`
+    const offerMsg = `[OFFER] Proposed Offer: ZMW ${offerAmount} for "${selectedListing.title}" (Original: ZMW ${selectedListing.price}) | Phone: ${phone || 'Not provided'}`
     onMessageSeller(offerMsg)
   }
 
@@ -263,7 +263,6 @@ export function ListingDetailPage({
               </div>
               <div>
                 <span style={{ display: 'block', fontSize: '0.74rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Location</span>
-                <strong style={{ display: 'block', fontSize: '0.98rem', color: 'var(--text)', marginTop: '2px' }}>{selectedListing.location}</strong>
               </div>
             </div>
 
@@ -551,7 +550,7 @@ function ListingRatingReviewBox({ listingId, currentUserName }: { listingId: num
       {/* Write a review form */}
       <form onSubmit={handleSubmitReview} style={{ display: 'flex', flexDirection: 'column', gap: '14px', background: 'var(--surface)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
         <h4 style={{ margin: 0, fontSize: '0.96rem' }}>Rate this item</h4>
-        
+
         <div>
           <span style={{ fontSize: '0.84rem', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Select Star Rating</span>
           <div style={{ display: 'flex', gap: '6px' }}>
@@ -629,7 +628,6 @@ type ListingFormPageProps = {
   description: string
   price: string
   category: string
-  location: string
   status: string
   listingType: string
   condition: string
@@ -642,13 +640,14 @@ type ListingFormPageProps = {
   onDescriptionChange: (value: string) => void
   onPriceChange: (value: string) => void
   onCategoryChange: (value: string) => void
-  onLocationChange: (value: string) => void
   onStatusChange: (value: string) => void
   onListingTypeChange: (value: string) => void
   onConditionChange: (value: string) => void
   onDeliveryOptionChange: (value: string) => void
   availableColors: string[]
   onAvailableColorsChange: (colors: string[]) => void
+  renewalFrequency?: 'daily' | 'weekly' | 'biweekly' | 'monthly'
+  onRenewalFrequencyChange?: (val: 'daily' | 'weekly' | 'biweekly' | 'monthly') => void
 }
 
 export function ListingFormPage({
@@ -657,7 +656,6 @@ export function ListingFormPage({
   description,
   price,
   category,
-  location,
   status,
   listingType,
   condition,
@@ -670,13 +668,14 @@ export function ListingFormPage({
   onDescriptionChange,
   onPriceChange,
   onCategoryChange,
-  onLocationChange,
   onStatusChange,
   onListingTypeChange,
   onConditionChange,
   onDeliveryOptionChange,
   availableColors,
   onAvailableColorsChange,
+  renewalFrequency = 'weekly',
+  onRenewalFrequencyChange,
 }: ListingFormPageProps) {
   const [errorText, setErrorText] = useState('')
   const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit')
@@ -905,7 +904,6 @@ export function ListingFormPage({
               description: description || 'No description provided.',
               price: Number(price) || 0,
               category,
-              location,
               status: status || 'Available',
               listing_type: listingKind,
               condition: listingKind === 'service' ? 'New' : condition,
@@ -1182,20 +1180,6 @@ export function ListingFormPage({
             </select>
           </div>
 
-          {/* LOCATION INPUT */}
-          <div>
-            <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text)' }}>
-              Location / City <span style={{ color: '#ef4444' }}>*</span>
-            </label>
-            <input
-              value={location}
-              onChange={(event) => onLocationChange(event.target.value)}
-              placeholder="e.g. Lusaka, Kitwe, Ndola"
-              required
-              style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.92rem' }}
-            />
-          </div>
-
           {/* STATUS SELECT (EDIT MODE ONLY) */}
           {mode === 'edit' && (
             <div>
@@ -1268,6 +1252,28 @@ export function ListingFormPage({
                 )
               })}
             </div>
+          </div>
+
+          {/* RENEWAL FREQUENCY SELECTOR */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text)' }}>
+              Listing Renewal Frequency <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>(How often this listing needs to be renewed)</span>
+            </label>
+            <select
+              value={renewalFrequency}
+              onChange={(e) => {
+                if (onRenewalFrequencyChange) onRenewalFrequencyChange(e.target.value as any)
+              }}
+              style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.92rem' }}
+            >
+              <option value="weekly">Weekly (Every 7 Days — Recommended)</option>
+              <option value="daily">Daily (Every 24 Hours)</option>
+              <option value="biweekly">Bi-Weekly (Every 14 Days)</option>
+              <option value="monthly">Monthly (Every 30 Days)</option>
+            </select>
+            <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+              After this duration, your listing will pause on the homepage until you tap "Renew" in your Seller Dashboard.
+            </p>
           </div>
 
           <button className="primary-btn" type="submit" style={{ marginTop: '8px' }}>{mode === 'create' ? 'Publish listing' : 'Save changes'}</button>
