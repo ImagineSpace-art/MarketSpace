@@ -104,6 +104,20 @@ export interface MarketplaceAppModel {
   setDeliveryOption: Dispatch<SetStateAction<string>>
   renewalFrequency: 'daily' | 'weekly' | 'biweekly' | 'monthly'
   setRenewalFrequency: Dispatch<SetStateAction<'daily' | 'weekly' | 'biweekly' | 'monthly'>>
+  publishAs: 'private' | 'store'
+  setPublishAs: Dispatch<SetStateAction<'private' | 'store'>>
+  collectionId: string
+  setCollectionId: Dispatch<SetStateAction<string>>
+  howItWorks: string
+  setHowItWorks: Dispatch<SetStateAction<string>>
+  useGlobalRenewal: boolean
+  setUseGlobalRenewal: Dispatch<SetStateAction<boolean>>
+  globalRenewalFrequency: 'daily' | 'weekly' | 'biweekly' | 'monthly'
+  setGlobalRenewalFrequency: Dispatch<SetStateAction<'daily' | 'weekly' | 'biweekly' | 'monthly'>>
+  globalRenewalDay: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday'
+  setGlobalRenewalDay: Dispatch<SetStateAction<'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday'>>
+  enableGlobalRenewal: boolean
+  setEnableGlobalRenewal: Dispatch<SetStateAction<boolean>>
   canMessage: boolean
   setCanMessage: Dispatch<SetStateAction<boolean>>
   userEmail: string
@@ -220,6 +234,35 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   const [sortBy, setSortBy] = useState('Newest')
   const [showOnlyAvailable, setShowOnlyAvailable] = useState(true)
   const [savedIds, setSavedIds] = useState<string[]>(getStoredSavedIds)
+  const [globalRenewalFrequency, setGlobalRenewalFrequency] = useState<'daily' | 'weekly' | 'biweekly' | 'monthly'>(() => {
+    if (typeof window === 'undefined') return 'weekly'
+    const stored = window.localStorage.getItem('marketspace-global-renewal')
+    return (stored as any) || 'weekly'
+  })
+
+  const [globalRenewalDay, setGlobalRenewalDay] = useState<'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday'>(() => {
+    if (typeof window === 'undefined') return 'Monday'
+    const stored = window.localStorage.getItem('marketspace-global-renewal-day')
+    return (stored as any) || 'Monday'
+  })
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('marketspace-global-renewal', globalRenewalFrequency)
+    }
+  }, [globalRenewalFrequency])
+
+  const [enableGlobalRenewal, setEnableGlobalRenewal] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true
+    const stored = window.localStorage.getItem('marketspace-enable-global-renewal')
+    return stored !== null ? JSON.parse(stored) : true
+  })
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('marketspace-enable-global-renewal', JSON.stringify(enableGlobalRenewal))
+    }
+  }, [enableGlobalRenewal])
   const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
     if (typeof window === 'undefined') return []
     const stored = window.localStorage.getItem('marketspace-notifications')
@@ -274,6 +317,10 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   const [uploadedImages, setUploadedImages] = useState<string[]>([])
   const [availableColors, setAvailableColors] = useState<string[]>([])
   const [renewalFrequency, setRenewalFrequency] = useState<'daily' | 'weekly' | 'biweekly' | 'monthly'>('weekly')
+  const [publishAs, setPublishAs] = useState<'private' | 'store'>('private')
+  const [collectionId, setCollectionId] = useState<string>('')
+  const [howItWorks, setHowItWorks] = useState<string>('')
+  const [useGlobalRenewal, setUseGlobalRenewal] = useState<boolean>(true)
   const [listingKindFilter, setListingKindFilter] = useState<'all' | 'item' | 'service'>('all')
   const [canMessage, setCanMessage] = useState(true)
 
@@ -830,6 +877,10 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setDeliveryOption('Meetup')
     setUploadedImages([])
     setAvailableColors([])
+    setPublishAs('private')
+    setCollectionId('')
+    setHowItWorks('')
+    setUseGlobalRenewal(true)
   }
 
   const handleCreateListing = async (event: FormEvent<HTMLFormElement>) => {
@@ -838,6 +889,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       setMessage('Please sign in to create a listing')
       return
     }
+
+    const effectiveRenewal = useGlobalRenewal ? globalRenewalFrequency : renewalFrequency
 
     const { error } = await supabase.from('listings').insert({
       user_id: session.user.id,
@@ -851,7 +904,11 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       delivery_option: deliveryOption,
       images: uploadedImages,
       available_colors: availableColors,
-      renewal_frequency: renewalFrequency,
+      renewal_frequency: effectiveRenewal,
+      use_global_renewal: useGlobalRenewal,
+      publish_as: publishAs,
+      collection_id: publishAs === 'store' ? collectionId : null,
+      how_it_works: howItWorks,
       last_renewed_at: new Date().toISOString(),
     })
 
@@ -870,6 +927,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     event.preventDefault()
     if (!editingListing) return
 
+    const effectiveRenewal = useGlobalRenewal ? globalRenewalFrequency : renewalFrequency
+
     const { error } = await supabase.from('listings').update({
       title,
       description,
@@ -881,7 +940,11 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       delivery_option: deliveryOption,
       images: uploadedImages,
       available_colors: availableColors,
-      renewal_frequency: renewalFrequency,
+      renewal_frequency: effectiveRenewal,
+      use_global_renewal: useGlobalRenewal,
+      publish_as: publishAs,
+      collection_id: publishAs === 'store' ? collectionId : null,
+      how_it_works: howItWorks,
     }).eq('id', editingListing.id)
 
     if (error) {
@@ -914,6 +977,10 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setUploadedImages(listing.images ?? [])
     setAvailableColors(listing.available_colors ?? [])
     setRenewalFrequency(listing.renewal_frequency ?? 'weekly')
+    setPublishAs((listing.publish_as as any) ?? 'private')
+    setCollectionId(listing.collection_id ?? '')
+    setHowItWorks(listing.how_it_works ?? '')
+    setUseGlobalRenewal(listing.use_global_renewal ?? true)
     navigate(`/edit/${listing.id}`)
   }
 
@@ -1074,12 +1141,35 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       .filter((listing) => {
         const listingPrice = Number(String(listing.price).replace(/[^\d.]/g, ''))
 
-        // Dynamic Renewal Frequency Rule: listings older than their renewal interval are paused from the homepage for ALL users
+        // Dynamic Renewal Frequency Rule: listings older than their renewal interval or cycle day are paused from homepage
         const DAY_MS = 24 * 60 * 60 * 1000
-        const freq = listing.renewal_frequency ?? 'weekly'
-        const expiryIntervalMs = freq === 'daily' ? DAY_MS : freq === 'biweekly' ? 14 * DAY_MS : freq === 'monthly' ? 30 * DAY_MS : 7 * DAY_MS
+        const now = Date.now()
         const lastRenewedTime = new Date(listing.last_renewed_at || listing.created_at || Date.now()).getTime()
-        const isExpired = Date.now() - lastRenewedTime > expiryIntervalMs
+        const daysSinceRenewed = (now - lastRenewedTime) / DAY_MS
+
+        let isExpired = false
+
+        if (listing.use_global_renewal === false) {
+          const freq = listing.renewal_frequency ?? 'weekly'
+          const expiryIntervalMs = freq === 'daily' ? DAY_MS : freq === 'biweekly' ? 14 * DAY_MS : freq === 'monthly' ? 30 * DAY_MS : 7 * DAY_MS
+          isExpired = now - lastRenewedTime > expiryIntervalMs
+        } else {
+          // Global Renewal Mode: Frequency + Preferred Day of Week
+          const freq = globalRenewalFrequency || 'weekly'
+          const cycleDays = freq === 'daily' ? 1 : freq === 'biweekly' ? 14 : freq === 'monthly' ? 30 : 7
+          const dayIndexMap: Record<string, number> = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 }
+          const targetDay = dayIndexMap[globalRenewalDay] ?? 1
+          const currentDay = new Date(now).getDay()
+
+          if (daysSinceRenewed >= cycleDays) {
+            isExpired = true
+          } else if (freq === 'weekly' || freq === 'biweekly') {
+            const lastRenewedDay = new Date(lastRenewedTime).getDay()
+            if (daysSinceRenewed >= 1 && currentDay === targetDay && lastRenewedDay !== targetDay) {
+              isExpired = true
+            }
+          }
+        }
 
         if (isExpired) {
           return false
@@ -1363,6 +1453,20 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setAvailableColors,
     renewalFrequency,
     setRenewalFrequency,
+    publishAs,
+    setPublishAs,
+    collectionId,
+    setCollectionId,
+    howItWorks,
+    setHowItWorks,
+    useGlobalRenewal,
+    setUseGlobalRenewal,
+    globalRenewalFrequency,
+    setGlobalRenewalFrequency,
+    globalRenewalDay,
+    setGlobalRenewalDay,
+    enableGlobalRenewal,
+    setEnableGlobalRenewal,
     listingKindFilter,
     setListingKindFilter,
     followingIds,

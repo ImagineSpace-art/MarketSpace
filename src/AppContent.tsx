@@ -167,6 +167,18 @@ export function AppContent() {
 
 
 
+  const isStorePage = location.pathname.startsWith('/store/')
+  const storeUserIdParam = isStorePage ? location.pathname.split('/store/')[1]?.split('?')[0] : null
+  const currentViewStore = storeUserIdParam
+    ? (allBusinesses[storeUserIdParam] || (businessProfile?.userId === storeUserIdParam ? businessProfile : null))
+    : null
+
+  const storeContext = currentViewStore ? {
+    userId: currentViewStore.userId,
+    shopName: currentViewStore.shopName,
+    collections: currentViewStore.collections || []
+  } : null
+
   return (
     <>
       <Shell
@@ -190,6 +202,7 @@ export function AppContent() {
         unreadChatCount={app.chatThreads.filter((t) => t.unread).length}
         searchQuery={app.searchQuery}
         onSearchQueryChange={app.setSearchQuery}
+        storeContext={storeContext}
       >
         {message ? <div className="status-banner">{message}</div> : null}
         <Routes>
@@ -256,6 +269,16 @@ export function AppContent() {
                 onAvailableColorsChange={setAvailableColors}
                 renewalFrequency={app.renewalFrequency}
                 onRenewalFrequencyChange={app.setRenewalFrequency}
+                businessProfile={businessProfile}
+                globalRenewalFrequency={app.globalRenewalFrequency}
+                publishAs={app.publishAs}
+                onPublishAsChange={app.setPublishAs}
+                collectionId={app.collectionId}
+                onCollectionIdChange={app.setCollectionId}
+                howItWorks={app.howItWorks}
+                onHowItWorksChange={app.setHowItWorks}
+                useGlobalRenewal={app.useGlobalRenewal}
+                onUseGlobalRenewalChange={app.setUseGlobalRenewal}
               />
             }
           />
@@ -393,6 +416,17 @@ export function AppContent() {
                   onAvailableColorsChange: setAvailableColors,
                   renewalFrequency: app.renewalFrequency,
                   onRenewalFrequencyChange: app.setRenewalFrequency,
+                  businessProfile,
+                  globalRenewalFrequency: app.globalRenewalFrequency,
+                  globalRenewalDay: app.globalRenewalDay,
+                  publishAs: app.publishAs,
+                  onPublishAsChange: app.setPublishAs,
+                  collectionId: app.collectionId,
+                  onCollectionIdChange: app.setCollectionId,
+                  howItWorks: app.howItWorks,
+                  onHowItWorksChange: app.setHowItWorks,
+                  useGlobalRenewal: app.useGlobalRenewal,
+                  onUseGlobalRenewalChange: app.setUseGlobalRenewal,
                 }}
                 storeSetupProps={{
                   userId: session ? session.user.id : '',
@@ -423,6 +457,12 @@ export function AppContent() {
                   clearSearchHistory={app.clearSearchHistory}
                   userEmail={userEmail}
                   onDeleteAccount={app.handleDeleteAccount}
+                  globalRenewalFrequency={app.globalRenewalFrequency}
+                  setGlobalRenewalFrequency={app.setGlobalRenewalFrequency}
+                  globalRenewalDay={app.globalRenewalDay}
+                  setGlobalRenewalDay={app.setGlobalRenewalDay}
+                  enableGlobalRenewal={app.enableGlobalRenewal}
+                  setEnableGlobalRenewal={app.setEnableGlobalRenewal}
                 />
               ) : (
                 <Navigate to="/login" replace />
@@ -631,6 +671,17 @@ function ListingEditRoute({
   onAvailableColorsChange,
   renewalFrequency,
   onRenewalFrequencyChange,
+  businessProfile,
+  globalRenewalFrequency,
+  globalRenewalDay,
+  publishAs,
+  onPublishAsChange,
+  collectionId,
+  onCollectionIdChange,
+  howItWorks,
+  onHowItWorksChange,
+  useGlobalRenewal,
+  onUseGlobalRenewalChange,
 }: {
   listings: Listing[]
   loading: boolean
@@ -658,6 +709,17 @@ function ListingEditRoute({
   onAvailableColorsChange: (colors: string[]) => void
   renewalFrequency?: 'daily' | 'weekly' | 'biweekly' | 'monthly'
   onRenewalFrequencyChange?: (val: 'daily' | 'weekly' | 'biweekly' | 'monthly') => void
+  businessProfile?: any
+  globalRenewalFrequency?: any
+  globalRenewalDay?: any
+  publishAs?: any
+  onPublishAsChange?: any
+  collectionId?: any
+  onCollectionIdChange?: any
+  howItWorks?: any
+  onHowItWorksChange?: any
+  useGlobalRenewal?: any
+  onUseGlobalRenewalChange?: any
 }) {
   const { id } = useParams()
   const listing = listings.find((l: Listing) => String(l.id) === id)
@@ -692,6 +754,17 @@ function ListingEditRoute({
       onAvailableColorsChange={onAvailableColorsChange}
       renewalFrequency={renewalFrequency}
       onRenewalFrequencyChange={onRenewalFrequencyChange}
+      businessProfile={businessProfile}
+      globalRenewalFrequency={globalRenewalFrequency}
+      globalRenewalDay={globalRenewalDay}
+      publishAs={publishAs}
+      onPublishAsChange={onPublishAsChange}
+      collectionId={collectionId}
+      onCollectionIdChange={onCollectionIdChange}
+      howItWorks={howItWorks}
+      onHowItWorksChange={onHowItWorksChange}
+      useGlobalRenewal={useGlobalRenewal}
+      onUseGlobalRenewalChange={onUseGlobalRenewalChange}
     />
   )
 }

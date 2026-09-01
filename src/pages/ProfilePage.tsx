@@ -336,28 +336,8 @@ export function ProfilePage({
                 ) : activeSection === 'create' ? (
                     <ListingFormPage
                         mode="create"
-                        title={createListingProps.title}
-                        description={createListingProps.description}
-                        price={createListingProps.price}
-                        category={createListingProps.category}
-                        status={createListingProps.status}
-                        listingType={createListingProps.listingType}
-                        condition={createListingProps.condition}
-                        deliveryOption={createListingProps.deliveryOption}
-                        uploadedImages={createListingProps.uploadedImages}
-                        onUploadedImagesChange={createListingProps.onUploadedImagesChange}
-                        onSubmit={createListingProps.onSubmit}
+                        {...createListingProps}
                         onCancel={() => navigate('/profile')}
-                        onTitleChange={createListingProps.onTitleChange}
-                        onDescriptionChange={createListingProps.onDescriptionChange}
-                        onPriceChange={createListingProps.onPriceChange}
-                        onCategoryChange={createListingProps.onCategoryChange}
-                        onStatusChange={createListingProps.onStatusChange}
-                        onListingTypeChange={createListingProps.onListingTypeChange}
-                        onConditionChange={createListingProps.onConditionChange}
-                        onDeliveryOptionChange={createListingProps.onDeliveryOptionChange}
-                        availableColors={createListingProps.availableColors}
-                        onAvailableColorsChange={createListingProps.onAvailableColorsChange}
                     />
                 ) : activeSection === 'store-dashboard' ? (
                     businessProfile ? (

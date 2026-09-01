@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
 import { ListingCard } from '../components/ListingCard'
 import type { MarketplaceAppModel } from '../features/marketplace/useMarketplaceApp'
 
@@ -65,7 +64,6 @@ export function HomePage({
       image: '/banners/banner_electronics.png',
       badge: 'Local Electronics',
       title: 'Find computers, audio systems, and gaming gear in Lusaka.',
-      buttonText: 'Explore Electronics',
       cat: 'Electronics',
     },
     {
@@ -73,7 +71,6 @@ export function HomePage({
       image: '/banners/banner_fashion.png',
       badge: 'Fashion & Trends',
       title: 'Update your wardrobe with sneakers and stylish wear.',
-      buttonText: 'Shop Fashion',
       cat: 'Fashion',
     },
     {
@@ -81,7 +78,6 @@ export function HomePage({
       image: '/banners/banner_community.png',
       badge: 'Verified Local Stores',
       title: 'Support local Zambian merchants and browse full shop catalogs.',
-      buttonText: 'Browse Stores',
       link: '/stores',
     },
     {
@@ -89,7 +85,6 @@ export function HomePage({
       image: '/banners/banner_electronics.png',
       badge: 'Sell on MarketSpace',
       title: 'List your goods instantly and get messages directly from buyers.',
-      buttonText: 'Start Selling',
       link: '/onboarding',
     },
   ]
@@ -671,17 +666,20 @@ export function HomePage({
         </div>
       ) : (
         /* ---------------- NORMAL HOMEPAGE VIEW ---------------- */
-        <div>
+        <div style={{ position: "relative" }}>
           {/* Full-Bleed Sticky Background Underlay Hero Banner */}
           <div style={{
             position: 'sticky',
-            top: '60px',
-            width: '100vw',
+            top: '105px',
+            marginLeft: 'calc(-50vw + 50%)',
+            marginRight: 'calc(-50vw + 50%)',
             overflow: 'hidden',
-            height: '420px',
+            height: '400px',
             marginTop: '-24px',
             zIndex: 1,
           }}>
+            {/* Gradient */}
+            <div style={{ position: 'absolute', bottom: '0', left: 0, width: '100%', height: '100px', background: 'linear-gradient(to bottom, transparent 0%, rgba(11, 15, 23, 0.4) 40%, var(--bg) 100%)', pointerEvents: 'none', zIndex: 4 }} />
             <div
               style={{
                 display: 'flex',
@@ -710,9 +708,6 @@ export function HomePage({
                   {/* Left Side Contrast Overlay */}
                   <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'linear-gradient(90deg, rgba(15, 23, 42, 0.85) 0%, rgba(15, 23, 42, 0.5) 55%, rgba(15, 23, 42, 0.15) 100%)' }} />
 
-                  {/* Amazon-Style Bottom Gradient Fade into Page Background */}
-                  <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '220px', background: 'linear-gradient(to bottom, transparent 0%, rgba(11, 15, 23, 0.4) 40%, var(--bg) 100%)', pointerEvents: 'none', zIndex: 4 }} />
-
                   {/* Banner Content */}
                   <div style={{ position: 'relative', zIndex: 5, maxWidth: '560px', color: '#ffffff', marginBottom: '80px' }}>
                     <span style={{ display: 'inline-block', padding: '5px 14px', backgroundColor: '#2563eb', color: '#ffffff', borderRadius: '14px', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>
@@ -721,24 +716,6 @@ export function HomePage({
                     <h2 style={{ fontSize: '2.1rem', fontWeight: 800, margin: '0 0 16px 0', lineHeight: 1.25, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
                       {slide.title}
                     </h2>
-                    {slide.cat ? (
-                      <button
-                        type="button"
-                        onClick={() => toggleCategory(slide.cat!)}
-                        className="primary-btn"
-                        style={{ padding: '12px 26px', fontSize: '0.92rem', fontWeight: 700, cursor: 'pointer' }}
-                      >
-                        {slide.buttonText}
-                      </button>
-                    ) : (
-                      <Link
-                        to={slide.link!}
-                        className="primary-btn"
-                        style={{ padding: '12px 26px', fontSize: '0.92rem', fontWeight: 700, textDecoration: 'none', display: 'inline-block' }}
-                      >
-                        {slide.buttonText}
-                      </Link>
-                    )}
                   </div>
                 </div>
               ))}
@@ -765,24 +742,28 @@ export function HomePage({
             </div>
           </div>
 
-          {/* Amazon-Style Overlapping Elevated Content Sheet (Scrolls Over Faded Hero Background) */}
+          {/* Overlapping Elevated Content Sheet (Scrolls Over Faded Hero Background) */}
           <div style={{
             position: 'relative',
             zIndex: 10,
-            marginTop: '-140px',
-            paddingTop: '20px',
+            marginTop: '-100px',
+            marginLeft: 'calc(-50vw + 50%)',
+            marginRight: 'calc(-50vw + 50%)',
+            padding: '20px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '36px'
+            gap: '36px',
+            //backgroundColor: 'var(--bg, #ffffff)',
+            background: 'linear-gradient(to bottom, transparent 0%, var(--bg) 10%)'
           }}>
             {/* SECTION 1: TODAY'S PICKS */}
             {latestListings.length > 0 && (
               <section className="marketplace-feed">
                 <div className="marketplace-feed-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                   <div>
-                    <h2 style={{ fontSize: '1.4rem', margin: 0 }}>Today's picks (Latest)</h2>
+                    <h2 style={{ fontSize: '1.4rem', margin: 0 }}>Latest Picks</h2>
                     <p style={{ margin: '4px 0 0', fontSize: '0.86rem', color: 'var(--text-secondary)' }}>
-                      Lusaka, Zambia • {distanceFilter === 100 ? 'Any distance' : `Within ${distanceFilter} km`} • Realtime Latest
+                      Lusaka, Zambia • {distanceFilter === 100 ? 'Any distance' : `Within ${distanceFilter} km`} • Latest
                     </p>
                   </div>
                   <button
@@ -852,7 +833,7 @@ export function HomePage({
               <section className="marketplace-feed">
                 <div className="marketplace-feed-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                   <div>
-                    <h2 style={{ fontSize: '1.4rem', margin: 0 }}>Local Electronics & Tech</h2>
+                    <h2 style={{ fontSize: '1.4rem', margin: 0 }}>Electronics & Tech</h2>
                     <p style={{ margin: '4px 0 0', fontSize: '0.86rem', color: 'var(--text-secondary)' }}>Computers, mobile phones, audio gear & accessories</p>
                   </div>
                   <button

@@ -46,6 +46,11 @@ ALTER TABLE public.stores
   ADD COLUMN IF NOT EXISTS collections JSONB DEFAULT '[]'::jsonb,
   ADD COLUMN IF NOT EXISTS customer_care JSONB DEFAULT '{}'::jsonb;
 
+-- Migration for profiles table:
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS global_renewal_frequency TEXT DEFAULT 'weekly',
+  ADD COLUMN IF NOT EXISTS global_renewal_day TEXT DEFAULT 'Monday';
+
 -- Migration for listings table:
 ALTER TABLE public.listings
   ADD COLUMN IF NOT EXISTS lowest_acceptable_price NUMERIC,

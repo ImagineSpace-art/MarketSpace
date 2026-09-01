@@ -44,12 +44,7 @@ export function ListingCard({ listing, saved = false, onOpen, onToggleSave }: Li
       </div>
 
       <div className="listing-card-body" onClick={() => onOpen(listing)} style={{ cursor: 'pointer', padding: '12px' }}>
-        <h3 style={{ margin: '0 0 6px 0', fontSize: '1rem', fontWeight: 700, color: 'var(--text)' }}>{listing.title}</h3>
-        {listing.description && (
-          <p style={{ margin: '0 0 10px 0', fontSize: '0.84rem', color: 'var(--text-secondary)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.4' }}>
-            {listing.description}
-          </p>
-        )}
+        <h2 style={{ margin: '0 0 6px 0', fontSize: '1rem', fontWeight: 700, color: 'var(--text)' }}>{listing.title}</h2>
         <div className="meta-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0', fontSize: '0.85rem' }}>
           <strong style={{ color: 'var(--primary)', fontSize: '1.05rem' }}>{formatZMWPrice(listing.price)}</strong>
         </div>

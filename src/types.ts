@@ -21,6 +21,10 @@ export type Listing = {
   created_at?: string
   rating?: number
   renewal_frequency?: 'daily' | 'weekly' | 'biweekly' | 'monthly'
+  use_global_renewal?: boolean
+  collection_id?: string
+  publish_as?: 'private' | 'store'
+  how_it_works?: string
 }
 
 export type Profile = {
@@ -32,6 +36,8 @@ export type Profile = {
   pending_otp?: string
   onboarding_choice?: string
   phone_verified?: boolean
+  global_renewal_frequency?: 'daily' | 'weekly' | 'biweekly' | 'monthly'
+  global_renewal_day?: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday'
 }
 
 export type CatalogItem = {

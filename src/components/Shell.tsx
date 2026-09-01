@@ -25,6 +25,7 @@ type ShellProps = {
   unreadChatCount?: number
   searchQuery: string
   onSearchQueryChange: (query: string) => void
+  storeContext?: { userId: string; shopName: string; collections: import('../types').StoreCollection[] } | null
 }
 
 const MEGA_CATEGORIES: Record<string, { label: string; subcats: string[]; featured: string[]; bannerTitle: string; bannerGradient: string }> = {
@@ -84,6 +85,7 @@ export function Shell({
   unreadChatCount = 0,
   searchQuery,
   onSearchQueryChange,
+  storeContext,
 }: ShellProps) {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null)
@@ -334,29 +336,78 @@ export function Shell({
           </form>
         </div>
 
-        {/* Row 3: Hover Expandable Category Bar (With Dropdown Arrow Chevrons on Mobile) */}
+        {/* Row 3: Hover Expandable Category Bar OR Storefront Departments Bar */}
         <nav className="category-mega-bar">
-          {Object.entries(MEGA_CATEGORIES).map(([catKey, catData]) => (
-            <button
-              key={catKey}
-              className={`category-bar-link ${activeCategories.includes(catKey) || hoveredCategory === catKey || mobileCatExpanded === catKey ? 'active' : ''}`}
-              onMouseEnter={() => {
-                if (window.innerWidth > 1024) setHoveredCategory(catKey)
-              }}
-              onClick={() => {
-                if (window.innerWidth <= 1024) {
-                  setMobileCatExpanded(mobileCatExpanded === catKey ? null : catKey)
-                } else {
-                  onCategoryToggle(catKey)
-                }
-              }}
-            >
-              <span>{catData.label}</span>
-              <span className="category-arrow-icon material-icons" style={{ fontSize: '15px', marginLeft: '3px' }}>
-                {mobileCatExpanded === catKey || hoveredCategory === catKey ? 'expand_less' : 'expand_more'}
-              </span>
-            </button>
-          ))}
+          {storeContext ? (
+            <>
+              <button
+                type="button"
+                className="category-bar-link active"
+                onClick={() => navigate(`/store/${storeContext.userId}?tab=catalog`)}
+                style={{ fontWeight: 700, color: '#60a5fa', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+              >
+                <span className="material-icons" style={{ fontSize: '16px' }}>storefront</span>
+                <span>{storeContext.shopName}</span>
+              </button>
+
+              <button
+                type="button"
+                className="category-bar-link"
+                onClick={() => navigate(`/store/${storeContext.userId}?tab=listings`)}
+              >
+                Listings
+              </button>
+
+              {(storeContext.collections || []).map((col) => (
+                <button
+                  key={col.id}
+                  type="button"
+                  className="category-bar-link"
+                  onClick={() => navigate(`/store/${storeContext.userId}?tab=col-${col.id}`)}
+                >
+                  {col.name}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                className="category-bar-link"
+                onClick={() => navigate(`/store/${storeContext.userId}?tab=care`)}
+              >
+                Customer Care & Policies
+              </button>
+
+              <button
+                type="button"
+                className="category-bar-link"
+                onClick={() => navigate(`/store/${storeContext.userId}?tab=reviews`)}
+              >
+                Reviews
+              </button>
+            </>
+          ) : (
+            Object.entries(MEGA_CATEGORIES).map(([catKey, catData]) => (
+              <button
+                key={catKey}
+                className={`category-bar-link ${activeCategories.includes(catKey) || hoveredCategory === catKey || mobileCatExpanded === catKey ? 'active' : ''}`}
+                onMouseEnter={() => {
+                  if (window.innerWidth > 1024) setHoveredCategory(catKey)
+                }}
+                onClick={() => {
+                  if (window.innerWidth <= 1024) {
+                    setMobileCatExpanded(mobileCatExpanded === catKey ? null : catKey)
+                  } else {
+                    onCategoryToggle(catKey)
+                  }
+                }}
+              >
+                <span>{catData.label}</span>
+                <span className="category-arrow-icon material-icons" style={{ fontSize: '15px', marginLeft: '3px' }}>
+                  {mobileCatExpanded === catKey || hoveredCategory === catKey ? 'expand_less' : 'expand_more'}
+                </span>
+              </button>
+            ))
+          )}
         </nav>
 
         {/* Mobile Expandable Category Sub-menu Drawer */}
@@ -448,7 +499,7 @@ export function Shell({
       </header>
 
       {/* 3. Sub-header Trust Badge Bar */}
-      <div className="trust-stats-bar">
+      {/* <div className="trust-stats-bar">
         <div className="trust-stat-item">
           <span className="material-icons" style={{ fontSize: '18px', color: '#1967d2' }}>star_outline</span>
           <span>Over <strong>13,000</strong> top-rated assets</span>
@@ -465,7 +516,7 @@ export function Shell({
           <span className="material-icons" style={{ fontSize: '18px', color: '#3b82f6' }}>verified</span>
           <span>Every item <strong>moderated by MarketSpace</strong></span>
         </div>
-      </div>
+      </div>*/}
 
       {/* Main Content Pane with Push Sidebar */}
       <div className={`content-grid full-width`}>
@@ -473,7 +524,7 @@ export function Shell({
       </div>
 
       {/* Footer */}
-      <footer className="amazon-footer" style={{ marginTop: '40px', fontFamily: 'inherit', clear: 'both' }}>
+      <footer className="market-footer" style={{ marginTop: '40px', fontFamily: 'inherit', clear: 'both' }}>
         <button
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           style={{

@@ -235,6 +235,18 @@ export function ListingDetailPage({
             </p>
           </div>
 
+          {selectedListing.how_it_works && (
+            <div style={{ background: 'var(--panel)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)', marginTop: '12px' }}>
+              <h4 style={{ margin: '0 0 8px 0', fontSize: '1.05rem', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="material-icons" style={{ fontSize: '20px', color: 'var(--primary)' }}>help_outline</span>
+                How It Works & Usage Instructions
+              </h4>
+              <p style={{ fontSize: '0.95rem', lineHeight: '1.6', color: 'var(--text-secondary)', margin: 0, whiteSpace: 'pre-line' }}>
+                {selectedListing.how_it_works}
+              </p>
+            </div>
+          )}
+
           {/* Rows of Metadata Cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px', marginTop: '10px' }}>
             <div style={{ backgroundColor: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -648,6 +660,17 @@ type ListingFormPageProps = {
   onAvailableColorsChange: (colors: string[]) => void
   renewalFrequency?: 'daily' | 'weekly' | 'biweekly' | 'monthly'
   onRenewalFrequencyChange?: (val: 'daily' | 'weekly' | 'biweekly' | 'monthly') => void
+  businessProfile?: import('../types').BusinessProfile | null
+  globalRenewalFrequency?: 'daily' | 'weekly' | 'biweekly' | 'monthly'
+  publishAs?: 'private' | 'store'
+  onPublishAsChange?: (val: 'private' | 'store') => void
+  collectionId?: string
+  onCollectionIdChange?: (val: string) => void
+  howItWorks?: string
+  onHowItWorksChange?: (val: string) => void
+  useGlobalRenewal?: boolean
+  onUseGlobalRenewalChange?: (val: boolean) => void
+  globalRenewalDay?: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday'
 }
 
 export function ListingFormPage({
@@ -676,6 +699,17 @@ export function ListingFormPage({
   onAvailableColorsChange,
   renewalFrequency = 'weekly',
   onRenewalFrequencyChange,
+  businessProfile,
+  globalRenewalFrequency = 'weekly',
+  globalRenewalDay = 'Monday',
+  publishAs = 'private',
+  onPublishAsChange,
+  collectionId = '',
+  onCollectionIdChange,
+  howItWorks = '',
+  onHowItWorksChange,
+  useGlobalRenewal = true,
+  onUseGlobalRenewalChange,
 }: ListingFormPageProps) {
   const [errorText, setErrorText] = useState('')
   const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit')
@@ -948,6 +982,95 @@ export function ListingFormPage({
             </div>
           </div>
 
+          {/* PUBLISHING ENTITY SELECTOR */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '8px', color: 'var(--text)' }}>
+              Publishing Entity <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <button
+                type="button"
+                onClick={() => onPublishAsChange && onPublishAsChange('private')}
+                style={{
+                  padding: '12px',
+                  borderRadius: '10px',
+                  border: publishAs === 'private' ? '2px solid #2563eb' : '1px solid var(--border)',
+                  background: publishAs === 'private' ? 'rgba(37, 99, 235, 0.08)' : 'var(--surface)',
+                  color: 'var(--text)',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px'
+                }}
+              >
+                <input
+                  type="radio"
+                  name="publish_as_radio"
+                  checked={publishAs === 'private'}
+                  onChange={() => onPublishAsChange && onPublishAsChange('private')}
+                  style={{ marginTop: '2px', cursor: 'pointer' }}
+                />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.92rem' }}>👤 Private Seller</div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '2px' }}>Standalone listing as an individual</div>
+                </div>
+              </button>
+              <button
+                type="button"
+                disabled={!businessProfile}
+                onClick={() => businessProfile && onPublishAsChange && onPublishAsChange('store')}
+                style={{
+                  padding: '12px',
+                  borderRadius: '10px',
+                  border: publishAs === 'store' ? '2px solid #2563eb' : '1px solid var(--border)',
+                  background: publishAs === 'store' ? 'rgba(37, 99, 235, 0.08)' : 'var(--surface)',
+                  color: 'var(--text)',
+                  textAlign: 'left',
+                  cursor: businessProfile ? 'pointer' : 'not-allowed',
+                  opacity: businessProfile ? 1 : 0.5,
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px'
+                }}
+              >
+                <input
+                  type="radio"
+                  name="publish_as_radio"
+                  checked={publishAs === 'store'}
+                  disabled={!businessProfile}
+                  onChange={() => businessProfile && onPublishAsChange && onPublishAsChange('store')}
+                  style={{ marginTop: '2px', cursor: businessProfile ? 'pointer' : 'not-allowed' }}
+                />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.92rem' }}>🏪 Store Catalog</div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                    {businessProfile ? `Publish under ${businessProfile.shopName}` : 'Requires merchant store setup'}
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* STORE DEPARTMENT / COLLECTION DROPDOWN */}
+          {publishAs === 'store' && businessProfile && (
+            <div>
+              <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text)' }}>
+                Store Department / Category
+              </label>
+              <select
+                value={collectionId || ''}
+                onChange={(e) => onCollectionIdChange && onCollectionIdChange(e.target.value)}
+                style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.92rem' }}
+              >
+                <option value="">General Store Catalog (Uncategorized)</option>
+                {(businessProfile.collections || []).map((col) => (
+                  <option key={col.id} value={col.id}>{col.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* TITLE INPUT */}
           <div>
             <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text)' }}>
@@ -972,6 +1095,20 @@ export function ListingFormPage({
               onChange={(event) => onDescriptionChange(event.target.value)}
               placeholder="Describe your item or service, key features, condition details, warranty, etc."
               rows={4}
+              style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.92rem', fontFamily: 'inherit' }}
+            />
+          </div>
+
+          {/* HOW IT WORKS TEXTAREA */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text)' }}>
+              How It Works & Usage Instructions <span style={{ fontSize: '0.78rem', fontWeight: 400, color: 'var(--text-secondary)' }}>(Optional)</span>
+            </label>
+            <textarea
+              value={howItWorks || ''}
+              onChange={(e) => onHowItWorksChange && onHowItWorksChange(e.target.value)}
+              placeholder="Explain in your own words how this item or service works, setup instructions, how to operate it, or what buyers need to know..."
+              rows={3}
               style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.92rem', fontFamily: 'inherit' }}
             />
           </div>
@@ -1256,22 +1393,52 @@ export function ListingFormPage({
 
           {/* RENEWAL FREQUENCY SELECTOR */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text)' }}>
-              Listing Renewal Frequency <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>(How often this listing needs to be renewed)</span>
+            <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '8px', color: 'var(--text)' }}>
+              Listing Renewal Frequency
             </label>
-            <select
-              value={renewalFrequency}
-              onChange={(e) => {
-                if (onRenewalFrequencyChange) onRenewalFrequencyChange(e.target.value as any)
-              }}
-              style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.92rem' }}
-            >
-              <option value="weekly">Weekly (Every 7 Days — Recommended)</option>
-              <option value="daily">Daily (Every 24 Hours)</option>
-              <option value="biweekly">Bi-Weekly (Every 14 Days)</option>
-              <option value="monthly">Monthly (Every 30 Days)</option>
-            </select>
-            <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '14px', background: 'var(--panel)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '0.9rem', color: 'var(--text)' }}>
+                <input
+                  type="radio"
+                  name="renewal_mode"
+                  checked={useGlobalRenewal !== false}
+                  onChange={() => onUseGlobalRenewalChange && onUseGlobalRenewalChange(true)}
+                  style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                />
+                <span>
+                  <strong>Use Global Renewal Schedule</strong> ({globalRenewalDay}s every {globalRenewalFrequency === 'daily' ? '1 Day' : globalRenewalFrequency === 'biweekly' ? '2 Weeks' : globalRenewalFrequency === 'monthly' ? 'Month' : 'Week'}) <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>(Default from Settings)</span>
+                </span>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '0.9rem', color: 'var(--text)' }}>
+                <input
+                  type="radio"
+                  name="renewal_mode"
+                  checked={useGlobalRenewal === false}
+                  onChange={() => onUseGlobalRenewalChange && onUseGlobalRenewalChange(false)}
+                  style={{ width: '16px', height: '16px' }}
+                />
+                <span><strong>Set Custom Frequency for this Listing</strong></span>
+              </label>
+
+              {useGlobalRenewal === false && (
+                <div style={{ marginTop: '4px' }}>
+                  <select
+                    value={renewalFrequency}
+                    onChange={(e) => {
+                      if (onRenewalFrequencyChange) onRenewalFrequencyChange(e.target.value as any)
+                    }}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.9rem' }}
+                  >
+                    <option value="weekly">Weekly (Every 7 Days — Recommended)</option>
+                    <option value="daily">Daily (Every 24 Hours)</option>
+                    <option value="biweekly">Bi-Weekly (Every 14 Days)</option>
+                    <option value="monthly">Monthly (Every 30 Days)</option>
+                  </select>
+                </div>
+              )}
+            </div>
+            <p style={{ margin: '6px 0 0 0', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
               After this duration, your listing will pause on the homepage until you tap "Renew" in your Seller Dashboard.
             </p>
           </div>

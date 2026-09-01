@@ -73,7 +73,17 @@ export function StoresPage({ stores, allBusinesses, onVisitShop, onOpenProfile, 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%', boxSizing: 'border-box' }}>
       {/* Sliding Store Hero Banner */}
-      <section style={{ position: 'relative', overflow: 'hidden', height: '240px', borderRadius: '16px', border: '1px solid var(--border)', width: '100%', boxSizing: 'border-box', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.25)' }}>
+      <div style={{
+        position: 'sticky',
+        top: '105px',
+        marginLeft: 'calc(-50vw + 50%)',
+        marginRight: 'calc(-50vw + 50%)',
+        overflow: 'hidden',
+        height: '200px',
+        marginTop: '-24px',
+        boxSizing: 'border-box'
+      }}>
+        <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '220px', background: 'linear-gradient(to bottom, transparent 0%, rgba(11, 15, 23, 0.4) 40%, var(--bg) 100%)', pointerEvents: 'none', zIndex: 4 }} />
         <div
           style={{
             display: 'flex',
@@ -111,10 +121,23 @@ export function StoresPage({ stores, allBusinesses, onVisitShop, onOpenProfile, 
             </div>
           ))}
         </div>
-      </section>
+      </div>
 
       {/* Main Content Area */}
-      <section className="section-card" style={{ padding: '24px' }}>
+      <div className="section-card"
+        style={{
+          position: 'relative',
+          zIndex: 10,
+          marginTop: '-100px',
+          marginLeft: 'calc(-50vw + 50%)',
+          marginRight: 'calc(-50vw + 50%)',
+          padding: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '36px',
+          //backgroundColor: 'var(--bg, #ffffff)',
+          background: 'linear-gradient(to bottom, transparent 0%, var(--bg) 10%)'
+        }}>
         {filteredShops.length > 0 && (
           <div style={{ marginBottom: '32px' }}>
             <p className="eyebrow" style={{ color: '#2563eb' }}>Registered Stores</p>
@@ -211,7 +234,7 @@ export function StoresPage({ stores, allBusinesses, onVisitShop, onOpenProfile, 
             </div>
           )}
         </div>
-      </section>
+      </div>
     </div>
   )
 }

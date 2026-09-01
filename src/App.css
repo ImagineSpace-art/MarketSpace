@@ -31,7 +31,7 @@ body {
     scrollbar-width: thin;
     scrollbar-color: rgba(150, 150, 150, 0.5) transparent;
     margin: 0;
-    overflow-x: hidden;
+    overflow-x: clip;
     min-height: 100%;
     background: var(--bg);
     color: var(--text);
@@ -256,7 +256,6 @@ select {
 }
 
 .listing-card {
-    border-radius: 18px;
     padding: 12px;
     cursor: pointer;
 }
@@ -371,7 +370,7 @@ select {
 .marketplace-listing-card {
     position: relative;
     padding: 0;
-    border: none;
+    border: 1px solid var(--border);
     box-shadow: none;
     background: transparent;
 }
@@ -755,8 +754,11 @@ select {
 }
 
 .dashboard-tab-btn.active {
-    background: var(--primary);
-    color: white;
+    border-width: 1px;
+    border-color: var(--primary);
+    border-style: solid;
+    /*background: var(--primary);*/
+    color: rgb(0, 0, 255);
     font-weight: 700;
 }
 
@@ -2633,12 +2635,12 @@ select {
     }
 }
 
-/* Amazon Footer Styles */
+/* Footer Styles */
 .back-to-top-btn:hover {
     background: #485769 !important;
 }
 
-.amazon-footer span:hover {
+.market-footer span:hover {
     text-decoration: underline;
     color: #ff9900 !important;
 }
@@ -2688,7 +2690,7 @@ body {
     min-height: 100vh;
     background: #f8f9fa !important;
     background-image: none !important;
-    overflow-x: hidden;
+    overflow-x: clip;
 }
 
 :root[data-theme="dark"] .app-shell {
@@ -2836,6 +2838,22 @@ body {
     font-weight: 800;
     font-size: 1.3rem;
     letter-spacing: -0.5px;
+    padding: 2px 5px;
+    border-radius: 8px;
+}
+
+.header-brand-logo:hover {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #ffffff;
+    text-decoration: none;
+    font-weight: 800;
+    font-size: 1.3rem;
+    letter-spacing: -0.5px;
+    background-color: var(--border);
+    padding: 2px 5px;
+    border-radius: 8px;
 }
 
 .header-brand-icon {
@@ -3113,6 +3131,7 @@ body {
     font-size: 0.85rem;
     color: #1f2937;
     width: 100%;
+    z-index: 10;
 }
 
 :root[data-theme="dark"] .trust-stats-bar {

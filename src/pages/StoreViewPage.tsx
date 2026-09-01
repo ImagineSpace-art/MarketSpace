@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { BusinessProfile, Listing, StoreReview } from '../types'
 import { ListingCard } from '../components/ListingCard'
 
@@ -44,7 +44,15 @@ export function StoreViewPage({
     const collectionsList = shop.collections || []
     const careInfo = shop.customerCare || {}
 
-    const [activeSubTab, setActiveSubTab] = useState<string>('catalog')
+    const [searchParams] = useSearchParams()
+    const tabQuery = searchParams.get('tab')
+    const [activeSubTab, setActiveSubTab] = useState<string>(tabQuery || 'catalog')
+
+    useEffect(() => {
+        if (tabQuery) {
+            setActiveSubTab(tabQuery)
+        }
+    }, [tabQuery])
     const [formRating, setFormRating] = useState(0)
 
     const shopListings = listings.filter(l => l.user_id === shop.userId)
@@ -286,20 +294,21 @@ export function StoreViewPage({
                 const colId = activeSubTab.replace('col-', '')
                 const targetCol = collectionsList.find(c => c.id === colId)
                 const colTitle = targetCol?.name || 'Department'
+                const filteredColListings = shopListings.filter(l => String(l.collection_id) === String(colId))
                 
                 return (
                     <section className="section-card">
                         <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: '12px', marginBottom: '16px' }}>
                             <h3 style={{ margin: 0, color: brandColor }}>{colTitle} Department</h3>
                             <p style={{ margin: '4px 0 0', fontSize: '0.86rem', color: 'var(--text-secondary)' }}>
-                                Browse items in {shop.shopName}'s {colTitle} collection.
+                                Browse items in {shop.shopName}'s {colTitle} collection ({filteredColListings.length} items).
                             </p>
                         </div>
-                        {shopListings.length === 0 ? (
-                            <p style={{ color: 'var(--text-muted)' }}>No products in this department yet.</p>
+                        {filteredColListings.length === 0 ? (
+                            <p style={{ color: 'var(--text-muted)', padding: '16px 0' }}>No products categorized under {colTitle} yet.</p>
                         ) : (
                             <div className="marketplace-listing-grid">
-                                {shopListings.map(listing => (
+                                {filteredColListings.map(listing => (
                                     <ListingCard
                                         key={listing.id}
                                         listing={listing}
