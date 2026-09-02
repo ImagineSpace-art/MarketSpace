@@ -218,7 +218,9 @@ export function AppContent() {
                 distanceFilter={distanceFilter}
                 toggleCategory={toggleCategory}
                 searchQuery={app.searchQuery}
+                activeCategories={activeCategories}
                 allBusinesses={allBusinesses}
+                clearAllFilters={app.clearAllFilters}
               />
             }
           />
@@ -330,6 +332,7 @@ export function AppContent() {
                 storeReviews={app.storeReviews}
                 addStoreReview={app.addStoreReview}
                 replyToStoreReview={app.replyToStoreReview}
+                handleUpdateListingCollection={app.handleUpdateListingCollection}
               />
             }
           />
@@ -769,7 +772,7 @@ function ListingEditRoute({
   )
 }
 
-function StoreViewRoute({ stores, businessProfile, allBusinesses, listings, navigate, handleStartChat, openListing, toggleSave, savedIds, loading, followingIds, notifyStoreIds, toggleFollowStore, toggleNotifyStore, session, storeReviews, addStoreReview, replyToStoreReview }: any) {
+function StoreViewRoute({ stores, businessProfile, allBusinesses, listings, navigate, handleStartChat, openListing, toggleSave, savedIds, loading, followingIds, notifyStoreIds, toggleFollowStore, toggleNotifyStore, session, storeReviews, addStoreReview, replyToStoreReview, handleUpdateListingCollection }: any) {
   const { userId } = useParams()
 
   const regStore: BusinessProfile | null =
@@ -819,6 +822,7 @@ function StoreViewRoute({ stores, businessProfile, allBusinesses, listings, navi
       storeReviews={storeReviews}
       onAddReview={addStoreReview}
       onReplyToReview={replyToStoreReview}
+      onUpdateListingCollection={handleUpdateListingCollection}
     />
   )
 }

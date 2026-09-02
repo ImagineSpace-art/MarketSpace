@@ -79,7 +79,7 @@ export function StoresPage({ stores, allBusinesses, onVisitShop, onOpenProfile, 
         marginLeft: 'calc(-50vw + 50%)',
         marginRight: 'calc(-50vw + 50%)',
         overflow: 'hidden',
-        height: '200px',
+        height: '400px',
         marginTop: '-24px',
         boxSizing: 'border-box'
       }}>
@@ -128,15 +128,18 @@ export function StoresPage({ stores, allBusinesses, onVisitShop, onOpenProfile, 
         style={{
           position: 'relative',
           zIndex: 10,
+          borderTopLeftRadius: '24px',
+          borderTopRightRadius: '24px',
           marginTop: '-100px',
           marginLeft: 'calc(-50vw + 50%)',
           marginRight: 'calc(-50vw + 50%)',
           padding: '20px',
           display: 'flex',
+          overflow: 'hidden',
           flexDirection: 'column',
           gap: '36px',
-          //backgroundColor: 'var(--bg, #ffffff)',
-          background: 'linear-gradient(to bottom, transparent 0%, var(--bg) 10%)'
+          backgroundColor: 'var(--bg, #ffffff)',
+          //background: 'linear-gradient(to bottom, transparent 0%, var(--bg) 10%)'
         }}>
         {filteredShops.length > 0 && (
           <div style={{ marginBottom: '32px' }}>

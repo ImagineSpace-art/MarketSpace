@@ -20,6 +20,7 @@ type StoreViewPageProps = {
     storeReviews?: StoreReview[]
     onAddReview?: (storeId: string, rating: number, comment: string) => void
     onReplyToReview?: (reviewId: string, replyText: string) => void
+    onUpdateListingCollection?: (listingId: number, colId: string | null) => void
 }
 
 export function StoreViewPage({
@@ -38,6 +39,7 @@ export function StoreViewPage({
     storeReviews = [],
     onAddReview = () => { },
     onReplyToReview = () => { },
+    onUpdateListingCollection,
 }: StoreViewPageProps) {
     const navigate = useNavigate()
     const brandColor = shop.accentColor || '#2563eb'
@@ -47,6 +49,7 @@ export function StoreViewPage({
     const [searchParams] = useSearchParams()
     const tabQuery = searchParams.get('tab')
     const [activeSubTab, setActiveSubTab] = useState<string>(tabQuery || 'catalog')
+    const [isPushDrawerOpen, setIsPushDrawerOpen] = useState(false)
 
     useEffect(() => {
         if (tabQuery) {
@@ -69,168 +72,152 @@ export function StoreViewPage({
         : null
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
             {/* Merchant Top Announcement Ticker Bar */}
             {shop.announcementBar && (
-                <div style={{ padding: '10px 16px', backgroundColor: brandColor, color: '#ffffff', borderRadius: '8px', fontWeight: 600, fontSize: '0.88rem', textAlign: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+                <div style={{ padding: '10px 16px', backgroundColor: brandColor, color: '#ffffff', fontWeight: 600, fontSize: '0.88rem', textAlign: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 15 }}>
                     {shop.announcementBar}
                 </div>
             )}
 
-            <button className="ghost-btn" style={{ alignSelf: 'flex-start' }} onClick={onBack}>← Back to Stores</button>
-
-            <section
+            {/* 1. Full-Bleed Sticky Hero Store Cover Banner (Identical scroll behavior to Homepage Hero) */}
+            <div
                 style={{
-                    position: 'relative',
+                    position: 'sticky',
+                    top: '105px',
+                    marginLeft: 'calc(-50vw + 50%)',
+                    marginRight: 'calc(-50vw + 50%)',
                     overflow: 'hidden',
-                    minHeight: '260px',
-                    borderRadius: '16px',
-                    border: '1px solid var(--border)',
-                    background: 'var(--surface)',
-                    display: 'flex',
-                    alignItems: 'flex-end',
-                    padding: '24px',
-                    boxShadow: 'var(--shadow)'
+                    height: '380px',
+                    marginTop: '-24px',
+                    zIndex: 1,
                 }}
             >
-                {/* Store cover banner background image */}
+                {/* Store cover image background full bleed */}
                 <div
                     style={{
-                        position: 'absolute',
-                        top: 0,
-                        right: 0,
                         width: '100%',
                         height: '100%',
                         backgroundImage: `url(${coverImage})`,
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
-                        zIndex: 1,
+                        position: 'relative'
                     }}
                 >
-                    {/* Linear gradient fade towards the right */}
+                    {/* Contrast Gradient Overlay */}
+                    <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'linear-gradient(90deg, rgba(15, 23, 42, 0.9) 0%, rgba(15, 23, 42, 0.6) 55%, rgba(15, 23, 42, 0.2) 100%)' }} />
+
+                    {/* Banner Content Overlay */}
                     <div
                         style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            width: '100%',
+                            position: 'relative',
+                            zIndex: 5,
+                            padding: '0 max(28px, calc((100vw - 1200px) / 2))',
                             height: '100%',
-                            background: 'linear-gradient(to right, var(--surface) 35%, rgba(15, 23, 42, 0.5) 75%, rgba(0, 0, 0, 0.1) 100%)'
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: '20px',
+                            color: '#ffffff'
                         }}
-                    />
-                </div>
-
-                {/* Content Overlay */}
-                <div style={{ position: 'relative', zIndex: 2, display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '16px' }}>
-                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                        {/* Store Logo */}
-                        <div style={{ width: '80px', height: '80px', borderRadius: '16px', overflow: 'hidden', border: `3px solid ${brandColor}`, boxShadow: 'var(--shadow)', flexShrink: 0 }}>
-                            <img src={logoImage} alt={shop.shopName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        </div>
-                        <div style={{ color: 'var(--text)' }}>
-                            <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 800 }}>
-                                {shop.shopName}
-                                <span className="badge" style={{ marginLeft: '8px', background: brandColor, color: 'white', fontSize: '0.75rem', padding: '4px 8px', borderRadius: '6px' }}>Verified Store</span>
-                            </h2>
-                            <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 500, flexWrap: 'wrap' }}>
-                                <span className="material-icons" style={{ fontSize: '18px', color: brandColor }}>storefront</span> {shop.category} |
-                                <span className="material-icons" style={{ fontSize: '18px', color: brandColor }}>location_on</span> {shop.address}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px', flexWrap: 'wrap' }}>
-                        <button
-                            className="secondary-btn compact-btn"
-                            onClick={() => navigate(`/seller/${shop.userId}`)}
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '10px 16px', background: 'var(--surface)' }}
-                        >
-                            <span className="material-icons" style={{ fontSize: '18px' }}>person</span>
-                            Owner Profile
-                        </button>
-                        {!isOwner && (
-                            <>
-                                {shop.whatsapp && (
-                                    <a href={`https://wa.me/${shop.whatsapp.replace(/[^\d]/g, '')}`} target="_blank" rel="noreferrer" className="primary-btn compact-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none', background: '#25D366', color: 'white', padding: '10px 16px' }}>
-                                        <span className="material-icons" style={{ fontSize: '18px' }}>chat</span> WhatsApp
-                                    </a>
-                                )}
-                                <button className="secondary-btn compact-btn" onClick={onMessageSeller} style={{ padding: '10px 16px', background: 'var(--surface)' }}>Chat</button>
-
-                                <button
-                                    className={followingIds.includes(shop.userId) ? "secondary-btn compact-btn" : "primary-btn compact-btn"}
-                                    onClick={() => onToggleFollowStore(shop.userId)}
-                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '10px 16px', backgroundColor: followingIds.includes(shop.userId) ? undefined : brandColor }}
-                                >
-                                    <span className="material-icons" style={{ fontSize: '18px' }}>
-                                        {followingIds.includes(shop.userId) ? 'person_remove' : 'person_add'}
-                                    </span>
-                                    {followingIds.includes(shop.userId) ? 'Unfollow' : 'Follow Store'}
-                                </button>
-
-                                <button
-                                    className="secondary-btn compact-btn"
-                                    onClick={() => onToggleNotifyStore(shop.userId)}
-                                    title={notifyStoreIds.includes(shop.userId) ? "Mute Notifications" : "Get Store Notifications"}
-                                    style={{ minWidth: '40px', padding: '10px 8px', color: notifyStoreIds.includes(shop.userId) ? brandColor : 'var(--text-muted)', background: 'var(--surface)' }}
-                                >
-                                    <span className="material-icons" style={{ fontSize: '20px' }}>
-                                        {notifyStoreIds.includes(shop.userId) ? 'notifications_active' : 'notifications_none'}
-                                    </span>
-                                </button>
-                            </>
-                        )}
-                    </div>
-                </div>
-            </section>
-
-            {shop.description && (
-                <div style={{ background: 'var(--panel)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)', marginTop: '4px' }}>
-                    <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{shop.description}</p>
-                </div>
-            )}
-
-            {/* Dynamic Store Subtabs (Home Catalog, Active Listings, Departments, Customer Care, Reviews) */}
-            <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', paddingBottom: '8px', gap: '8px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                <button
-                    className={`dashboard-tab-btn ${activeSubTab === 'catalog' ? 'active' : ''}`}
-                    onClick={() => setActiveSubTab('catalog')}
-                    style={{ borderColor: activeSubTab === 'catalog' ? brandColor : undefined, color: activeSubTab === 'catalog' ? brandColor : undefined }}
-                >
-                    Home Catalog
-                </button>
-                <button
-                    className={`dashboard-tab-btn ${activeSubTab === 'listings' ? 'active' : ''}`}
-                    onClick={() => setActiveSubTab('listings')}
-                    style={{ borderColor: activeSubTab === 'listings' ? brandColor : undefined, color: activeSubTab === 'listings' ? brandColor : undefined }}
-                >
-                    Listings ({shopListings.length})
-                </button>
-                {collectionsList.map((col) => (
-                    <button
-                        key={col.id}
-                        className={`dashboard-tab-btn ${activeSubTab === `col-${col.id}` ? 'active' : ''}`}
-                        onClick={() => setActiveSubTab(`col-${col.id}`)}
-                        style={{ borderColor: activeSubTab === `col-${col.id}` ? brandColor : undefined, color: activeSubTab === `col-${col.id}` ? brandColor : undefined }}
                     >
-                        {col.name}
-                    </button>
-                ))}
-                <button
-                    className={`dashboard-tab-btn ${activeSubTab === 'care' ? 'active' : ''}`}
-                    onClick={() => setActiveSubTab('care')}
-                    style={{ borderColor: activeSubTab === 'care' ? brandColor : undefined, color: activeSubTab === 'care' ? brandColor : undefined }}
-                >
-                    Customer Care & Policies
-                </button>
-                <button
-                    className={`dashboard-tab-btn ${activeSubTab === 'reviews' ? 'active' : ''}`}
-                    onClick={() => setActiveSubTab('reviews')}
-                    style={{ borderColor: activeSubTab === 'reviews' ? brandColor : undefined, color: activeSubTab === 'reviews' ? brandColor : undefined }}
-                >
-                    Reviews ({reviewsList.length})
-                </button>
+                        {/* Store Brand / Logo / Title */}
+                        <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+                            <div style={{ width: '90px', height: '90px', borderRadius: '18px', overflow: 'hidden', border: `3px solid ${brandColor}`, boxShadow: '0 8px 24px rgba(0,0,0,0.5)', flexShrink: 0, background: '#ffffff' }}>
+                                <img src={logoImage} alt={shop.shopName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            </div>
+                            <div>
+                                <span style={{ display: 'inline-block', padding: '4px 12px', backgroundColor: brandColor, color: '#ffffff', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>
+                                    Verified Store
+                                </span>
+                                <h1 style={{ margin: 0, fontSize: '2.2rem', fontWeight: 800, color: '#ffffff', textShadow: '0 2px 6px rgba(0,0,0,0.6)' }}>
+                                    {shop.shopName}
+                                </h1>
+                                <p style={{ margin: '6px 0 0 0', fontSize: '0.92rem', color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 500, flexWrap: 'wrap' }}>
+                                    <span><span className="material-icons" style={{ fontSize: '18px', color: '#60a5fa', verticalAlign: 'middle' }}>storefront</span> {shop.category}</span>
+                                    <span>|</span>
+                                    <span><span className="material-icons" style={{ fontSize: '18px', color: '#60a5fa', verticalAlign: 'middle' }}>location_on</span> {shop.address}</span>
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Store Action Buttons */}
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                            <button
+                                className="secondary-btn compact-btn"
+                                onClick={() => navigate(`/seller/${shop.userId}`)}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '10px 18px', background: 'rgba(255,255,255,0.15)', color: '#ffffff', border: '1px solid rgba(255,255,255,0.3)', backdropFilter: 'blur(8px)', borderRadius: '10px', fontWeight: 600 }}
+                            >
+                                <span className="material-icons" style={{ fontSize: '18px' }}>person</span>
+                                Owner Profile
+                            </button>
+                            {!isOwner && (
+                                <>
+                                    {shop.whatsapp && (
+                                        <a href={`https://wa.me/${shop.whatsapp.replace(/[^\d]/g, '')}`} target="_blank" rel="noreferrer" className="primary-btn compact-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', textDecoration: 'none', background: '#25D366', color: 'white', padding: '10px 18px', borderRadius: '10px', fontWeight: 700 }}>
+                                            <span className="material-icons" style={{ fontSize: '18px' }}>chat</span> WhatsApp
+                                        </a>
+                                    )}
+                                    <button className="secondary-btn compact-btn" onClick={onMessageSeller} style={{ padding: '10px 18px', background: 'rgba(255,255,255,0.15)', color: '#ffffff', border: '1px solid rgba(255,255,255,0.3)', backdropFilter: 'blur(8px)', borderRadius: '10px', fontWeight: 600 }}>Chat</button>
+
+                                    <button
+                                        className={followingIds.includes(shop.userId) ? "secondary-btn compact-btn" : "primary-btn compact-btn"}
+                                        onClick={() => onToggleFollowStore(shop.userId)}
+                                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '10px 18px', borderRadius: '10px', fontWeight: 700, backgroundColor: followingIds.includes(shop.userId) ? 'rgba(255,255,255,0.2)' : brandColor }}
+                                    >
+                                        <span className="material-icons" style={{ fontSize: '18px' }}>
+                                            {followingIds.includes(shop.userId) ? 'person_remove' : 'person_add'}
+                                        </span>
+                                        {followingIds.includes(shop.userId) ? 'Unfollow' : 'Follow Store'}
+                                    </button>
+
+                                    <button
+                                        className="secondary-btn compact-btn"
+                                        onClick={() => onToggleNotifyStore(shop.userId)}
+                                        title={notifyStoreIds.includes(shop.userId) ? "Mute Notifications" : "Get Store Notifications"}
+                                        style={{ minWidth: '40px', padding: '10px 12px', color: notifyStoreIds.includes(shop.userId) ? brandColor : '#ffffff', background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '10px' }}
+                                    >
+                                        <span className="material-icons" style={{ fontSize: '20px' }}>
+                                            {notifyStoreIds.includes(shop.userId) ? 'notifications_active' : 'notifications_none'}
+                                        </span>
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Bottom gradient fade into main sheet */}
+                <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '90px', background: 'linear-gradient(to bottom, transparent 0%, rgba(11, 15, 23, 0.4) 40%, var(--bg) 100%)', pointerEvents: 'none', zIndex: 4 }} />
             </div>
+
+            {/* 2. Overlapping Elevated Content Sheet (Scrolls Over Faded Hero Cover Background) */}
+            <div
+                style={{
+                    position: 'relative',
+                    zIndex: 10,
+                    marginTop: '-80px',
+                    marginLeft: 'calc(-50vw + 50%)',
+                    marginRight: 'calc(-50vw + 50%)',
+                    background: 'var(--bg)',
+                    borderTopLeftRadius: '24px',
+                    borderTopRightRadius: '24px',
+                    padding: '24px max(24px, calc((100vw - 1200px) / 2))',
+                    minHeight: '600px',
+                    boxShadow: '0 -10px 30px rgba(0, 0, 0, 0.4)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '20px'
+                }}
+            >
+                <button className="ghost-btn" style={{ alignSelf: 'flex-start' }} onClick={onBack}>← Back to Stores</button>
+
+                {shop.description && (
+                    <div style={{ background: 'var(--panel)', padding: '16px 20px', borderRadius: '14px', border: '1px solid var(--border)' }}>
+                        <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{shop.description}</p>
+                    </div>
+                )}
 
             {/* Tab render */}
             {activeSubTab === 'catalog' && (
@@ -295,17 +282,43 @@ export function StoreViewPage({
                 const targetCol = collectionsList.find(c => c.id === colId)
                 const colTitle = targetCol?.name || 'Department'
                 const filteredColListings = shopListings.filter(l => String(l.collection_id) === String(colId))
-                
+
                 return (
                     <section className="section-card">
-                        <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: '12px', marginBottom: '16px' }}>
-                            <h3 style={{ margin: 0, color: brandColor }}>{colTitle} Department</h3>
-                            <p style={{ margin: '4px 0 0', fontSize: '0.86rem', color: 'var(--text-secondary)' }}>
-                                Browse items in {shop.shopName}'s {colTitle} collection ({filteredColListings.length} items).
-                            </p>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', borderBottom: '1px solid var(--border)', paddingBottom: '14px', marginBottom: '16px' }}>
+                            <div>
+                                <h3 style={{ margin: 0, color: brandColor }}>{colTitle} Department</h3>
+                                <p style={{ margin: '4px 0 0', fontSize: '0.86rem', color: 'var(--text-secondary)' }}>
+                                    Browse items in {shop.shopName}'s {colTitle} collection ({filteredColListings.length} items).
+                                </p>
+                            </div>
+                            {isOwner && (
+                                <button
+                                    type="button"
+                                    className="primary-btn compact-btn"
+                                    onClick={() => setIsPushDrawerOpen(true)}
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: brandColor, padding: '10px 16px', borderRadius: '8px' }}
+                                >
+                                    <span className="material-icons" style={{ fontSize: '18px' }}>move_to_inbox</span>
+                                    <span>Push Listings to {colTitle}</span>
+                                </button>
+                            )}
                         </div>
+
                         {filteredColListings.length === 0 ? (
-                            <p style={{ color: 'var(--text-muted)', padding: '16px 0' }}>No products categorized under {colTitle} yet.</p>
+                            <div style={{ textAlign: 'center', padding: '36px 16px', background: 'var(--panel)', borderRadius: '12px', border: '1px dashed var(--border)' }}>
+                                <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: '0.92rem' }}>No products categorized under {colTitle} yet.</p>
+                                {isOwner && (
+                                    <button
+                                        type="button"
+                                        className="primary-btn compact-btn"
+                                        onClick={() => setIsPushDrawerOpen(true)}
+                                        style={{ marginTop: '12px', backgroundColor: brandColor }}
+                                    >
+                                        Push Items Now
+                                    </button>
+                                )}
+                            </div>
                         ) : (
                             <div className="marketplace-listing-grid">
                                 {filteredColListings.map(listing => (
@@ -317,6 +330,104 @@ export function StoreViewPage({
                                         onToggleSave={onToggleSave}
                                     />
                                 ))}
+                            </div>
+                        )}
+
+                        {/* Push Listings Seller Drawer Overlay */}
+                        {isPushDrawerOpen && isOwner && (
+                            <div
+                                style={{
+                                    position: 'fixed',
+                                    top: 0,
+                                    left: 0,
+                                    width: '100vw',
+                                    height: '100vh',
+                                    backgroundColor: 'rgba(0,0,0,0.65)',
+                                    zIndex: 99999,
+                                    display: 'flex',
+                                    justifyContent: 'flex-end',
+                                    backdropFilter: 'blur(4px)'
+                                }}
+                                onClick={() => setIsPushDrawerOpen(false)}
+                            >
+                                <div
+                                    style={{
+                                        width: '100%',
+                                        maxWidth: '460px',
+                                        height: '100%',
+                                        backgroundColor: '#141414',
+                                        borderLeft: '1px solid #333',
+                                        padding: '24px',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        boxShadow: '-10px 0 30px rgba(0,0,0,0.7)',
+                                        overflowY: 'auto'
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #2e2e2e', paddingBottom: '14px' }}>
+                                        <div>
+                                            <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#ffffff' }}>Push Items to {colTitle}</h3>
+                                            <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: '#94a3b8' }}>Select listings to categorize under this department</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsPushDrawerOpen(false)}
+                                            style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', fontSize: '1.2rem' }}
+                                        >
+                                            <span className="material-icons">close</span>
+                                        </button>
+                                    </div>
+
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                        {shopListings.length === 0 ? (
+                                            <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>You have no listings posted under your store yet.</p>
+                                        ) : (
+                                            shopListings.map((item) => {
+                                                const isAssigned = String(item.collection_id) === String(colId)
+                                                return (
+                                                    <div
+                                                        key={item.id}
+                                                        onClick={() => onUpdateListingCollection && onUpdateListingCollection(item.id, isAssigned ? null : colId)}
+                                                        style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'space-between',
+                                                            padding: '12px',
+                                                            borderRadius: '10px',
+                                                            border: isAssigned ? `2px solid ${brandColor}` : '1px solid #2e2e2e',
+                                                            background: isAssigned ? 'rgba(37, 99, 235, 0.12)' : '#1f1f1f',
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.15s ease'
+                                                        }}
+                                                    >
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={isAssigned}
+                                                                onChange={() => onUpdateListingCollection && onUpdateListingCollection(item.id, isAssigned ? null : colId)}
+                                                                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                                            />
+                                                            {item.images && item.images[0] ? (
+                                                                <img src={item.images[0]} alt={item.title} style={{ width: '42px', height: '42px', borderRadius: '6px', objectFit: 'cover' }} />
+                                                            ) : (
+                                                                <div style={{ width: '42px', height: '42px', borderRadius: '6px', background: '#333', display: 'grid', placeItems: 'center', color: '#888', fontSize: '0.7rem' }}>Item</div>
+                                                            )}
+                                                            <div>
+                                                                <strong style={{ display: 'block', fontSize: '0.88rem', color: '#ffffff' }}>{item.title}</strong>
+                                                                <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>ZMW {item.price} • {item.category}</span>
+                                                            </div>
+                                                        </div>
+
+                                                        {isAssigned && (
+                                                            <span style={{ fontSize: '0.72rem', background: brandColor, color: '#ffffff', padding: '2px 8px', borderRadius: '12px', fontWeight: 700 }}>Categorized</span>
+                                                        )}
+                                                    </div>
+                                                )
+                                            })
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </section>
@@ -527,6 +638,7 @@ export function StoreViewPage({
                     </div>
                 </section>
             )}
+            </div>
         </div>
     )
 }

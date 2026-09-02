@@ -164,6 +164,26 @@ export function Shell({
               onChange={(e) => onSearchQueryChange(e.target.value)}
               className="header-search-input"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => onSearchQueryChange('')}
+                title="Clear search"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: '4px'
+                }}
+              >
+                <span className="material-icons" style={{ fontSize: '18px' }}>close</span>
+              </button>
+            )}
             <button type="submit" className="header-search-btn" title="Search">
               <span className="material-icons">search</span>
             </button>
@@ -274,8 +294,8 @@ export function Shell({
                 </span>
               )}
             </Link>
-            <Link to="/inbox" className="header-icon-link" title="Inbox Messages" style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-              <span className="material-icons">chat_bubble_outline</span>
+            <Link to="/inbox" className="header-icon-link" title="Inbox & Messages">
+              <span className="material-icons">chat</span>
               {unreadChatCount > 0 && (
                 <span
                   style={{
@@ -330,83 +350,162 @@ export function Shell({
               onChange={(e) => onSearchQueryChange(e.target.value)}
               className="header-search-input"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => onSearchQueryChange('')}
+                title="Clear search"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: '4px'
+                }}
+              >
+                <span className="material-icons" style={{ fontSize: '18px' }}>close</span>
+              </button>
+            )}
             <button type="submit" className="header-search-btn" title="Search">
               <span className="material-icons">search</span>
             </button>
           </form>
         </div>
 
-        {/* Row 3: Hover Expandable Category Bar OR Storefront Departments Bar */}
-        <nav className="category-mega-bar">
-          {storeContext ? (
-            <>
-              <button
-                type="button"
-                className="category-bar-link active"
-                onClick={() => navigate(`/store/${storeContext.userId}?tab=catalog`)}
-                style={{ fontWeight: 700, color: '#60a5fa', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-              >
-                <span className="material-icons" style={{ fontSize: '16px' }}>storefront</span>
-                <span>{storeContext.shopName}</span>
-              </button>
-
-              <button
-                type="button"
-                className="category-bar-link"
-                onClick={() => navigate(`/store/${storeContext.userId}?tab=listings`)}
-              >
-                Listings
-              </button>
-
-              {(storeContext.collections || []).map((col) => (
+        {/* Row 3: Center-Aligned Category & Store Department Bar with Highlights */}
+        <nav className="category-mega-bar" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', gap: '8px', padding: '6px 16px' }}>
+          {storeContext ? (() => {
+            const currentTab = (new URLSearchParams(location.search).get('tab') || 'catalog')
+            return (
+              <>
                 <button
-                  key={col.id}
                   type="button"
-                  className="category-bar-link"
-                  onClick={() => navigate(`/store/${storeContext.userId}?tab=col-${col.id}`)}
+                  className={`category-bar-link ${currentTab === 'catalog' ? 'active' : ''}`}
+                  onClick={() => navigate(`/store/${storeContext.userId}?tab=catalog`)}
+                  style={{
+                    fontWeight: 700,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    backgroundColor: currentTab === 'catalog' ? '#2563eb' : 'transparent',
+                    color: currentTab === 'catalog' ? '#ffffff' : '#60a5fa',
+                    border: currentTab === 'catalog' ? '1px solid #3b82f6' : '1px solid transparent'
+                  }}
                 >
-                  {col.name}
+                  <span className="material-icons" style={{ fontSize: '16px' }}>storefront</span>
+                  <span>{storeContext.shopName}</span>
                 </button>
-              ))}
 
-              <button
-                type="button"
-                className="category-bar-link"
-                onClick={() => navigate(`/store/${storeContext.userId}?tab=care`)}
-              >
-                Customer Care & Policies
-              </button>
+                <button
+                  type="button"
+                  className={`category-bar-link ${currentTab === 'listings' ? 'active' : ''}`}
+                  onClick={() => navigate(`/store/${storeContext.userId}?tab=listings`)}
+                  style={{
+                    fontWeight: 600,
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    backgroundColor: currentTab === 'listings' ? '#2563eb' : 'transparent',
+                    color: currentTab === 'listings' ? '#ffffff' : 'inherit',
+                    border: currentTab === 'listings' ? '1px solid #3b82f6' : '1px solid transparent'
+                  }}
+                >
+                  All Listings
+                </button>
 
-              <button
-                type="button"
-                className="category-bar-link"
-                onClick={() => navigate(`/store/${storeContext.userId}?tab=reviews`)}
-              >
-                Reviews
-              </button>
-            </>
-          ) : (
-            Object.entries(MEGA_CATEGORIES).map(([catKey, catData]) => (
-              <button
-                key={catKey}
-                className={`category-bar-link ${activeCategories.includes(catKey) || hoveredCategory === catKey || mobileCatExpanded === catKey ? 'active' : ''}`}
-                onMouseEnter={() => {
-                  if (window.innerWidth > 1024) setHoveredCategory(catKey)
-                }}
-                onClick={() => {
-                  if (window.innerWidth <= 1024) {
-                    setMobileCatExpanded(mobileCatExpanded === catKey ? null : catKey)
-                  } else {
-                    onCategoryToggle(catKey)
-                  }
-                }}
-              >
-                <span>{catData.label}</span>
-                <span className="category-arrow-icon material-icons" style={{ fontSize: '15px', marginLeft: '3px' }}>
-                  {mobileCatExpanded === catKey || hoveredCategory === catKey ? 'expand_less' : 'expand_more'}
-                </span>
-              </button>
-            ))
+                {(storeContext.collections || []).map((col) => {
+                  const isColActive = currentTab === `col-${col.id}`
+                  return (
+                    <button
+                      key={col.id}
+                      type="button"
+                      className={`category-bar-link ${isColActive ? 'active' : ''}`}
+                      onClick={() => navigate(`/store/${storeContext.userId}?tab=col-${col.id}`)}
+                      style={{
+                        fontWeight: 600,
+                        padding: '6px 14px',
+                        borderRadius: '20px',
+                        backgroundColor: isColActive ? '#2563eb' : 'transparent',
+                        color: isColActive ? '#ffffff' : 'inherit',
+                        border: isColActive ? '1px solid #3b82f6' : '1px solid transparent'
+                      }}
+                    >
+                      {col.name}
+                    </button>
+                  )
+                })}
+
+                <button
+                  type="button"
+                  className={`category-bar-link ${currentTab === 'care' ? 'active' : ''}`}
+                  onClick={() => navigate(`/store/${storeContext.userId}?tab=care`)}
+                  style={{
+                    fontWeight: 600,
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    backgroundColor: currentTab === 'care' ? '#2563eb' : 'transparent',
+                    color: currentTab === 'care' ? '#ffffff' : 'inherit',
+                    border: currentTab === 'care' ? '1px solid #3b82f6' : '1px solid transparent'
+                  }}
+                >
+                  Customer Care & Policies
+                </button>
+
+                <button
+                  type="button"
+                  className={`category-bar-link ${currentTab === 'reviews' ? 'active' : ''}`}
+                  onClick={() => navigate(`/store/${storeContext.userId}?tab=reviews`)}
+                  style={{
+                    fontWeight: 600,
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    backgroundColor: currentTab === 'reviews' ? '#2563eb' : 'transparent',
+                    color: currentTab === 'reviews' ? '#ffffff' : 'inherit',
+                    border: currentTab === 'reviews' ? '1px solid #3b82f6' : '1px solid transparent'
+                  }}
+                >
+                  Reviews
+                </button>
+              </>
+            )
+          })() : (
+            Object.entries(MEGA_CATEGORIES).map(([catKey, catData]) => {
+              const isSelected = activeCategories.includes(catKey)
+              return (
+                <button
+                  key={catKey}
+                  className={`category-bar-link ${isSelected || hoveredCategory === catKey || mobileCatExpanded === catKey ? 'active' : ''}`}
+                  onMouseEnter={() => {
+                    if (window.innerWidth > 1024) setHoveredCategory(catKey)
+                  }}
+                  onClick={() => {
+                    if (window.innerWidth <= 1024) {
+                      setMobileCatExpanded(mobileCatExpanded === catKey ? null : catKey)
+                    } else {
+                      onCategoryToggle(catKey)
+                    }
+                  }}
+                  style={isSelected ? {
+                    backgroundColor: 'rgba(37, 99, 235, 0.22)',
+                    color: '#60a5fa',
+                    border: '1px solid #2563eb',
+                    borderRadius: '20px',
+                    fontWeight: 700,
+                    padding: '6px 14px'
+                  } : { padding: '6px 14px' }}
+                >
+                  <span>{catData.label}</span>
+                  <span className="category-arrow-icon material-icons" style={{ fontSize: '15px', marginLeft: '3px' }}>
+                    {mobileCatExpanded === catKey || hoveredCategory === catKey ? 'expand_less' : 'expand_more'}
+                  </span>
+                </button>
+              )
+            })
           )}
         </nav>
 

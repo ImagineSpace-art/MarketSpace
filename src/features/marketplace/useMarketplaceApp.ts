@@ -133,6 +133,8 @@ export interface MarketplaceAppModel {
   openListing: (listing: Listing) => void
   openEditListing: (listing: Listing) => void
   toggleSave: (listingId: number) => void
+  clearAllFilters: () => void
+  handleUpdateListingCollection: (listingId: number, targetColId: string | null) => Promise<void>
   markAllRead: () => void
   sendInboxMessage: () => void
   filteredListings: Listing[]
@@ -1033,6 +1035,30 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     })
   }
 
+  const clearAllFilters = () => {
+    setActiveCategories(['All'])
+    setSearchQuery('')
+    setPriceRange(3000)
+    setDistanceFilter(65)
+    setShowOnlyAvailable(false)
+    setListingKindFilter('all')
+  }
+
+  const handleUpdateListingCollection = async (listingId: number, targetColId: string | null) => {
+    const { error } = await supabase
+      .from('listings')
+      .update({ collection_id: targetColId })
+      .eq('id', listingId)
+
+    if (error) {
+      setMessage('Failed to update listing department: ' + error.message)
+      return
+    }
+
+    setMessage('Listing department updated successfully!')
+    await fetchListings()
+  }
+
   const markAllRead = () => {
     setNotifications((current) => current.map((item) => ({ ...item, unread: false })))
   }
@@ -1494,6 +1520,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     toggleArchiveChat,
     deleteChat,
     handleDeleteAccount,
+    clearAllFilters,
+    handleUpdateListingCollection,
   }
 }
 

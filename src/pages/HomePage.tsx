@@ -13,7 +13,8 @@ type HomePageProps = Pick<MarketplaceAppModel,
   'setSearchQuery' |
   'toggleCategory' |
   'activeCategories' |
-  'allBusinesses'
+  'allBusinesses' |
+  'clearAllFilters'
 >
 
 export function HomePage({
@@ -25,8 +26,10 @@ export function HomePage({
   distanceFilter,
   toggleCategory,
   searchQuery,
-  allBusinesses
-}: Omit<HomePageProps, 'setSearchQuery' | 'activeCategories'>) {
+  activeCategories = ['All'],
+  allBusinesses,
+  clearAllFilters: globalClearAllFilters
+}: Omit<HomePageProps, 'setSearchQuery'>) {
   const [currentSlide, setCurrentSlide] = useState(0)
 
   // Quick Filter Popover States
@@ -122,8 +125,13 @@ export function HomePage({
 
   const isSearchActive = Boolean(searchQuery && searchQuery.trim().length > 0)
 
+  const isGlobalCatActive = !activeCategories.includes('All')
+  const isGlobalSearchActive = Boolean(searchQuery && searchQuery.trim().length > 0)
+
   // Calculate active filter count tags
   const activeFiltersCount =
+    (isGlobalCatActive ? 1 : 0) +
+    (isGlobalSearchActive ? 1 : 0) +
     (priceMax < 3000 ? 1 : 0) +
     (minRating > 0 ? 1 : 0) +
     (typeFilter !== 'all' ? 1 : 0) +
@@ -141,6 +149,7 @@ export function HomePage({
     setIncludeServices(true)
     setIncludeSellers(true)
     setSortOption('Relevance')
+    if (globalClearAllFilters) globalClearAllFilters()
   }
 
   // 1. Filtered Listings Evaluation
@@ -713,7 +722,7 @@ export function HomePage({
                     <span style={{ display: 'inline-block', padding: '5px 14px', backgroundColor: '#2563eb', color: '#ffffff', borderRadius: '14px', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>
                       {slide.badge}
                     </span>
-                    <h2 style={{ fontSize: '2.1rem', fontWeight: 800, margin: '0 0 16px 0', lineHeight: 1.25, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+                    <h2 style={{ fontFamily: 'Times New Roman', fontSize: '2.1rem', fontWeight: 600, margin: '0 0 16px 0', lineHeight: 1.25, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
                       {slide.title}
                     </h2>
                   </div>
@@ -747,14 +756,16 @@ export function HomePage({
             position: 'relative',
             zIndex: 10,
             marginTop: '-100px',
+            borderTopLeftRadius: '24px',
+            borderTopRightRadius: '24px',
             marginLeft: 'calc(-50vw + 50%)',
             marginRight: 'calc(-50vw + 50%)',
             padding: '20px',
             display: 'flex',
             flexDirection: 'column',
             gap: '36px',
-            //backgroundColor: 'var(--bg, #ffffff)',
-            background: 'linear-gradient(to bottom, transparent 0%, var(--bg) 10%)'
+            backgroundColor: 'var(--bg, #ffffff)',
+            //background: 'linear-gradient(to bottom, transparent 0%, var(--bg) 10%)'
           }}>
             {/* SECTION 1: TODAY'S PICKS */}
             {latestListings.length > 0 && (
