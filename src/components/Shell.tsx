@@ -90,6 +90,8 @@ export function Shell({
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null)
   const [mobileCatExpanded, setMobileCatExpanded] = useState<string | null>(null)
+  const [isMobileCategoryDrawerOpen, setIsMobileCategoryDrawerOpen] = useState(false)
+  const [selectedDrawerCategory, setSelectedDrawerCategory] = useState<string | null>(null)
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const navigate = useNavigate()
 
@@ -134,9 +136,9 @@ export function Shell({
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
-                backgroundColor: '#1967d2',
+                background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
                 color: '#ffffff',
-                border: '1.5px solid #ffffff',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
                 borderRadius: '6px',
                 padding: '5px 12px',
                 fontSize: '0.82rem',
@@ -190,6 +192,25 @@ export function Shell({
           </form>
 
           <div className="header-actions-group">
+            {/* Mobile Categories & Filters Button (Left of Notifications) */}
+            <button
+              type="button"
+              className="header-mobile-filters-btn"
+              onClick={() => setIsMobileCategoryDrawerOpen(true)}
+              title="Categories & Filters"
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#ffffff',
+                padding: '6px',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <span className="material-icons" style={{ fontSize: '24px' }}>tune</span>
+            </button>
+
             {/* Notifications Floating Popover Dropdown */}
             <div
               className="header-notifications-wrapper"
@@ -714,6 +735,183 @@ export function Shell({
           <p style={{ margin: 0 }}>© 2026, MarketSpace. Developed by ImagineSpace Technologies</p>
         </div>
       </footer>
+
+      {/* Mobile Category Drawer (<1024px) */}
+      {isMobileCategoryDrawerOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            zIndex: 999999,
+            display: 'flex',
+            backdropFilter: 'blur(4px)'
+          }}
+          onClick={() => {
+            setIsMobileCategoryDrawerOpen(false)
+            setSelectedDrawerCategory(null)
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '340px',
+              height: '100%',
+              backgroundColor: '#050505',
+              borderRight: '1px solid #222',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '10px 0 30px rgba(0,0,0,0.8)',
+              overflowY: 'auto'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Level 1: Full Categories List */}
+            {!selectedDrawerCategory ? (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '18px 20px', borderBottom: '1px solid #181818' }}>
+                  <button
+                    type="button"
+                    onClick={() => setIsMobileCategoryDrawerOpen(false)}
+                    style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                  >
+                    <span className="material-icons" style={{ fontSize: '24px' }}>close</span>
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {Object.entries(MEGA_CATEGORIES).map(([catKey, catData]) => (
+                    <button
+                      key={catKey}
+                      type="button"
+                      onClick={() => setSelectedDrawerCategory(catKey)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '16px 20px',
+                        background: 'transparent',
+                        border: 'none',
+                        borderBottom: '1px solid #141414',
+                        color: '#ffffff',
+                        fontSize: '1rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        textAlign: 'left'
+                      }}
+                    >
+                      <span>{catData.label}</span>
+                      <span className="material-icons" style={{ fontSize: '20px', color: '#64748b' }}>chevron_right</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              /* Level 2: Selected Category Subcategories Drilldown */
+              (() => {
+                const catData = MEGA_CATEGORIES[selectedDrawerCategory]
+                if (!catData) return null
+                return (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 20px', borderBottom: '1px solid #181818' }}>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDrawerCategory(null)}
+                        style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                      >
+                        <span className="material-icons" style={{ fontSize: '24px' }}>chevron_left</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsMobileCategoryDrawerOpen(false)
+                          setSelectedDrawerCategory(null)
+                        }}
+                        style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                      >
+                        <span className="material-icons" style={{ fontSize: '24px' }}>close</span>
+                      </button>
+                    </div>
+
+                    <div style={{ padding: '20px 20px 10px 20px' }}>
+                      <h2 style={{ fontSize: '1.45rem', fontWeight: 800, margin: '0 0 16px 0', color: '#ffffff' }}>
+                        {catData.label}
+                      </h2>
+                      <span style={{ fontSize: '0.78rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700, display: 'block', marginBottom: '8px' }}>
+                        {catData.label}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      {catData.subcats.map((subcat) => (
+                        <button
+                          key={subcat}
+                          type="button"
+                          onClick={() => {
+                            onCategoryToggle(selectedDrawerCategory)
+                            setIsMobileCategoryDrawerOpen(false)
+                            setSelectedDrawerCategory(null)
+                            navigate('/')
+                          }}
+                          style={{
+                            display: 'block',
+                            padding: '12px 20px',
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#e2e8f0',
+                            fontSize: '0.94rem',
+                            cursor: 'pointer',
+                            textAlign: 'left'
+                          }}
+                        >
+                          {subcat}
+                        </button>
+                      ))}
+                    </div>
+
+                    {catData.featured && catData.featured.length > 0 && (
+                      <div style={{ marginTop: '20px', borderTop: '1px solid #181818', paddingTop: '16px' }}>
+                        <span style={{ fontSize: '0.78rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700, padding: '0 20px 10px 20px', display: 'block' }}>
+                          FEATURED
+                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          {catData.featured.map((feat) => (
+                            <button
+                              key={feat}
+                              type="button"
+                              onClick={() => {
+                                onCategoryToggle(selectedDrawerCategory)
+                                setIsMobileCategoryDrawerOpen(false)
+                                setSelectedDrawerCategory(null)
+                                navigate('/')
+                              }}
+                              style={{
+                                display: 'block',
+                                padding: '12px 20px',
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#e2e8f0',
+                                fontSize: '0.94rem',
+                                cursor: 'pointer',
+                                textAlign: 'left'
+                              }}
+                            >
+                              {feat}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )
+              })()
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

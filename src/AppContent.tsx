@@ -607,13 +607,15 @@ function ProfileTabRoute({ session, ...props }: any) {
         ? 'notifications'
         : tab === 'create'
           ? 'create'
-          : tab === 'business-setup'
-            ? 'business-setup'
-            : tab === 'store-dashboard'
-              ? 'store-dashboard'
-              : tab === 'saved-listings'
-                ? 'saved-listings'
-                : 'dashboard'
+          : tab === 'create-ad'
+            ? 'create-ad'
+            : tab === 'business-setup'
+              ? 'business-setup'
+              : tab === 'store-dashboard'
+                ? 'store-dashboard'
+                : tab === 'saved-listings'
+                  ? 'saved-listings'
+                  : 'dashboard'
 
   return session ? (
     <ProfilePage activeSection={activeSection} {...props} />

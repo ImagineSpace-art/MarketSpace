@@ -48,18 +48,48 @@ export function StoreViewPage({
 
     const [searchParams] = useSearchParams()
     const tabQuery = searchParams.get('tab')
+    const highlightListingId = searchParams.get('highlight')
     const [activeSubTab, setActiveSubTab] = useState<string>(tabQuery || 'catalog')
     const [isPushDrawerOpen, setIsPushDrawerOpen] = useState(false)
-
-    useEffect(() => {
-        if (tabQuery) {
-            setActiveSubTab(tabQuery)
-        }
-    }, [tabQuery])
+    const [blinkListingId, setBlinkListingId] = useState<string | null>(highlightListingId)
     const [formRating, setFormRating] = useState(0)
 
     const shopListings = listings.filter(l => l.user_id === shop.userId)
     const isOwner = currentUserId === shop.userId
+
+    useEffect(() => {
+        if (tabQuery) {
+            setActiveSubTab(tabQuery)
+        } else if (highlightListingId) {
+            const target = shopListings.find(l => String(l.id) === String(highlightListingId))
+            if (target && target.collection_id) {
+                setActiveSubTab(`col-${target.collection_id}`)
+            } else {
+                setActiveSubTab('listings')
+            }
+        }
+    }, [tabQuery, highlightListingId])
+
+    useEffect(() => {
+        if (highlightListingId) {
+            setBlinkListingId(highlightListingId)
+            const scrollTimer = setTimeout(() => {
+                const el = document.getElementById(`listing-${highlightListingId}`)
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                }
+            }, 350)
+
+            const clearTimer = setTimeout(() => {
+                setBlinkListingId(null)
+            }, 5000)
+
+            return () => {
+                clearTimeout(scrollTimer)
+                clearTimeout(clearTimer)
+            }
+        }
+    }, [highlightListingId, activeSubTab])
 
     // Cover image and logo image fallbacks
     const coverImage = shop.cover || '/banners/store_banner_electronics.png'
@@ -263,13 +293,26 @@ export function StoreViewPage({
                     ) : (
                         <div className="marketplace-listing-grid">
                             {shopListings.map(listing => (
-                                <ListingCard
+                                <div
+                                    id={`listing-${listing.id}`}
                                     key={listing.id}
-                                    listing={listing}
-                                    saved={savedIds.includes(String(listing.id))}
-                                    onOpen={onOpenListing}
-                                    onToggleSave={onToggleSave}
-                                />
+                                    style={{
+                                        transition: 'all 0.3s ease',
+                                        borderRadius: '16px',
+                                        ...(String(listing.id) === String(blinkListingId) ? {
+                                            animation: 'attention-glow-blink 0.8s ease-in-out infinite alternate',
+                                            border: '3px solid #2563eb',
+                                            boxShadow: '0 0 30px 10px rgba(37, 99, 235, 0.75)'
+                                        } : {})
+                                    }}
+                                >
+                                    <ListingCard
+                                        listing={listing}
+                                        saved={savedIds.includes(String(listing.id))}
+                                        onOpen={onOpenListing}
+                                        onToggleSave={onToggleSave}
+                                    />
+                                </div>
                             ))}
                         </div>
                     )}
@@ -322,13 +365,26 @@ export function StoreViewPage({
                         ) : (
                             <div className="marketplace-listing-grid">
                                 {filteredColListings.map(listing => (
-                                    <ListingCard
+                                    <div
+                                        id={`listing-${listing.id}`}
                                         key={listing.id}
-                                        listing={listing}
-                                        saved={savedIds.includes(String(listing.id))}
-                                        onOpen={onOpenListing}
-                                        onToggleSave={onToggleSave}
-                                    />
+                                        style={{
+                                            transition: 'all 0.3s ease',
+                                            borderRadius: '16px',
+                                            ...(String(listing.id) === String(blinkListingId) ? {
+                                                animation: 'attention-glow-blink 0.8s ease-in-out infinite alternate',
+                                                border: '3px solid #2563eb',
+                                                boxShadow: '0 0 30px 10px rgba(37, 99, 235, 0.75)'
+                                            } : {})
+                                        }}
+                                    >
+                                        <ListingCard
+                                            listing={listing}
+                                            saved={savedIds.includes(String(listing.id))}
+                                            onOpen={onOpenListing}
+                                            onToggleSave={onToggleSave}
+                                        />
+                                    </div>
                                 ))}
                             </div>
                         )}

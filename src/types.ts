@@ -50,11 +50,32 @@ export type CatalogItem = {
 
 export type BusinessAd = {
   id: string
-  listingId: number
-  adTitle: string
+  targetType?: 'store' | 'listing'
+  storeId?: string
+  listingId?: number
+  goal?: string
+  adTitle?: string
+  adText?: string
+  headline?: string
+  media?: string[]
+  buttonLabel?: string
+  destinationUrl?: string
+  contactMethod?: 'whatsapp' | 'messenger' | 'none'
+  contactPhone?: string
+  enableAdvantageCreative?: boolean
+  isSpecialCategory?: boolean
+  audienceLocation?: string
+  audienceMinAge?: number
+  scheduleType?: 'continuous' | 'end_date'
+  startDate?: string
+  startTime?: string
+  endDate?: string
   budget: string
-  duration: string
+  duration?: string
+  currency?: string
+  placements?: string[]
   status: 'Active' | 'Paused' | 'Ended'
+  createdAt?: string
 }
 
 export type StoreCollection = {

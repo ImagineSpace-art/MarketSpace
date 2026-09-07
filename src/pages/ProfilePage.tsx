@@ -4,6 +4,7 @@ import type { Listing, Profile, BusinessProfile, PaymentMethodItem, Notification
 import { SavedItemsPage, NotificationsPage } from './SavedNotificationsPage'
 import { ListingFormPage } from './ListingPage'
 import { StoreSetupPage } from './StoreSetupPage'
+import { AdCreationPage } from './AdCreationPage'
 import type { NotificationItem } from '../features/marketplace/useMarketplaceApp'
 import { uploadImageToSupabase } from '../features/marketplace/ImageUploader'
 
@@ -27,7 +28,7 @@ type ProfilePageProps = {
     onOpenDashboardPanel?: () => void
 
     // Settings panel specific props
-    activeSection: 'dashboard' | 'settings' | 'notifications' | 'create' | 'business-setup' | 'store-dashboard' | 'saved-listings'
+    activeSection: 'dashboard' | 'settings' | 'notifications' | 'create' | 'create-ad' | 'business-setup' | 'store-dashboard' | 'saved-listings'
     theme: 'light' | 'dark'
     locationString: string
     onToggleTheme: () => void
@@ -222,6 +223,7 @@ export function ProfilePage({
 
     const navItems = [
         { path: '/profile/create', label: 'Create new listing', icon: 'add_circle', isPrimary: true },
+        { path: '/profile/create-ad', label: 'Create ad', icon: 'campaign', isPrimary: false },
         { path: '/profile', label: 'Seller dashboard', icon: 'dashboard', exact: true },
         { path: '/profile/store-dashboard', label: 'Store dashboard', icon: 'storefront' },
         { path: '/profile/saved-listings', label: 'Saved listings', icon: 'bookmark' },
@@ -240,16 +242,18 @@ export function ProfilePage({
                         <span className="material-icons" style={{ fontSize: '20px', color: '#1967d2' }}>
                             {activeSection === 'settings' ? 'settings' :
                                 activeSection === 'create' ? 'add_circle' :
-                                    activeSection === 'store-dashboard' ? 'storefront' :
-                                        activeSection === 'saved-listings' ? 'bookmark' :
-                                            activeSection === 'notifications' ? 'notifications' : 'dashboard'}
+                                    activeSection === 'create-ad' ? 'campaign' :
+                                        activeSection === 'store-dashboard' ? 'storefront' :
+                                            activeSection === 'saved-listings' ? 'bookmark' :
+                                                activeSection === 'notifications' ? 'notifications' : 'dashboard'}
                         </span>
                         <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>
                             {activeSection === 'settings' ? 'Settings Menu' :
                                 activeSection === 'create' ? 'Create New Listing' :
-                                    activeSection === 'store-dashboard' ? 'Store Dashboard' :
-                                        activeSection === 'saved-listings' ? 'Saved Listings' :
-                                            activeSection === 'notifications' ? 'Notifications' : 'Seller Dashboard'}
+                                    activeSection === 'create-ad' ? 'Create Ad' :
+                                        activeSection === 'store-dashboard' ? 'Store Dashboard' :
+                                            activeSection === 'saved-listings' ? 'Saved Listings' :
+                                                activeSection === 'notifications' ? 'Notifications' : 'Seller Dashboard'}
                         </span>
                     </div>
                     <span className="material-icons" style={{ fontSize: '22px' }}>
@@ -338,6 +342,21 @@ export function ProfilePage({
                         mode="create"
                         {...createListingProps}
                         onCancel={() => navigate('/profile')}
+                    />
+                ) : activeSection === 'create-ad' ? (
+                    <AdCreationPage
+                        businessProfile={businessProfile}
+                        myListings={myListings}
+                        profile={profile}
+                        onSaveAd={async (newAd) => {
+                            if (businessProfile) {
+                                void storeSetupProps.onSave({
+                                    ...businessProfile,
+                                    ads: [...(businessProfile.ads || []), newAd]
+                                })
+                            }
+                        }}
+                        onBack={() => navigate('/profile')}
                     />
                 ) : activeSection === 'store-dashboard' ? (
                     businessProfile ? (
