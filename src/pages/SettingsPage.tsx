@@ -297,7 +297,7 @@ export function SettingsPage({
                             <div>
                                 <h3 style={{ marginTop: 0, fontSize: '1.1rem' }}>Global Renewal Schedule & Preference</h3>
                                 <p className="text-muted" style={{ margin: '4px 0 16px 0', fontSize: '0.85rem' }}>
-                                    Configure your default automated renewal schedule. All your listings using the global renewal setting will align to this day and interval.
+                                    Configure your synchronized inventory renewal schedule. All your listings using the global schedule will align to expire together on this day and interval, making manual review and bulk renewal easy. Listings do not renew automatically.
                                 </p>
                             </div>
                             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem', background: 'var(--surface)', padding: '8px 14px', borderRadius: '8px', border: '1px solid var(--border)' }}>
@@ -363,9 +363,9 @@ export function SettingsPage({
                             {/* Live Summary Preview */}
                             <div style={{ padding: '12px 14px', background: 'var(--surface)', borderRadius: '8px', border: '1px dashed var(--border)', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
                                 {enableGlobalRenewal ? (
-                                    <>💡 <strong>Schedule Rule:</strong> Listings will be scheduled to renew on <strong>{globalRenewalDay}s</strong> every <strong>{globalRenewalFrequency === 'daily' ? '1 Day' : globalRenewalFrequency === 'biweekly' ? '2 Weeks' : globalRenewalFrequency === 'monthly' ? 'Month' : 'Week'}</strong>.</>
+                                    <>💡 <strong>Schedule Rule:</strong> All synchronized listings will expire on <strong>{globalRenewalDay}s</strong> every <strong>{globalRenewalFrequency === 'daily' ? '1 Day' : globalRenewalFrequency === 'biweekly' ? '2 Weeks' : globalRenewalFrequency === 'monthly' ? 'Month' : 'Week'}</strong> for manual review and renewal. There is no auto-renewal.</>
                                 ) : (
-                                    <>⚠️ <strong>Global Renewal Disabled:</strong> Check "Use global renewal time" above to enable auto-renewal scheduling.</>
+                                    <>⚠️ <strong>Global Schedule Disabled:</strong> Check "Use global renewal time" above to synchronize listing expiration dates.</>
                                 )}
                             </div>
                         </div>

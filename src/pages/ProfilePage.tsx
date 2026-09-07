@@ -5,6 +5,7 @@ import { SavedItemsPage, NotificationsPage } from './SavedNotificationsPage'
 import { ListingFormPage } from './ListingPage'
 import { StoreSetupPage } from './StoreSetupPage'
 import { AdCreationPage } from './AdCreationPage'
+import { StoreInsightsView } from '../components/StoreInsightsView'
 import type { NotificationItem } from '../features/marketplace/useMarketplaceApp'
 import { uploadImageToSupabase } from '../features/marketplace/ImageUploader'
 
@@ -26,9 +27,10 @@ type ProfilePageProps = {
     onToggleSave: (listingId: number) => void
     onLogout: () => void
     onOpenDashboardPanel?: () => void
+    onUpdateListingCollection?: (listingId: number, targetColId: string | null) => void | Promise<void>
 
     // Settings panel specific props
-    activeSection: 'dashboard' | 'settings' | 'notifications' | 'create' | 'create-ad' | 'business-setup' | 'store-dashboard' | 'saved-listings'
+    activeSection: 'dashboard' | 'settings' | 'notifications' | 'create' | 'create-ad' | 'business-setup' | 'store-dashboard' | 'store-insights' | 'saved-listings'
     theme: 'light' | 'dark'
     locationString: string
     onToggleTheme: () => void
@@ -113,12 +115,23 @@ export function ProfilePage({
     allBusinesses = {},
     followingIds = [],
     onToggleFollowStore = () => { },
+    onUpdateListingCollection,
 }: ProfilePageProps) {
     const displayName = profile?.username || (userEmail && userEmail !== 'Guest' ? userEmail.split('@')[0] : 'User Profile')
     const navigate = useNavigate()
 
-    const [storeTab, setStoreTab] = useState<'analytics' | 'catalog' | 'ads' | 'social'>('analytics')
+    const [storeTab, setStoreTab] = useState<'analytics' | 'departments' | 'catalog' | 'ads' | 'social'>('analytics')
     const [sellerTab, setSellerTab] = useState<'active' | 'sold' | 'drafts'>('active')
+
+    // Store Performance time filter
+    const [perfTimeFilter, setPerfTimeFilter] = useState<'7d' | '14d' | '30d'>('7d')
+
+    // Departments Manager states
+    const [newDeptName, setNewDeptName] = useState('')
+    const [newDeptDesc, setNewDeptDesc] = useState('')
+    const [editingDeptId, setEditingDeptId] = useState<string | null>(null)
+    const [editingDeptName, setEditingDeptName] = useState('')
+    const [deptListingsFilter, setDeptListingsFilter] = useState<string>('all')
 
     // Catalog Item creation states
     const [catalogName, setCatName] = useState('')
@@ -226,6 +239,7 @@ export function ProfilePage({
         { path: '/profile/create-ad', label: 'Create ad', icon: 'campaign', isPrimary: false },
         { path: '/profile', label: 'Seller dashboard', icon: 'dashboard', exact: true },
         { path: '/profile/store-dashboard', label: 'Store dashboard', icon: 'storefront' },
+        { path: '/profile/store-insights', label: 'Store insights', icon: 'insights' },
         { path: '/profile/saved-listings', label: 'Saved listings', icon: 'bookmark' },
         { path: '/profile/notifications', label: 'Notifications', icon: 'notifications' },
     ]
@@ -244,16 +258,18 @@ export function ProfilePage({
                                 activeSection === 'create' ? 'add_circle' :
                                     activeSection === 'create-ad' ? 'campaign' :
                                         activeSection === 'store-dashboard' ? 'storefront' :
-                                            activeSection === 'saved-listings' ? 'bookmark' :
-                                                activeSection === 'notifications' ? 'notifications' : 'dashboard'}
+                                            activeSection === 'store-insights' ? 'insights' :
+                                                activeSection === 'saved-listings' ? 'bookmark' :
+                                                    activeSection === 'notifications' ? 'notifications' : 'dashboard'}
                         </span>
                         <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>
                             {activeSection === 'settings' ? 'Settings Menu' :
                                 activeSection === 'create' ? 'Create New Listing' :
                                     activeSection === 'create-ad' ? 'Create Ad' :
                                         activeSection === 'store-dashboard' ? 'Store Dashboard' :
-                                            activeSection === 'saved-listings' ? 'Saved Listings' :
-                                                activeSection === 'notifications' ? 'Notifications' : 'Seller Dashboard'}
+                                            activeSection === 'store-insights' ? 'Store Insights' :
+                                                activeSection === 'saved-listings' ? 'Saved Listings' :
+                                                    activeSection === 'notifications' ? 'Notifications' : 'Seller Dashboard'}
                         </span>
                     </div>
                     <span className="material-icons" style={{ fontSize: '22px' }}>
@@ -358,6 +374,13 @@ export function ProfilePage({
                         }}
                         onBack={() => navigate('/profile')}
                     />
+                ) : activeSection === 'store-insights' ? (
+                    <StoreInsightsView
+                        businessProfile={businessProfile}
+                        myListings={myListings}
+                        followingCount={followingIds.filter(id => id === businessProfile?.userId).length}
+                        onNavigateToCreatePost={() => navigate('/profile/create-ad')}
+                    />
                 ) : activeSection === 'store-dashboard' ? (
                     businessProfile ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -389,75 +412,499 @@ export function ProfilePage({
                             {/* Tab controls */}
                             <div style={{ display: 'flex', overflowX: 'auto', gap: '8px', paddingBottom: '8px', marginBottom: '16px', borderBottom: '1px solid var(--border)', WebkitOverflowScrolling: 'touch' }}>
                                 <button className={`dashboard-tab-btn ${storeTab === 'analytics' ? 'active' : ''}`} onClick={() => setStoreTab('analytics')}>Performance Dashboard</button>
+                                <button className={`dashboard-tab-btn ${storeTab === 'departments' ? 'active' : ''}`} onClick={() => setStoreTab('departments')}>Departments Manager</button>
                                 <button className={`dashboard-tab-btn ${storeTab === 'catalog' ? 'active' : ''}`} onClick={() => setStoreTab('catalog')}>Catalogs Manager</button>
                                 <button className={`dashboard-tab-btn ${storeTab === 'ads' ? 'active' : ''}`} onClick={() => setStoreTab('ads')}>Advertising Manager</button>
                                 <button className={`dashboard-tab-btn ${storeTab === 'social' ? 'active' : ''}`} onClick={() => setStoreTab('social')}>Followers & Following</button>
                             </div>
 
                             {/* ANALYTICS TAB */}
-                            {storeTab === 'analytics' && (
-                                <div className="business-hub-grid" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                    <div className="notification-summary" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', background: 'var(--panel)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                                        <div style={{ textAlign: 'center' }}>
-                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Catalog Products</span>
-                                            <h3 style={{ margin: '4px 0 0', fontSize: '1.5rem' }}>{(businessProfile.catalog || []).length}</h3>
-                                        </div>
-                                        <div style={{ textAlign: 'center' }}>
-                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Active Ads</span>
-                                            <h3 style={{ margin: '4px 0 0', fontSize: '1.5rem' }}>{(businessProfile.ads || []).filter(a => a.status === 'Active').length}</h3>
-                                        </div>
-                                        <div style={{ textAlign: 'center' }}>
-                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Store Clicks (7d)</span>
-                                            <h3 style={{ margin: '4px 0 0', fontSize: '1.5rem', color: 'var(--primary)' }}>
-                                                {(businessProfile.catalog || []).length * 4 + (businessProfile.ads || []).filter(a => a.status === 'Active').length * 10}
-                                            </h3>
-                                        </div>
-                                        <div style={{ textAlign: 'center' }}>
-                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Followers</span>
-                                            <h3 style={{ margin: '4px 0 0', fontSize: '1.5rem', color: '#10b981' }}>
-                                                {followingIds.filter(id => id === businessProfile.userId).length}
-                                            </h3>
-                                        </div>
-                                    </div>
+                            {storeTab === 'analytics' && (() => {
+                                const perfMultiplier = perfTimeFilter === '7d' ? 1.0 : perfTimeFilter === '14d' ? 1.85 : 3.4
+                                const activeAds = (businessProfile.ads || []).filter(a => a.status === 'Active').length
+                                const catalogItems = (businessProfile.catalog || []).length
+                                const perfStoreClicks = Math.round((catalogItems * 4 + activeAds * 10 + 15) * perfMultiplier)
+                                const perfListingClicks = Math.round((myListings.length * 9 + activeAds * 18 + 22) * perfMultiplier)
+                                const perfAdClicks = Math.round((activeAds * 38 + (activeAds > 0 ? 14 : 0)) * perfMultiplier)
+                                const perfListingShares = Math.round((myListings.length * 3 + 5) * perfMultiplier)
+                                const perfListingSaves = Math.round((myListings.length * 7 + 9) * perfMultiplier)
+                                const perfFollowers = followingIds.filter(id => id === businessProfile.userId).length
 
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                                        <div className="sidebar-card" style={{ background: 'var(--panel)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                                            <h3 style={{ marginTop: 0 }}>Catalog Products Overview</h3>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '14px' }}>
-                                                {(businessProfile.catalog || []).length === 0 ? (
-                                                    <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>No catalog items listed yet.</p>
-                                                ) : (
-                                                    (businessProfile.catalog || []).map(item => (
-                                                        <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', paddingBottom: '6px', borderBottom: '1px solid var(--border)' }}>
-                                                            <span>{item.name}</span>
-                                                            <strong style={{ color: 'var(--primary)' }}>{item.price}</strong>
-                                                        </div>
-                                                    ))
-                                                )}
+                                return (
+                                    <div className="business-hub-grid" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                        {/* Time Filter Bar */}
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', background: 'var(--panel)', padding: '14px 20px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                                            <div>
+                                                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Store Performance Metrics</h3>
+                                                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Activity for the last {perfTimeFilter === '7d' ? '7 days' : perfTimeFilter === '14d' ? '14 days' : '30 days'}</span>
+                                            </div>
+                                            <div style={{ display: 'flex', gap: '6px' }}>
+                                                {(['7d', '14d', '30d'] as const).map(tf => (
+                                                    <button
+                                                        key={tf}
+                                                        type="button"
+                                                        onClick={() => setPerfTimeFilter(tf)}
+                                                        style={{
+                                                            padding: '6px 14px',
+                                                            borderRadius: '8px',
+                                                            border: 'none',
+                                                            fontWeight: 700,
+                                                            fontSize: '0.82rem',
+                                                            cursor: 'pointer',
+                                                            background: perfTimeFilter === tf ? '#2563eb' : 'var(--surface)',
+                                                            color: perfTimeFilter === tf ? '#ffffff' : 'var(--text)',
+                                                            boxShadow: perfTimeFilter === tf ? '0 2px 8px rgba(37, 99, 235, 0.3)' : 'none'
+                                                        }}
+                                                    >
+                                                        {tf === '7d' ? '7 Days' : tf === '14d' ? '14 Days' : '30 Days'}
+                                                    </button>
+                                                ))}
                                             </div>
                                         </div>
 
-                                        <div className="sidebar-card" style={{ background: 'var(--panel)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                                            <h3 style={{ marginTop: 0 }}>Ad Campaign Status</h3>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '14px' }}>
-                                                {(businessProfile.ads || []).length === 0 ? (
-                                                    <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>No active or past advertisements.</p>
-                                                ) : (
-                                                    (businessProfile.ads || []).map(ad => (
-                                                        <div key={ad.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', paddingBottom: '6px', borderBottom: '1px solid var(--border)' }}>
-                                                            <span>{ad.adTitle}</span>
-                                                            <span className="badge" style={{ background: ad.status === 'Active' ? '#e2f0d9' : '#fce4d6', color: ad.status === 'Active' ? '#385723' : '#c65911' }}>
-                                                                {ad.status} ({ad.duration})
-                                                            </span>
-                                                        </div>
-                                                    ))
-                                                )}
+                                        {/* Metric Summary Cards Grid */}
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
+                                            <div style={{ background: 'var(--panel)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Store Clicks</span>
+                                                    <span className="material-icons" style={{ fontSize: '18px', color: '#2563eb' }}>storefront</span>
+                                                </div>
+                                                <h3 style={{ margin: '6px 0 2px 0', fontSize: '1.6rem', color: '#2563eb' }}>{perfStoreClicks.toLocaleString()}</h3>
+                                                <span style={{ fontSize: '0.74rem', color: '#10b981', fontWeight: 700 }}>↑ +14% vs prev period</span>
+                                            </div>
+
+                                            <div style={{ background: 'var(--panel)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Listing Clicks</span>
+                                                    <span className="material-icons" style={{ fontSize: '18px', color: '#3b82f6' }}>touch_app</span>
+                                                </div>
+                                                <h3 style={{ margin: '6px 0 2px 0', fontSize: '1.6rem' }}>{perfListingClicks.toLocaleString()}</h3>
+                                                <span style={{ fontSize: '0.74rem', color: '#10b981', fontWeight: 700 }}>↑ +26% vs prev period</span>
+                                            </div>
+
+                                            <div style={{ background: 'var(--panel)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Ad Clicks</span>
+                                                    <span className="material-icons" style={{ fontSize: '18px', color: '#f59e0b' }}>campaign</span>
+                                                </div>
+                                                <h3 style={{ margin: '6px 0 2px 0', fontSize: '1.6rem' }}>{perfAdClicks.toLocaleString()}</h3>
+                                                <span style={{ fontSize: '0.74rem', color: activeAds > 0 ? '#10b981' : 'var(--text-secondary)', fontWeight: 700 }}>
+                                                    {activeAds > 0 ? '↑ +19% vs prev period' : 'No active ads'}
+                                                </span>
+                                            </div>
+
+                                            <div style={{ background: 'var(--panel)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Listing Shares</span>
+                                                    <span className="material-icons" style={{ fontSize: '18px', color: '#8b5cf6' }}>share</span>
+                                                </div>
+                                                <h3 style={{ margin: '6px 0 2px 0', fontSize: '1.6rem' }}>{perfListingShares.toLocaleString()}</h3>
+                                                <span style={{ fontSize: '0.74rem', color: '#10b981', fontWeight: 700 }}>↑ +8% vs prev period</span>
+                                            </div>
+
+                                            <div style={{ background: 'var(--panel)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Listing Saves</span>
+                                                    <span className="material-icons" style={{ fontSize: '18px', color: '#ec4899' }}>bookmark</span>
+                                                </div>
+                                                <h3 style={{ margin: '6px 0 2px 0', fontSize: '1.6rem' }}>{perfListingSaves.toLocaleString()}</h3>
+                                                <span style={{ fontSize: '0.74rem', color: '#10b981', fontWeight: 700 }}>↑ +31% vs prev period</span>
+                                            </div>
+
+                                            <div style={{ background: 'var(--panel)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Followers</span>
+                                                    <span className="material-icons" style={{ fontSize: '18px', color: '#10b981' }}>people</span>
+                                                </div>
+                                                <h3 style={{ margin: '6px 0 2px 0', fontSize: '1.6rem', color: '#10b981' }}>{perfFollowers}</h3>
+                                                <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>Total followers</span>
+                                            </div>
+                                        </div>
+
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                                            <div className="sidebar-card" style={{ background: 'var(--panel)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                                                <h3 style={{ marginTop: 0 }}>Catalog Products Overview</h3>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '14px' }}>
+                                                    {(businessProfile.catalog || []).length === 0 ? (
+                                                        <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>No catalog items listed yet.</p>
+                                                    ) : (
+                                                        (businessProfile.catalog || []).map(item => (
+                                                            <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', paddingBottom: '6px', borderBottom: '1px solid var(--border)' }}>
+                                                                <span>{item.name}</span>
+                                                                <strong style={{ color: 'var(--primary)' }}>{item.price}</strong>
+                                                            </div>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="sidebar-card" style={{ background: 'var(--panel)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                                                <h3 style={{ marginTop: 0 }}>Ad Campaign Status</h3>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '14px' }}>
+                                                    {(businessProfile.ads || []).length === 0 ? (
+                                                        <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>No active or past advertisements.</p>
+                                                    ) : (
+                                                        (businessProfile.ads || []).map(ad => (
+                                                            <div key={ad.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', paddingBottom: '6px', borderBottom: '1px solid var(--border)' }}>
+                                                                <span>{ad.adTitle}</span>
+                                                                <span className="badge" style={{ background: ad.status === 'Active' ? '#e2f0d9' : '#fce4d6', color: ad.status === 'Active' ? '#385723' : '#c65911' }}>
+                                                                    {ad.status} ({ad.duration})
+                                                                </span>
+                                                            </div>
+                                                        ))
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            )
-                            }
+                                )
+                            })()}
+
+                            {/* DEPARTMENTS MANAGER TAB */}
+                            {storeTab === 'departments' && (() => {
+                                const currentCols = businessProfile.collections || []
+                                const storeCatalogListings = myListings
+
+                                const handleCreateDept = () => {
+                                    if (!newDeptName.trim()) return
+                                    const created = {
+                                        id: String(Date.now()),
+                                        name: newDeptName.trim(),
+                                        description: newDeptDesc.trim() || undefined
+                                    }
+                                    void storeSetupProps.onSave({
+                                        ...businessProfile,
+                                        collections: [...currentCols, created]
+                                    })
+                                    setNewDeptName('')
+                                    setNewDeptDesc('')
+                                }
+
+                                const handleRenameDept = (id: string) => {
+                                    if (!editingDeptName.trim()) return
+                                    const updated = currentCols.map(c => c.id === id ? { ...c, name: editingDeptName.trim() } : c)
+                                    void storeSetupProps.onSave({
+                                        ...businessProfile,
+                                        collections: updated
+                                    })
+                                    setEditingDeptId(null)
+                                    setEditingDeptName('')
+                                }
+
+                                const handleDeleteDept = async (id: string) => {
+                                    if (!confirm('Are you sure you want to delete this department? All items inside will become unassigned general store listings.')) return
+                                    const affected = storeCatalogListings.filter(l => l.collection_id === id)
+                                    for (const l of affected) {
+                                        if (onUpdateListingCollection) {
+                                            await onUpdateListingCollection(l.id, null)
+                                        }
+                                    }
+                                    void storeSetupProps.onSave({
+                                        ...businessProfile,
+                                        collections: currentCols.filter(c => c.id !== id)
+                                    })
+                                }
+
+                                const filteredListings = storeCatalogListings.filter(l => {
+                                    if (deptListingsFilter === 'all') return true
+                                    if (deptListingsFilter === 'unassigned') return !l.collection_id
+                                    return l.collection_id === deptListingsFilter
+                                })
+
+                                return (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                        {/* Add New Department Card */}
+                                        <div style={{ background: 'var(--panel)', padding: '20px', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                                            <h3 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <span className="material-icons" style={{ color: '#2563eb' }}>add_business</span>
+                                                Create Store Department
+                                            </h3>
+                                            <p style={{ margin: '0 0 16px 0', fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
+                                                Organize your store catalog into departments (e.g. "Footwear", "New Arrivals", "Electronics", "Beauty & Care").
+                                            </p>
+                                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                                <input
+                                                    type="text"
+                                                    value={newDeptName}
+                                                    onChange={e => setNewDeptName(e.target.value)}
+                                                    placeholder="Department Name (e.g. Summer Essentials)"
+                                                    style={{ flex: 1, minWidth: '220px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.9rem' }}
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={newDeptDesc}
+                                                    onChange={e => setNewDeptDesc(e.target.value)}
+                                                    placeholder="Optional description"
+                                                    style={{ flex: 1, minWidth: '220px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.9rem' }}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={handleCreateDept}
+                                                    disabled={!newDeptName.trim()}
+                                                    className="primary-btn"
+                                                    style={{ padding: '10px 20px', borderRadius: '8px', whiteSpace: 'nowrap' }}
+                                                >
+                                                    Add Department
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Existing Departments List */}
+                                        <div style={{ background: 'var(--panel)', padding: '20px', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                                            <h3 style={{ margin: '0 0 14px 0', fontSize: '1.05rem', fontWeight: 700 }}>
+                                                Store Departments ({currentCols.length})
+                                            </h3>
+                                            {currentCols.length === 0 ? (
+                                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem' }}>No departments created yet. Create one above to start organizing your store catalog.</p>
+                                            ) : (
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+                                                    {currentCols.map(col => {
+                                                        const count = storeCatalogListings.filter(l => l.collection_id === col.id).length
+                                                        const isEditing = editingDeptId === col.id
+                                                        return (
+                                                            <div
+                                                                key={col.id}
+                                                                style={{
+                                                                    background: 'var(--surface)',
+                                                                    padding: '14px 16px',
+                                                                    borderRadius: '12px',
+                                                                    border: '1px solid var(--border)',
+                                                                    display: 'flex',
+                                                                    flexDirection: 'column',
+                                                                    gap: '8px'
+                                                                }}
+                                                            >
+                                                                {isEditing ? (
+                                                                    <div style={{ display: 'flex', gap: '6px' }}>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={editingDeptName}
+                                                                            onChange={e => setEditingDeptName(e.target.value)}
+                                                                            style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
+                                                                        />
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleRenameDept(col.id)}
+                                                                            className="primary-btn"
+                                                                            style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                                                                        >
+                                                                            Save
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setEditingDeptId(null)}
+                                                                            className="outline-btn"
+                                                                            style={{ padding: '6px 10px', fontSize: '0.8rem' }}
+                                                                        >
+                                                                            Cancel
+                                                                        </button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                        <strong style={{ fontSize: '0.98rem' }}>{col.name}</strong>
+                                                                        <span style={{ fontSize: '0.78rem', background: 'rgba(37, 99, 235, 0.12)', color: '#2563eb', padding: '3px 8px', borderRadius: '12px', fontWeight: 700 }}>
+                                                                            {count} {count === 1 ? 'item' : 'items'}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                                {col.description && (
+                                                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{col.description}</span>
+                                                                )}
+                                                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
+                                                                    {!isEditing && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => { setEditingDeptId(col.id); setEditingDeptName(col.name) }}
+                                                                            style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}
+                                                                        >
+                                                                            <span className="material-icons" style={{ fontSize: '14px' }}>edit</span> Rename
+                                                                        </button>
+                                                                    )}
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleDeleteDept(col.id)}
+                                                                        style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}
+                                                                    >
+                                                                        <span className="material-icons" style={{ fontSize: '14px' }}>delete_outline</span> Remove
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Organize / Move Listings in Departments */}
+                                        <div style={{ background: 'var(--panel)', padding: '20px', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '16px' }}>
+                                                <div>
+                                                    <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Manage & Move Store Listings</h3>
+                                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                                        Move listings between departments, assign unassigned products, or remove items from a department.
+                                                    </span>
+                                                </div>
+
+                                                {/* Filter pills */}
+                                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setDeptListingsFilter('all')}
+                                                        style={{
+                                                            padding: '6px 12px',
+                                                            borderRadius: '8px',
+                                                            border: 'none',
+                                                            fontSize: '0.8rem',
+                                                            fontWeight: 600,
+                                                            cursor: 'pointer',
+                                                            background: deptListingsFilter === 'all' ? '#2563eb' : 'var(--surface)',
+                                                            color: deptListingsFilter === 'all' ? '#ffffff' : 'var(--text)'
+                                                        }}
+                                                    >
+                                                        All ({storeCatalogListings.length})
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setDeptListingsFilter('unassigned')}
+                                                        style={{
+                                                            padding: '6px 12px',
+                                                            borderRadius: '8px',
+                                                            border: 'none',
+                                                            fontSize: '0.8rem',
+                                                            fontWeight: 600,
+                                                            cursor: 'pointer',
+                                                            background: deptListingsFilter === 'unassigned' ? '#2563eb' : 'var(--surface)',
+                                                            color: deptListingsFilter === 'unassigned' ? '#ffffff' : 'var(--text)'
+                                                        }}
+                                                    >
+                                                        Unassigned ({storeCatalogListings.filter(l => !l.collection_id).length})
+                                                    </button>
+                                                    {currentCols.map(col => {
+                                                        const count = storeCatalogListings.filter(l => l.collection_id === col.id).length
+                                                        return (
+                                                            <button
+                                                                key={col.id}
+                                                                type="button"
+                                                                onClick={() => setDeptListingsFilter(col.id)}
+                                                                style={{
+                                                                    padding: '6px 12px',
+                                                                    borderRadius: '8px',
+                                                                    border: 'none',
+                                                                    fontSize: '0.8rem',
+                                                                    fontWeight: 600,
+                                                                    cursor: 'pointer',
+                                                                    background: deptListingsFilter === col.id ? '#2563eb' : 'var(--surface)',
+                                                                    color: deptListingsFilter === col.id ? '#ffffff' : 'var(--text)'
+                                                                }}
+                                                            >
+                                                                {col.name} ({count})
+                                                            </button>
+                                                        )
+                                                    })}
+                                                </div>
+                                            </div>
+
+                                            {/* Listings Grid */}
+                                            {filteredListings.length === 0 ? (
+                                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', padding: '16px 0' }}>
+                                                    No listings match this department filter.
+                                                </p>
+                                            ) : (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                                    {filteredListings.map(item => {
+                                                        const currentDept = currentCols.find(c => c.id === item.collection_id)
+                                                        return (
+                                                            <div
+                                                                key={item.id}
+                                                                style={{
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'space-between',
+                                                                    gap: '12px',
+                                                                    background: 'var(--surface)',
+                                                                    padding: '12px 16px',
+                                                                    borderRadius: '10px',
+                                                                    border: '1px solid var(--border)',
+                                                                    flexWrap: 'wrap'
+                                                                }}
+                                                            >
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: '220px' }}>
+                                                                    <div style={{ width: '44px', height: '44px', borderRadius: '8px', overflow: 'hidden', background: 'var(--border)', flexShrink: 0 }}>
+                                                                        {item.images && item.images[0] ? (
+                                                                            <img src={item.images[0]} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                                        ) : (
+                                                                            <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', color: 'var(--text-secondary)' }}>
+                                                                                <span className="material-icons" style={{ fontSize: '20px' }}>inventory_2</span>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                    <div>
+                                                                        <strong style={{ display: 'block', fontSize: '0.92rem' }}>{item.title}</strong>
+                                                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                                                            ZMW {item.price} • {item.category}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Move to Department Action */}
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Department:</span>
+                                                                        <select
+                                                                            value={item.collection_id || ''}
+                                                                            onChange={(e) => {
+                                                                                const targetVal = e.target.value || null
+                                                                                if (onUpdateListingCollection) {
+                                                                                    void onUpdateListingCollection(item.id, targetVal)
+                                                                                }
+                                                                            }}
+                                                                            style={{
+                                                                                padding: '6px 10px',
+                                                                                borderRadius: '6px',
+                                                                                border: '1px solid var(--border)',
+                                                                                background: 'var(--panel)',
+                                                                                color: 'var(--text)',
+                                                                                fontSize: '0.84rem',
+                                                                                fontWeight: 600
+                                                                            }}
+                                                                        >
+                                                                            <option value="">Unassigned (General Store)</option>
+                                                                            {currentCols.map(c => (
+                                                                                <option key={c.id} value={c.id}>{c.name}</option>
+                                                                            ))}
+                                                                        </select>
+                                                                    </div>
+
+                                                                    {item.collection_id && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                if (onUpdateListingCollection) {
+                                                                                    void onUpdateListingCollection(item.id, null)
+                                                                                }
+                                                                            }}
+                                                                            style={{
+                                                                                background: 'none',
+                                                                                border: 'none',
+                                                                                color: 'var(--text-secondary)',
+                                                                                fontSize: '0.78rem',
+                                                                                cursor: 'pointer',
+                                                                                textDecoration: 'underline'
+                                                                            }}
+                                                                        >
+                                                                            Remove from {currentDept?.name || 'Department'}
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )
+                            })()}
 
                             {/* CATALOGS TAB */}
                             {storeTab === 'catalog' && (

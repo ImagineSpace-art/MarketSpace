@@ -375,6 +375,7 @@ export function AppContent() {
                 onOpenListing={openListing}
                 onToggleSave={toggleSave}
                 onLogout={handleLogout}
+                onUpdateListingCollection={app.handleUpdateListingCollection}
                 onOpenDashboardPanel={() => setIsProfilePanelOpen(true)}
                 theme={theme}
                 locationString="Lusaka"
@@ -613,9 +614,11 @@ function ProfileTabRoute({ session, ...props }: any) {
               ? 'business-setup'
               : tab === 'store-dashboard'
                 ? 'store-dashboard'
-                : tab === 'saved-listings'
-                  ? 'saved-listings'
-                  : 'dashboard'
+                : tab === 'store-insights'
+                  ? 'store-insights'
+                  : tab === 'saved-listings'
+                    ? 'saved-listings'
+                    : 'dashboard'
 
   return session ? (
     <ProfilePage activeSection={activeSection} {...props} />

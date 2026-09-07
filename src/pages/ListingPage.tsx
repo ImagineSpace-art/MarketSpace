@@ -1439,7 +1439,7 @@ export function ListingFormPage({
               )}
             </div>
             <p style={{ margin: '6px 0 0 0', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-              After this duration, your listing will pause on the homepage until you tap "Renew" in your Seller Dashboard.
+              After this duration, your listing will pause on the marketplace until you manually tap "Renew" in your Seller Dashboard. There is no auto-renewal.
             </p>
           </div>
 
