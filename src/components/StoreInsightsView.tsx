@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import type { BusinessProfile, Listing } from '../types'
+import { fetchStoreAnalytics, type StoreAnalyticsData } from '../services/analytics'
 
 type StoreInsightsViewProps = {
     businessProfile: BusinessProfile | null
@@ -21,10 +22,31 @@ export function StoreInsightsView({
     const [timeFilter, setTimeFilter] = useState<TimeFilter>('30d')
     const [showPublishingActivity, setShowPublishingActivity] = useState(true)
     const [hoveredPoint, setHoveredPoint] = useState<{ x: number; y: number; value: number; label: string } | null>(null)
+    const [analyticsData, setAnalyticsData] = useState<StoreAnalyticsData | null>(null)
+    const [loadingAnalytics, setLoadingAnalytics] = useState(false)
 
-    // Calculate dates & multipliers based on time filter
+    // Calculate dates based on time filter
     const daysCount = timeFilter === '7d' ? 7 : timeFilter === '14d' ? 14 : 30
-    const filterMultiplier = timeFilter === '7d' ? 0.35 : timeFilter === '14d' ? 0.6 : 1.0
+
+    // Query real Supabase database analytics for this store
+    useEffect(() => {
+        if (!businessProfile?.userId) return
+        let isMounted = true
+        setLoadingAnalytics(true)
+        const listingIds = myListings.map(l => l.id)
+        fetchStoreAnalytics(businessProfile.userId, daysCount, listingIds)
+            .then(data => {
+                if (isMounted) {
+                    setAnalyticsData(data)
+                    setLoadingAnalytics(false)
+                }
+            })
+            .catch(err => {
+                console.error('Error loading store analytics:', err)
+                if (isMounted) setLoadingAnalytics(false)
+            })
+        return () => { isMounted = false }
+    }, [businessProfile?.userId, daysCount, myListings])
 
     // Date range label
     const dateRangeLabel = useMemo(() => {
@@ -35,45 +57,35 @@ export function StoreInsightsView({
         return `Last ${daysCount} days: ${format(start)} – ${format(end)}`
     }, [daysCount])
 
-    // Dynamic stats based on user's real business data
+    // Active ads count
     const activeAdsCount = (businessProfile?.ads || []).filter(a => a.status === 'Active').length
-    const listingsCount = myListings.length
 
-    // Views tab metrics
-    const viewsCount = Math.round((listingsCount * 28 + activeAdsCount * 85 + 42) * filterMultiplier)
-    const listingClicks = Math.round((listingsCount * 14 + 18) * filterMultiplier)
-    const adClicks = Math.round((activeAdsCount * 45 + (activeAdsCount > 0 ? 12 : 0)) * filterMultiplier)
-    const storeClicks = Math.round((listingsCount * 6 + activeAdsCount * 22 + 10) * filterMultiplier)
+    // Real database metrics (Views)
+    const viewsCount = analyticsData?.viewsCount ?? 0
+    const listingClicks = analyticsData?.listingClicks ?? 0
+    const adClicks = analyticsData?.adClicks ?? 0
+    const storeClicks = analyticsData?.storeClicks ?? 0
 
-    // Engagement tab metrics
-    const totalEngagement = Math.round((viewsCount * 0.12 + 6) * filterMultiplier)
-    const listingSaves = Math.round((listingsCount * 5 + 4) * filterMultiplier)
-    const listingShares = Math.round((listingsCount * 2 + 1) * filterMultiplier)
-    const customerInquiries = Math.round((listingsCount * 3 + 2) * filterMultiplier)
+    // Real database metrics (Engagement)
+    const totalEngagement = analyticsData?.totalEngagement ?? 0
+    const listingSaves = analyticsData?.listingSaves ?? 0
+    const listingShares = analyticsData?.listingShares ?? 0
+    const customerInquiries = analyticsData?.customerInquiries ?? 0
 
-    // Generate chart points
+    // Real chart points from Supabase event aggregation
     const chartData = useMemo(() => {
-        const pointsCount = timeFilter === '7d' ? 7 : timeFilter === '14d' ? 14 : 10
-        const points: { label: string; value: number }[] = []
-        const baseVal = insightsTab === 'views' ? viewsCount / pointsCount : totalEngagement / pointsCount
-
-        for (let i = 0; i < pointsCount; i++) {
-            const d = new Date()
-            d.setDate(d.getDate() - (pointsCount - 1 - i) * (daysCount / pointsCount))
-            const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-
-            // Create a realistic spike pattern (like in the screenshot)
-            let multiplier = 0.2 + 0.3 * Math.sin(i * 0.8)
-            if (i === Math.floor(pointsCount * 0.6)) {
-                multiplier = 2.4 // Spike peak
-            } else if (i === Math.floor(pointsCount * 0.6) - 1 || i === Math.floor(pointsCount * 0.6) + 1) {
-                multiplier = 1.2
+        if (!analyticsData) {
+            const pointsCount = timeFilter === '7d' ? 7 : timeFilter === '14d' ? 14 : 10
+            const points: { label: string; value: number }[] = []
+            for (let i = 0; i < pointsCount; i++) {
+                const d = new Date()
+                d.setDate(d.getDate() - (pointsCount - 1 - i) * Math.max(1, Math.round(daysCount / pointsCount)))
+                points.push({ label: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), value: 0 })
             }
-            const value = Math.max(0, Math.round(baseVal * multiplier))
-            points.push({ label, value })
+            return points
         }
-        return points
-    }, [insightsTab, viewsCount, totalEngagement, timeFilter, daysCount])
+        return insightsTab === 'views' ? analyticsData.viewsChart : analyticsData.engagementChart
+    }, [analyticsData, insightsTab, timeFilter, daysCount])
 
     // SVG Line & Area coordinates
     const chartWidth = 720
@@ -128,7 +140,7 @@ export function StoreInsightsView({
                         Insights
                     </h3>
                     <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                        {businessProfile?.shopName || 'Store Analytics'}
+                        {loadingAnalytics ? 'Updating analytics...' : (businessProfile?.shopName || 'Store Analytics')}
                     </p>
                 </div>
 
@@ -302,7 +314,7 @@ export function StoreInsightsView({
                             }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <span style={{ fontSize: '1.8rem', fontWeight: 800 }}>{viewsCount.toLocaleString()}</span>
-                                    <span style={{ fontSize: '0.86rem', color: '#10b981', fontWeight: 700 }}>↑ 658%</span>
+                                    <span style={{ fontSize: '0.8rem', color: '#3b82f6', fontWeight: 600 }}>{timeFilter} window</span>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px', color: 'var(--text-secondary)', fontSize: '0.84rem' }}>
                                     <span>Total Views</span>
@@ -319,7 +331,7 @@ export function StoreInsightsView({
                             }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <span style={{ fontSize: '1.8rem', fontWeight: 800 }}>{listingClicks.toLocaleString()}</span>
-                                    <span style={{ fontSize: '0.86rem', color: '#10b981', fontWeight: 700 }}>↑ 42%</span>
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Real-time</span>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px', color: 'var(--text-secondary)', fontSize: '0.84rem' }}>
                                     <span>Listing Clicks</span>
@@ -336,8 +348,8 @@ export function StoreInsightsView({
                             }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <span style={{ fontSize: '1.8rem', fontWeight: 800 }}>{adClicks.toLocaleString()}</span>
-                                    <span style={{ fontSize: '0.86rem', color: activeAdsCount > 0 ? '#10b981' : 'var(--text-secondary)', fontWeight: 700 }}>
-                                        {activeAdsCount > 0 ? '↑ 18%' : '0%'}
+                                    <span style={{ fontSize: '0.8rem', color: activeAdsCount > 0 ? '#10b981' : 'var(--text-secondary)', fontWeight: 600 }}>
+                                        {activeAdsCount > 0 ? 'Active' : 'No ads'}
                                     </span>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px', color: 'var(--text-secondary)', fontSize: '0.84rem' }}>
@@ -355,7 +367,7 @@ export function StoreInsightsView({
                             }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <span style={{ fontSize: '1.8rem', fontWeight: 800 }}>{storeClicks.toLocaleString()}</span>
-                                    <span style={{ fontSize: '0.86rem', color: '#10b981', fontWeight: 700 }}>↑ 94%</span>
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Real-time</span>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px', color: 'var(--text-secondary)', fontSize: '0.84rem' }}>
                                     <span>Storefront Clicks</span>
@@ -521,91 +533,103 @@ export function StoreInsightsView({
                                 </div>
 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '6px' }}>
-                                    <div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.86rem', marginBottom: '6px' }}>
-                                            <span>Listings & Products</span>
-                                            <strong>74.5%</strong>
-                                        </div>
-                                        <div style={{ height: '8px', width: '100%', background: 'var(--surface)', borderRadius: '4px', overflow: 'hidden' }}>
-                                            <div style={{ width: '74.5%', height: '100%', background: '#3b82f6', borderRadius: '4px' }} />
-                                        </div>
-                                    </div>
+                                    {(() => {
+                                        const ct = analyticsData?.contentTypeBreakdown || { listings: 0, storefront: 0, ads: 0 }
+                                        return (
+                                            <>
+                                                <div>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.86rem', marginBottom: '6px' }}>
+                                                        <span>Listings & Products</span>
+                                                        <strong>{ct.listings.toFixed(1)}%</strong>
+                                                    </div>
+                                                    <div style={{ height: '8px', width: '100%', background: 'var(--surface)', borderRadius: '4px', overflow: 'hidden' }}>
+                                                        <div style={{ width: `${ct.listings}%`, height: '100%', background: '#3b82f6', borderRadius: '4px', transition: 'width 0.4s ease' }} />
+                                                    </div>
+                                                </div>
 
-                                    <div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.86rem', marginBottom: '6px' }}>
-                                            <span>Storefront & Profile</span>
-                                            <strong>18.2%</strong>
-                                        </div>
-                                        <div style={{ height: '8px', width: '100%', background: 'var(--surface)', borderRadius: '4px', overflow: 'hidden' }}>
-                                            <div style={{ width: '18.2%', height: '100%', background: '#60a5fa', borderRadius: '4px' }} />
-                                        </div>
-                                    </div>
+                                                <div>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.86rem', marginBottom: '6px' }}>
+                                                        <span>Storefront & Profile</span>
+                                                        <strong>{ct.storefront.toFixed(1)}%</strong>
+                                                    </div>
+                                                    <div style={{ height: '8px', width: '100%', background: 'var(--surface)', borderRadius: '4px', overflow: 'hidden' }}>
+                                                        <div style={{ width: `${ct.storefront}%`, height: '100%', background: '#60a5fa', borderRadius: '4px', transition: 'width 0.4s ease' }} />
+                                                    </div>
+                                                </div>
 
-                                    <div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.86rem', marginBottom: '6px' }}>
-                                            <span>Promoted Ads</span>
-                                            <strong>7.3%</strong>
-                                        </div>
-                                        <div style={{ height: '8px', width: '100%', background: 'var(--surface)', borderRadius: '4px', overflow: 'hidden' }}>
-                                            <div style={{ width: '7.3%', height: '100%', background: '#93c5fd', borderRadius: '4px' }} />
-                                        </div>
-                                    </div>
+                                                <div>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.86rem', marginBottom: '6px' }}>
+                                                        <span>Promoted Ads</span>
+                                                        <strong>{ct.ads.toFixed(1)}%</strong>
+                                                    </div>
+                                                    <div style={{ height: '8px', width: '100%', background: 'var(--surface)', borderRadius: '4px', overflow: 'hidden' }}>
+                                                        <div style={{ width: `${ct.ads}%`, height: '100%', background: '#93c5fd', borderRadius: '4px', transition: 'width 0.4s ease' }} />
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )
+                                    })()}
                                 </div>
                             </div>
 
                             {/* Card 2: Views by followers vs. non-followers (Donut) */}
-                            <div style={{
-                                background: 'var(--panel)',
-                                borderRadius: '16px',
-                                padding: '22px',
-                                border: '1px solid var(--border)',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                textAlign: 'center'
-                            }}>
-                                <h3 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', fontWeight: 700, alignSelf: 'flex-start' }}>
-                                    Views by followers vs. non-followers
-                                </h3>
+                            {(() => {
+                                const fb = analyticsData?.followersBreakdown || { followers: 0, nonFollowers: 100 }
+                                return (
+                                    <div style={{
+                                        background: 'var(--panel)',
+                                        borderRadius: '16px',
+                                        padding: '22px',
+                                        border: '1px solid var(--border)',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        textAlign: 'center'
+                                    }}>
+                                        <h3 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', fontWeight: 700, alignSelf: 'flex-start' }}>
+                                            Views by followers vs. non-followers
+                                        </h3>
 
-                                <div style={{ position: 'relative', width: '140px', height: '140px', margin: '10px 0' }}>
-                                    <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
-                                        {/* Background ring (96.4% Non-followers) */}
-                                        <path
-                                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                            fill="none"
-                                            stroke="#3b82f6"
-                                            strokeWidth="3.8"
-                                            strokeDasharray="96.4, 100"
-                                        />
-                                        {/* Accent ring (3.6% Followers) */}
-                                        <path
-                                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                            fill="none"
-                                            stroke="#93c5fd"
-                                            strokeWidth="3.8"
-                                            strokeDasharray="3.6, 100"
-                                            strokeDashoffset="-96.4"
-                                        />
-                                    </svg>
-                                </div>
+                                        <div style={{ position: 'relative', width: '140px', height: '140px', margin: '10px 0' }}>
+                                            <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
+                                                {/* Background ring (Non-followers) */}
+                                                <path
+                                                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                                    fill="none"
+                                                    stroke="#3b82f6"
+                                                    strokeWidth="3.8"
+                                                    strokeDasharray={`${fb.nonFollowers}, 100`}
+                                                />
+                                                {/* Accent ring (Followers) */}
+                                                <path
+                                                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                                    fill="none"
+                                                    stroke="#93c5fd"
+                                                    strokeWidth="3.8"
+                                                    strokeDasharray={`${fb.followers}, 100`}
+                                                    strokeDashoffset={`-${fb.nonFollowers}`}
+                                                />
+                                            </svg>
+                                        </div>
 
-                                <div style={{ display: 'flex', gap: '24px', marginTop: '12px', fontSize: '0.86rem' }}>
-                                    <div>
-                                        <strong style={{ display: 'block', fontSize: '1.1rem' }}>96.4%</strong>
-                                        <span style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3b82f6' }} /> Non-followers
-                                        </span>
+                                        <div style={{ display: 'flex', gap: '24px', marginTop: '12px', fontSize: '0.86rem' }}>
+                                            <div>
+                                                <strong style={{ display: 'block', fontSize: '1.1rem' }}>{fb.nonFollowers.toFixed(1)}%</strong>
+                                                <span style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3b82f6' }} /> Non-followers
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <strong style={{ display: 'block', fontSize: '1.1rem' }}>{fb.followers.toFixed(1)}%</strong>
+                                                <span style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#93c5fd' }} /> Followers
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <strong style={{ display: 'block', fontSize: '1.1rem' }}>3.6%</strong>
-                                        <span style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#93c5fd' }} /> Followers
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
+                                )
+                            })()}
                         </div>
                     </>
                 )}
@@ -628,7 +652,7 @@ export function StoreInsightsView({
                             }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <span style={{ fontSize: '1.8rem', fontWeight: 800 }}>{totalEngagement}</span>
-                                    <span style={{ fontSize: '0.86rem', color: '#10b981', fontWeight: 700 }}>+100.0%</span>
+                                    <span style={{ fontSize: '0.8rem', color: '#3b82f6', fontWeight: 600 }}>{timeFilter} window</span>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px', color: 'var(--text-secondary)', fontSize: '0.84rem' }}>
                                     <span>Total Engagement</span>
@@ -645,7 +669,7 @@ export function StoreInsightsView({
                             }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <span style={{ fontSize: '1.8rem', fontWeight: 800 }}>{listingSaves}</span>
-                                    <span style={{ fontSize: '0.86rem', color: '#10b981', fontWeight: 700 }}>↑ 50%</span>
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Real-time</span>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px', color: 'var(--text-secondary)', fontSize: '0.84rem' }}>
                                     <span>Listing Saves</span>
@@ -662,7 +686,7 @@ export function StoreInsightsView({
                             }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <span style={{ fontSize: '1.8rem', fontWeight: 800 }}>{customerInquiries}</span>
-                                    <span style={{ fontSize: '0.86rem', color: '#10b981', fontWeight: 700 }}>↑ 33%</span>
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Real-time</span>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px', color: 'var(--text-secondary)', fontSize: '0.84rem' }}>
                                     <span>Direct Inquiries</span>
@@ -679,7 +703,7 @@ export function StoreInsightsView({
                             }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <span style={{ fontSize: '1.8rem', fontWeight: 800 }}>{listingShares}</span>
-                                    <span style={{ fontSize: '0.86rem', color: '#10b981', fontWeight: 700 }}>↑ 20%</span>
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Real-time</span>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px', color: 'var(--text-secondary)', fontSize: '0.84rem' }}>
                                     <span>Listing Shares</span>
@@ -769,74 +793,100 @@ export function StoreInsightsView({
                         {/* Three column engagement breakdown cards */}
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
                             {/* By content type */}
-                            <div style={{ background: 'var(--panel)', padding: '20px', borderRadius: '16px', border: '1px solid var(--border)' }}>
-                                <h4 style={{ margin: '0 0 12px 0' }}>By content type</h4>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                    <div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.84rem', marginBottom: '4px' }}>
-                                            <span>Product Inquiries</span>
-                                            <strong>62.5%</strong>
-                                        </div>
-                                        <div style={{ height: '6px', width: '100%', background: 'var(--surface)', borderRadius: '3px' }}>
-                                            <div style={{ width: '62.5%', height: '100%', background: '#3b82f6', borderRadius: '3px' }} />
+                            {(() => {
+                                const inqPct = totalEngagement > 0 ? (customerInquiries / totalEngagement) * 100 : 0
+                                const sharePct = totalEngagement > 0 ? (listingShares / totalEngagement) * 100 : 0
+                                const savePct = totalEngagement > 0 ? (listingSaves / totalEngagement) * 100 : 0
+                                return (
+                                    <div style={{ background: 'var(--panel)', padding: '20px', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                                        <h4 style={{ margin: '0 0 12px 0' }}>By content type</h4>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                            <div>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.84rem', marginBottom: '4px' }}>
+                                                    <span>Product Inquiries</span>
+                                                    <strong>{inqPct.toFixed(1)}%</strong>
+                                                </div>
+                                                <div style={{ height: '6px', width: '100%', background: 'var(--surface)', borderRadius: '3px' }}>
+                                                    <div style={{ width: `${inqPct}%`, height: '100%', background: '#3b82f6', borderRadius: '3px', transition: 'width 0.4s ease' }} />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.84rem', marginBottom: '4px' }}>
+                                                    <span>Listing Shares</span>
+                                                    <strong>{sharePct.toFixed(1)}%</strong>
+                                                </div>
+                                                <div style={{ height: '6px', width: '100%', background: 'var(--surface)', borderRadius: '3px' }}>
+                                                    <div style={{ width: `${sharePct}%`, height: '100%', background: '#60a5fa', borderRadius: '3px', transition: 'width 0.4s ease' }} />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.84rem', marginBottom: '4px' }}>
+                                                    <span>Saves</span>
+                                                    <strong>{savePct.toFixed(1)}%</strong>
+                                                </div>
+                                                <div style={{ height: '6px', width: '100%', background: 'var(--surface)', borderRadius: '3px' }}>
+                                                    <div style={{ width: `${savePct}%`, height: '100%', background: '#93c5fd', borderRadius: '3px', transition: 'width 0.4s ease' }} />
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.84rem', marginBottom: '4px' }}>
-                                            <span>Listing Shares</span>
-                                            <strong>25.0%</strong>
-                                        </div>
-                                        <div style={{ height: '6px', width: '100%', background: 'var(--surface)', borderRadius: '3px' }}>
-                                            <div style={{ width: '25%', height: '100%', background: '#60a5fa', borderRadius: '3px' }} />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.84rem', marginBottom: '4px' }}>
-                                            <span>Saves</span>
-                                            <strong>12.5%</strong>
-                                        </div>
-                                        <div style={{ height: '6px', width: '100%', background: 'var(--surface)', borderRadius: '3px' }}>
-                                            <div style={{ width: '12.5%', height: '100%', background: '#93c5fd', borderRadius: '3px' }} />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                                )
+                            })()}
 
                             {/* By interaction type */}
-                            <div style={{ background: 'var(--panel)', padding: '20px', borderRadius: '16px', border: '1px solid var(--border)', textAlign: 'center' }}>
-                                <h4 style={{ margin: '0 0 12px 0', textAlign: 'left' }}>By interaction type</h4>
-                                <div style={{ width: '90px', height: '90px', margin: '0 auto 8px auto' }}>
-                                    <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
-                                        <path
-                                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                            fill="none"
-                                            stroke="#3b82f6"
-                                            strokeWidth="4"
-                                            strokeDasharray="100, 100"
-                                        />
-                                    </svg>
-                                </div>
-                                <strong style={{ fontSize: '1.2rem', display: 'block' }}>100%</strong>
-                                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Clicks & Inquiries</span>
-                            </div>
+                            {(() => {
+                                const clicksAndInq = listingClicks + customerInquiries
+                                const interactionPct = viewsCount > 0 ? Math.min(100, Math.round((clicksAndInq / viewsCount) * 100)) : (totalEngagement > 0 ? 100 : 0)
+                                return (
+                                    <div style={{ background: 'var(--panel)', padding: '20px', borderRadius: '16px', border: '1px solid var(--border)', textAlign: 'center' }}>
+                                        <h4 style={{ margin: '0 0 12px 0', textAlign: 'left' }}>By interaction type</h4>
+                                        <div style={{ width: '90px', height: '90px', margin: '0 auto 8px auto' }}>
+                                            <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
+                                                <path
+                                                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                                    fill="none"
+                                                    stroke="#3b82f6"
+                                                    strokeWidth="4"
+                                                    strokeDasharray={`${interactionPct}, 100`}
+                                                />
+                                            </svg>
+                                        </div>
+                                        <strong style={{ fontSize: '1.2rem', display: 'block' }}>{interactionPct}%</strong>
+                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Clicks & Inquiries</span>
+                                    </div>
+                                )
+                            })()}
 
                             {/* By followers vs non-followers */}
-                            <div style={{ background: 'var(--panel)', padding: '20px', borderRadius: '16px', border: '1px solid var(--border)', textAlign: 'center' }}>
-                                <h4 style={{ margin: '0 0 12px 0', textAlign: 'left' }}>Followers vs. Non-followers</h4>
-                                <div style={{ width: '90px', height: '90px', margin: '0 auto 8px auto' }}>
-                                    <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
-                                        <path
-                                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                            fill="none"
-                                            stroke="#3b82f6"
-                                            strokeWidth="4"
-                                            strokeDasharray="100, 100"
-                                        />
-                                    </svg>
-                                </div>
-                                <strong style={{ fontSize: '1.2rem', display: 'block' }}>100%</strong>
-                                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Non-followers (New Reach)</span>
-                            </div>
+                            {(() => {
+                                const fb = analyticsData?.followersBreakdown || { followers: 0, nonFollowers: 100 }
+                                return (
+                                    <div style={{ background: 'var(--panel)', padding: '20px', borderRadius: '16px', border: '1px solid var(--border)', textAlign: 'center' }}>
+                                        <h4 style={{ margin: '0 0 12px 0', textAlign: 'left' }}>Followers vs. Non-followers</h4>
+                                        <div style={{ width: '90px', height: '90px', margin: '0 auto 8px auto' }}>
+                                            <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
+                                                <path
+                                                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                                    fill="none"
+                                                    stroke="#3b82f6"
+                                                    strokeWidth="4"
+                                                    strokeDasharray={`${fb.nonFollowers}, 100`}
+                                                />
+                                                <path
+                                                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                                    fill="none"
+                                                    stroke="#93c5fd"
+                                                    strokeWidth="4"
+                                                    strokeDasharray={`${fb.followers}, 100`}
+                                                    strokeDashoffset={`-${fb.nonFollowers}`}
+                                                />
+                                            </svg>
+                                        </div>
+                                        <strong style={{ fontSize: '1.2rem', display: 'block' }}>{fb.nonFollowers.toFixed(0)}%</strong>
+                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Non-followers (New Reach)</span>
+                                    </div>
+                                )
+                            })()}
                         </div>
                     </>
                 )}
@@ -856,15 +906,15 @@ export function StoreInsightsView({
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
                             <div style={{ background: 'var(--surface)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
                                 <span style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>Store Followers</span>
-                                <h3 style={{ margin: '4px 0 0', fontSize: '1.6rem', color: '#10b981' }}>{followingCount}</h3>
+                                <h3 style={{ margin: '4px 0 0', fontSize: '1.6rem', color: '#10b981' }}>{analyticsData?.followersCount ?? followingCount}</h3>
                             </div>
                             <div style={{ background: 'var(--surface)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
                                 <span style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>Primary Location</span>
                                 <h3 style={{ margin: '4px 0 0', fontSize: '1.4rem' }}>Zambia (Lusaka & Copperbelt)</h3>
                             </div>
                             <div style={{ background: 'var(--surface)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                                <span style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>Active Buyers</span>
-                                <h3 style={{ margin: '4px 0 0', fontSize: '1.4rem' }}>{Math.round(viewsCount * 0.42)}</h3>
+                                <span style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>Active Interactions</span>
+                                <h3 style={{ margin: '4px 0 0', fontSize: '1.4rem' }}>{customerInquiries + listingSaves}</h3>
                             </div>
                         </div>
                     </div>
@@ -886,9 +936,10 @@ export function StoreInsightsView({
                             gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
                             gap: '14px'
                         }}>
-                            {myListings.slice(0, 6).map((item, idx) => {
-                                const itemViews = Math.max(12, Math.round((viewsCount / (myListings.length || 1)) * (1.2 - idx * 0.15)))
-                                const itemEng = Math.max(1, Math.round(itemViews * 0.08))
+                            {myListings.slice(0, 6).map((item) => {
+                                const itemStats = analyticsData?.recentListingsMetrics?.[item.id]
+                                const itemViews = itemStats?.views ?? 0
+                                const itemEng = itemStats?.engagement ?? 0
                                 return (
                                     <div
                                         key={item.id}

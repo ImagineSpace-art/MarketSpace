@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { CATEGORY_OPTIONS, CONDITION_OPTIONS, DELIVERY_OPTIONS } from './constants'
 import type { Listing, Profile, View, BusinessProfile, StoreReview, PaymentMethodItem, NotificationConfig } from '../../types'
+import { logAnalyticsEvent, toggleStoreFollowInDb } from '../../services/analytics'
 
 export type NotificationItem = {
   id: number
@@ -537,9 +538,15 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   }
 
   const toggleFollowStore = (storeId: string) => {
+    if (!session) {
+      setMessage('Please sign in to follow stores')
+      return
+    }
+    const isFollowing = followingIds.includes(storeId)
     setFollowingIds(prev =>
-      prev.includes(storeId) ? prev.filter(id => id !== storeId) : [...prev, storeId]
+      isFollowing ? prev.filter(id => id !== storeId) : [...prev, storeId]
     )
+    void toggleStoreFollowInDb(session.user.id, storeId)
   }
 
   const toggleNotifyStore = (storeId: string) => {
@@ -700,6 +707,10 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       let loadedProfile: Profile | null = null
       if (currentSession) {
         loadedProfile = await loadProfile(currentSession.user.id, currentSession.user)
+        const { data: followRows } = await supabase.from('store_followers').select('store_id').eq('user_id', currentSession.user.id)
+        if (followRows) {
+          setFollowingIds(followRows.map((r: any) => r.store_id))
+        }
       }
 
       await fetchListings()
@@ -963,6 +974,20 @@ export function useMarketplaceApp(): MarketplaceAppModel {
 
   const openListing = (listing: Listing) => {
     setSelectedListing(listing)
+    void logAnalyticsEvent({
+      event_type: 'listing_click',
+      seller_id: listing.user_id,
+      listing_id: listing.id,
+      actor_id: session?.user?.id
+    })
+    if (listing.sponsored) {
+      void logAnalyticsEvent({
+        event_type: 'ad_click',
+        seller_id: listing.user_id,
+        listing_id: listing.id,
+        actor_id: session?.user?.id
+      })
+    }
     navigate(`/listings/${listing.id}`)
   }
 
@@ -1016,6 +1041,13 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       await supabase.from('saved_listings').delete().eq('user_id', session.user.id).eq('listing_id', strId)
     } else {
       await supabase.from('saved_listings').upsert({ user_id: session.user.id, listing_id: strId }, { onConflict: 'user_id,listing_id' })
+      const targetListing = listings.find((l) => l.id === listingId)
+      void logAnalyticsEvent({
+        event_type: 'listing_save',
+        seller_id: targetListing?.user_id,
+        listing_id: listingId,
+        actor_id: session.user.id
+      })
     }
   }
 
@@ -1141,6 +1173,12 @@ export function useMarketplaceApp(): MarketplaceAppModel {
 
       await fetchChatThreads()
       setActiveChatId(chatId)
+      void logAnalyticsEvent({
+        event_type: 'chat_inquiry',
+        seller_id: listing.user_id || undefined,
+        listing_id: listing.id,
+        actor_id: session.user.id
+      })
       navigate('/inbox')
     } catch (err: any) {
       setMessage(err.message || 'Failed to start chat')

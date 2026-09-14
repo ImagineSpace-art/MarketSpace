@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { BusinessProfile, Listing, StoreReview } from '../types'
 import { ListingCard } from '../components/ListingCard'
+import { logAnalyticsEvent } from '../services/analytics'
 
 // ---------------- PUBLIC STORE VIEW ----------------
 type StoreViewPageProps = {
@@ -56,6 +57,16 @@ export function StoreViewPage({
 
     const shopListings = listings.filter(l => l.user_id === shop.userId)
     const isOwner = currentUserId === shop.userId
+
+    useEffect(() => {
+        if (shop?.userId) {
+            void logAnalyticsEvent({
+                event_type: 'store_view',
+                seller_id: shop.userId,
+                actor_id: currentUserId || undefined
+            })
+        }
+    }, [shop?.userId, currentUserId])
 
     useEffect(() => {
         if (tabQuery) {

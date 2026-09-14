@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent, type FormEvent } from 'react'
+import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import type { Listing, Profile, BusinessProfile, PaymentMethodItem, NotificationConfig } from '../types'
 import { SavedItemsPage, NotificationsPage } from './SavedNotificationsPage'
@@ -8,6 +8,7 @@ import { AdCreationPage } from './AdCreationPage'
 import { StoreInsightsView } from '../components/StoreInsightsView'
 import type { NotificationItem } from '../features/marketplace/useMarketplaceApp'
 import { uploadImageToSupabase } from '../features/marketplace/ImageUploader'
+import { fetchStoreAnalytics, type StoreAnalyticsData } from '../services/analytics'
 
 // ---------------- PROFILE PAGE ----------------
 type ProfilePageProps = {
@@ -123,8 +124,22 @@ export function ProfilePage({
     const [storeTab, setStoreTab] = useState<'analytics' | 'departments' | 'catalog' | 'ads' | 'social'>('analytics')
     const [sellerTab, setSellerTab] = useState<'active' | 'sold' | 'drafts'>('active')
 
-    // Store Performance time filter
+    // Store Performance time filter & database data
     const [perfTimeFilter, setPerfTimeFilter] = useState<'7d' | '14d' | '30d'>('7d')
+    const [perfAnalyticsData, setPerfAnalyticsData] = useState<StoreAnalyticsData | null>(null)
+
+    useEffect(() => {
+        if (!businessProfile?.userId || storeTab !== 'analytics') return
+        let isMounted = true
+        const days = perfTimeFilter === '7d' ? 7 : perfTimeFilter === '14d' ? 14 : 30
+        const listingIds = myListings.map(l => l.id)
+        fetchStoreAnalytics(businessProfile.userId, days, listingIds)
+            .then(data => {
+                if (isMounted) setPerfAnalyticsData(data)
+            })
+            .catch(err => console.error('Error loading performance analytics:', err))
+        return () => { isMounted = false }
+    }, [businessProfile?.userId, storeTab, perfTimeFilter, myListings])
 
     // Departments Manager states
     const [newDeptName, setNewDeptName] = useState('')
@@ -420,15 +435,13 @@ export function ProfilePage({
 
                             {/* ANALYTICS TAB */}
                             {storeTab === 'analytics' && (() => {
-                                const perfMultiplier = perfTimeFilter === '7d' ? 1.0 : perfTimeFilter === '14d' ? 1.85 : 3.4
                                 const activeAds = (businessProfile.ads || []).filter(a => a.status === 'Active').length
-                                const catalogItems = (businessProfile.catalog || []).length
-                                const perfStoreClicks = Math.round((catalogItems * 4 + activeAds * 10 + 15) * perfMultiplier)
-                                const perfListingClicks = Math.round((myListings.length * 9 + activeAds * 18 + 22) * perfMultiplier)
-                                const perfAdClicks = Math.round((activeAds * 38 + (activeAds > 0 ? 14 : 0)) * perfMultiplier)
-                                const perfListingShares = Math.round((myListings.length * 3 + 5) * perfMultiplier)
-                                const perfListingSaves = Math.round((myListings.length * 7 + 9) * perfMultiplier)
-                                const perfFollowers = followingIds.filter(id => id === businessProfile.userId).length
+                                const perfStoreClicks = perfAnalyticsData?.storeClicks ?? 0
+                                const perfListingClicks = perfAnalyticsData?.listingClicks ?? 0
+                                const perfAdClicks = perfAnalyticsData?.adClicks ?? 0
+                                const perfListingShares = perfAnalyticsData?.listingShares ?? 0
+                                const perfListingSaves = perfAnalyticsData?.listingSaves ?? 0
+                                const perfFollowers = perfAnalyticsData?.followersCount ?? followingIds.filter(id => id === businessProfile.userId).length
 
                                 return (
                                     <div className="business-hub-grid" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -470,7 +483,7 @@ export function ProfilePage({
                                                     <span className="material-icons" style={{ fontSize: '18px', color: '#2563eb' }}>storefront</span>
                                                 </div>
                                                 <h3 style={{ margin: '6px 0 2px 0', fontSize: '1.6rem', color: '#2563eb' }}>{perfStoreClicks.toLocaleString()}</h3>
-                                                <span style={{ fontSize: '0.74rem', color: '#10b981', fontWeight: 700 }}>↑ +14% vs prev period</span>
+                                                <span style={{ fontSize: '0.74rem', color: '#3b82f6', fontWeight: 600 }}>{perfTimeFilter} window</span>
                                             </div>
 
                                             <div style={{ background: 'var(--panel)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
@@ -479,7 +492,7 @@ export function ProfilePage({
                                                     <span className="material-icons" style={{ fontSize: '18px', color: '#3b82f6' }}>touch_app</span>
                                                 </div>
                                                 <h3 style={{ margin: '6px 0 2px 0', fontSize: '1.6rem' }}>{perfListingClicks.toLocaleString()}</h3>
-                                                <span style={{ fontSize: '0.74rem', color: '#10b981', fontWeight: 700 }}>↑ +26% vs prev period</span>
+                                                <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Real-time</span>
                                             </div>
 
                                             <div style={{ background: 'var(--panel)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
@@ -488,8 +501,8 @@ export function ProfilePage({
                                                     <span className="material-icons" style={{ fontSize: '18px', color: '#f59e0b' }}>campaign</span>
                                                 </div>
                                                 <h3 style={{ margin: '6px 0 2px 0', fontSize: '1.6rem' }}>{perfAdClicks.toLocaleString()}</h3>
-                                                <span style={{ fontSize: '0.74rem', color: activeAds > 0 ? '#10b981' : 'var(--text-secondary)', fontWeight: 700 }}>
-                                                    {activeAds > 0 ? '↑ +19% vs prev period' : 'No active ads'}
+                                                <span style={{ fontSize: '0.74rem', color: activeAds > 0 ? '#10b981' : 'var(--text-secondary)', fontWeight: 600 }}>
+                                                    {activeAds > 0 ? 'Active campaigns' : 'No active ads'}
                                                 </span>
                                             </div>
 
@@ -499,7 +512,7 @@ export function ProfilePage({
                                                     <span className="material-icons" style={{ fontSize: '18px', color: '#8b5cf6' }}>share</span>
                                                 </div>
                                                 <h3 style={{ margin: '6px 0 2px 0', fontSize: '1.6rem' }}>{perfListingShares.toLocaleString()}</h3>
-                                                <span style={{ fontSize: '0.74rem', color: '#10b981', fontWeight: 700 }}>↑ +8% vs prev period</span>
+                                                <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Real-time</span>
                                             </div>
 
                                             <div style={{ background: 'var(--panel)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
@@ -508,7 +521,7 @@ export function ProfilePage({
                                                     <span className="material-icons" style={{ fontSize: '18px', color: '#ec4899' }}>bookmark</span>
                                                 </div>
                                                 <h3 style={{ margin: '6px 0 2px 0', fontSize: '1.6rem' }}>{perfListingSaves.toLocaleString()}</h3>
-                                                <span style={{ fontSize: '0.74rem', color: '#10b981', fontWeight: 700 }}>↑ +31% vs prev period</span>
+                                                <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Real-time</span>
                                             </div>
 
                                             <div style={{ background: 'var(--panel)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>

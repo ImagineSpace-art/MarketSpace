@@ -1,10 +1,11 @@
-import { useState, type FormEvent, type ChangeEvent } from 'react'
+import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { CATEGORY_OPTIONS, CONDITION_OPTIONS } from '../features/marketplace/constants'
 import type { Listing } from '../types'
 import { formatZMWPrice } from '../utils/formatPrice'
 import { uploadImageToSupabase } from '../features/marketplace/ImageUploader'
+import { logAnalyticsEvent } from '../services/analytics'
 
 type ListingDetailPageProps = {
   selectedListing: Listing | null
@@ -103,7 +104,24 @@ export function ListingDetailPage({
     onMessageSeller(offerMsg)
   }
 
+  useEffect(() => {
+    if (selectedListing?.id) {
+      void logAnalyticsEvent({
+        event_type: 'listing_view',
+        seller_id: selectedListing.user_id,
+        listing_id: selectedListing.id,
+        actor_id: session?.user?.id
+      })
+    }
+  }, [selectedListing?.id, selectedListing?.user_id, session?.user?.id])
+
   const handleShare = async () => {
+    void logAnalyticsEvent({
+      event_type: 'listing_share',
+      seller_id: selectedListing.user_id,
+      listing_id: selectedListing.id,
+      actor_id: session?.user?.id
+    })
     const url = window.location.href
     if (navigator.share) {
       try {
