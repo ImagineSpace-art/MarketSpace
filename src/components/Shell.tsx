@@ -1,7 +1,8 @@
 import { useState, useRef, type ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import type { Profile, NotificationItem } from '../types'
+import { CartDrawer, type CartItem } from './CartDrawer'
 
 type ShellProps = {
   children: ReactNode
@@ -26,6 +27,12 @@ type ShellProps = {
   searchQuery: string
   onSearchQueryChange: (query: string) => void
   storeContext?: { userId: string; shopName: string; collections: import('../types').StoreCollection[] } | null
+  cartItems?: CartItem[]
+  isCartOpen?: boolean
+  onToggleCart?: () => void
+  onUpdateCartQty?: (id: number | string, qty: number) => void
+  onRemoveCartItem?: (id: number | string) => void
+  onClearCart?: () => void
 }
 
 const MEGA_CATEGORIES: Record<string, { label: string; subcats: string[]; featured: string[]; bannerTitle: string; bannerGradient: string }> = {
@@ -86,6 +93,12 @@ export function Shell({
   searchQuery,
   onSearchQueryChange,
   storeContext,
+  cartItems = [],
+  isCartOpen = false,
+  onToggleCart,
+  onUpdateCartQty,
+  onRemoveCartItem,
+  onClearCart,
 }: ShellProps) {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null)
@@ -94,6 +107,10 @@ export function Shell({
   const [selectedDrawerCategory, setSelectedDrawerCategory] = useState<string | null>(null)
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const navigate = useNavigate()
+  const location = useLocation()
+
+  // Only show marketplace search and mega-categories row when actively browsing marketplace
+  const isMarketplace = location.pathname === '/' || location.pathname === '/marketplace' || location.pathname === '/stores'
 
   const userNotifications = notifications.filter(
     (n) => !n.user_id || n.user_id === 'all' || (session?.user?.id && n.user_id === session.user.id)
@@ -117,8 +134,38 @@ export function Shell({
     }, 250)
   }
 
+  const cartCount = cartItems.reduce((acc, it) => acc + it.quantity, 0)
+
   return (
     <div className="app-shell">
+      {/* 1. Top Announcement Ticker */}
+      <div
+        className="shell-top-ticker"
+        style={{
+          backgroundColor: '#0f172a',
+          color: '#f8fafc',
+          padding: '8px 16px',
+          textAlign: 'center',
+          fontSize: '0.78rem',
+          fontWeight: 600,
+          letterSpacing: '0.02em',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: '14px',
+          flexWrap: 'wrap',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
+        }}
+      >
+        <span>⚡ Free Nationwide Delivery On Orders Over K500</span>
+        <span style={{ opacity: 0.3 }}>|</span>
+        <span>Summer Flash Sale Up To 70% Off</span>
+        <span style={{ opacity: 0.3 }}>|</span>
+        <Link to="/stores" style={{ color: '#fab829', textDecoration: 'none', fontWeight: 700 }}>
+          Explore Verified Storefronts →
+        </Link>
+      </div>
+
       {/* 2. Top Header Navigation Bar */}
       <header className="site-header-bar" onMouseLeave={() => setHoveredCategory(null)}>
         {/* Row 1: Brand Logo, Integrated Search, Action Icons */}
@@ -128,88 +175,158 @@ export function Shell({
               <span className="header-brand-icon">❖</span>
               <span className="header-brand-name">MarketSpace</span>
             </Link>
-            <Link
-              to="/stores"
-              className="header-stores-btn"
-              title="Stores Directory"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
-                color: '#ffffff',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                borderRadius: '6px',
-                padding: '5px 12px',
-                fontSize: '0.82rem',
-                fontWeight: 700,
-                textDecoration: 'none',
-                whiteSpace: 'nowrap',
-                marginLeft: 'auto',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <span className="material-icons" style={{ fontSize: '16px' }}>storefront</span>
-              <span>Browse Stores</span>
-            </Link>
-          </div>
 
-          <form
-            className="header-search-container"
-            onSubmit={handleSearchSubmit}
-          >
-            <input
-              type="text"
-              placeholder="Search for items, categories, or stores"
-              value={searchQuery}
-              onChange={(e) => onSearchQueryChange(e.target.value)}
-              className="header-search-input"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => onSearchQueryChange('')}
-                title="Clear search"
+            <nav className="desktop-header-links" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '12px' }}>
+              <Link
+                to="/"
+                className="header-nav-pill"
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#94a3b8',
-                  cursor: 'pointer',
-                  padding: '4px',
-                  display: 'flex',
+                  display: 'inline-flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: '4px'
+                  color: location.pathname === '/' ? '#ffffff' : '#94a3b8',
+                  background: location.pathname === '/' ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  padding: '5px 12px',
+                  borderRadius: '20px',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                  transition: 'all 0.15s ease',
                 }}
               >
-                <span className="material-icons" style={{ fontSize: '18px' }}>close</span>
+                Discovery
+              </Link>
+              <Link
+                to="/browse"
+                className="header-nav-pill"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  color: location.pathname === '/browse' ? '#ffffff' : '#94a3b8',
+                  background: location.pathname === '/browse' ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  padding: '5px 12px',
+                  borderRadius: '20px',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                Browse & Shop
+              </Link>
+              <Link
+                to="/stores"
+                className="header-nav-pill"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  color: location.pathname === '/stores' ? '#ffffff' : '#94a3b8',
+                  background: location.pathname === '/stores' ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  padding: '5px 12px',
+                  borderRadius: '20px',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                Stores
+              </Link>
+              <Link
+                to="/browse?filter=new"
+                className="header-nav-pill"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  color: '#94a3b8',
+                  padding: '5px 12px',
+                  borderRadius: '20px',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                New Arrivals
+              </Link>
+              <Link
+                to="/browse?filter=bestseller"
+                className="header-nav-pill"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  color: '#94a3b8',
+                  padding: '5px 12px',
+                  borderRadius: '20px',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                Best Sellers
+              </Link>
+            </nav>
+          </div>
+
+          {isMarketplace && (
+            <form
+              className="header-search-container"
+              onSubmit={handleSearchSubmit}
+            >
+              <input
+                type="text"
+                placeholder="Search for items, categories, or stores"
+                value={searchQuery}
+                onChange={(e) => onSearchQueryChange(e.target.value)}
+                className="header-search-input"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => onSearchQueryChange('')}
+                  title="Clear search"
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#94a3b8',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: '4px'
+                  }}
+                >
+                  <span className="material-icons" style={{ fontSize: '18px' }}>close</span>
+                </button>
+              )}
+              <button type="submit" className="header-search-btn" title="Search">
+                <span className="material-icons">search</span>
               </button>
-            )}
-            <button type="submit" className="header-search-btn" title="Search">
-              <span className="material-icons">search</span>
-            </button>
-          </form>
+            </form>
+          )}
 
           <div className="header-actions-group">
             {/* Mobile Categories & Filters Button (Left of Notifications) */}
-            <button
-              type="button"
-              className="header-mobile-filters-btn"
-              onClick={() => setIsMobileCategoryDrawerOpen(true)}
-              title="Categories & Filters"
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                color: '#ffffff',
-                padding: '6px',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <span className="material-icons" style={{ fontSize: '24px' }}>tune</span>
-            </button>
+            {isMarketplace && (
+              <button
+                type="button"
+                className="header-mobile-filters-btn"
+                onClick={() => setIsMobileCategoryDrawerOpen(true)}
+                title="Categories & Filters"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#ffffff',
+                  padding: '6px',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <span className="material-icons" style={{ fontSize: '24px' }}>tune</span>
+              </button>
+            )}
 
             {/* Notifications Floating Popover Dropdown */}
             <div
@@ -340,6 +457,47 @@ export function Shell({
               )}
             </Link>
 
+            {/* Shopping Bag Trigger */}
+            <button
+              type="button"
+              className="header-icon-link"
+              onClick={onToggleCart}
+              title="Shopping Bag"
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                position: 'relative',
+                display: 'inline-flex',
+                alignItems: 'center',
+                color: '#ffffff',
+                padding: '6px',
+              }}
+            >
+              <span className="material-icons">shopping_bag</span>
+              {cartCount > 0 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '-4px',
+                    right: '-4px',
+                    backgroundColor: '#ea580c',
+                    color: 'white',
+                    fontSize: '0.7rem',
+                    fontWeight: 800,
+                    borderRadius: '50%',
+                    width: '16px',
+                    height: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {cartCount}
+                </span>
+              )}
+            </button>
+
             <Link to="/settings" className="header-icon-link" title="Settings">
               <span className="material-icons">settings</span>
             </Link>
@@ -362,43 +520,47 @@ export function Shell({
         </div>
 
         {/* Row 2: Search bar on small screens (<768px) */}
-        <div className="header-mobile-search-row">
-          <form onSubmit={handleSearchSubmit} className="header-search-container">
-            <input
-              type="text"
-              placeholder="Search for items, categories, or stores"
-              value={searchQuery}
-              onChange={(e) => onSearchQueryChange(e.target.value)}
-              className="header-search-input"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => onSearchQueryChange('')}
-                title="Clear search"
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#94a3b8',
-                  cursor: 'pointer',
-                  padding: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: '4px'
-                }}
-              >
-                <span className="material-icons" style={{ fontSize: '18px' }}>close</span>
+        {isMarketplace && (
+          <div className="header-mobile-search-row">
+            <form onSubmit={handleSearchSubmit} className="header-search-container">
+              <input
+                type="text"
+                placeholder="Search for items, categories, or stores"
+                value={searchQuery}
+                onChange={(e) => onSearchQueryChange(e.target.value)}
+                className="header-search-input"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => onSearchQueryChange('')}
+                  title="Clear search"
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#94a3b8',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: '4px'
+                  }}
+                >
+                  <span className="material-icons" style={{ fontSize: '18px' }}>close</span>
+                </button>
+              )}
+              <button type="submit" className="header-search-btn" title="Search">
+                <span className="material-icons">search</span>
               </button>
-            )}
-            <button type="submit" className="header-search-btn" title="Search">
-              <span className="material-icons">search</span>
-            </button>
-          </form>
-        </div>
+            </form>
+          </div>
+        )}
 
         {/* Row 3: Center-Aligned Category & Store Department Bar with Highlights */}
-        <nav className="category-mega-bar" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', gap: '8px', padding: '6px 16px' }}>
+        {isMarketplace && (
+          <>
+            <nav className="category-mega-bar" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', gap: '8px', padding: '6px 16px' }}>
           {storeContext ? (() => {
             const currentTab = (new URLSearchParams(location.search).get('tab') || 'catalog')
             return (
@@ -616,6 +778,8 @@ export function Shell({
             </div>
           </div>
         )}
+      </>
+    )}
       </header>
 
       {/* 3. Sub-header Trust Badge Bar */}
@@ -912,6 +1076,16 @@ export function Shell({
           </div>
         </div>
       )}
+
+      {/* Global Slide-out Shopping Cart Drawer */}
+      <CartDrawer
+        isOpen={Boolean(isCartOpen)}
+        onClose={onToggleCart || (() => {})}
+        items={cartItems || []}
+        onUpdateQuantity={onUpdateCartQty || (() => {})}
+        onRemoveItem={onRemoveCartItem || (() => {})}
+        onClearCart={onClearCart || (() => {})}
+      />
     </div>
   )
 }

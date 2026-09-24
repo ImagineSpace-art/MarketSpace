@@ -1,11 +1,12 @@
 import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
-import type { Listing, Profile, BusinessProfile, PaymentMethodItem, NotificationConfig } from '../types'
+import type { Listing, Profile, BusinessProfile, PaymentMethodItem, NotificationConfig, StoreThemeConfig } from '../types'
 import { SavedItemsPage, NotificationsPage } from './SavedNotificationsPage'
 import { ListingFormPage } from './ListingPage'
 import { StoreSetupPage } from './StoreSetupPage'
 import { AdCreationPage } from './AdCreationPage'
 import { StoreInsightsView } from '../components/StoreInsightsView'
+import { StoreThemeCustomizer } from '../components/store-theme/StoreThemeCustomizer'
 import type { NotificationItem } from '../features/marketplace/useMarketplaceApp'
 import { uploadImageToSupabase } from '../features/marketplace/ImageUploader'
 import { fetchStoreAnalytics, type StoreAnalyticsData } from '../services/analytics'
@@ -19,6 +20,7 @@ type ProfilePageProps = {
     savedListings: Listing[]
     savedIds: string[]
     businessProfile: BusinessProfile | null
+    onSaveStoreTheme?: (config: StoreThemeConfig) => Promise<void> | void
     onEditListing: (listing: Listing) => void
     onRenewListing: (listingId: number) => void
     onDeleteListing: (listingId: number) => void
@@ -116,12 +118,20 @@ export function ProfilePage({
     allBusinesses = {},
     followingIds = [],
     onToggleFollowStore = () => { },
-    onUpdateListingCollection,
+    onSaveStoreTheme,
 }: ProfilePageProps) {
     const displayName = profile?.username || (userEmail && userEmail !== 'Guest' ? userEmail.split('@')[0] : 'User Profile')
     const navigate = useNavigate()
 
-    const [storeTab, setStoreTab] = useState<'analytics' | 'departments' | 'catalog' | 'ads' | 'social'>('analytics')
+    const [storeTab, setStoreTab] = useState<'analytics' | 'catalog' | 'ads' | 'social' | 'customizer'>('analytics')
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search)
+        if (params.get('tab') === 'customizer') {
+            setStoreTab('customizer')
+        }
+    }, [])
+
     const [sellerTab, setSellerTab] = useState<'active' | 'sold' | 'drafts'>('active')
 
     // Store Performance time filter & database data
@@ -140,13 +150,6 @@ export function ProfilePage({
             .catch(err => console.error('Error loading performance analytics:', err))
         return () => { isMounted = false }
     }, [businessProfile?.userId, storeTab, perfTimeFilter, myListings])
-
-    // Departments Manager states
-    const [newDeptName, setNewDeptName] = useState('')
-    const [newDeptDesc, setNewDeptDesc] = useState('')
-    const [editingDeptId, setEditingDeptId] = useState<string | null>(null)
-    const [editingDeptName, setEditingDeptName] = useState('')
-    const [deptListingsFilter, setDeptListingsFilter] = useState<string>('all')
 
     // Catalog Item creation states
     const [catalogName, setCatName] = useState('')
@@ -248,6 +251,23 @@ export function ProfilePage({
     }
 
     const [isMobileNavExpanded, setIsMobileNavExpanded] = useState(false)
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+        try {
+            return localStorage.getItem('marketspace_sidebar_collapsed') === 'true'
+        } catch {
+            return false
+        }
+    })
+
+    const handleToggleSidebar = () => {
+        setIsSidebarCollapsed(prev => {
+            const next = !prev
+            try {
+                localStorage.setItem('marketspace_sidebar_collapsed', String(next))
+            } catch { }
+            return next
+        })
+    }
 
     const navItems = [
         { path: '/profile/create', label: 'Create new listing', icon: 'add_circle', isPrimary: true },
@@ -260,7 +280,22 @@ export function ProfilePage({
     ]
 
     return (
-        <div className="dashboard-layout">
+        <div className={`dashboard-layout ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+            {/* --- FLOATING TOP-LEFT SIDEBAR TOGGLE BUTTON (ONLY WHEN COLLAPSED) --- */}
+            {isSidebarCollapsed && (
+                <button
+                    type="button"
+                    className="floating-sidebar-toggle-btn"
+                    onClick={handleToggleSidebar}
+                    title="Expand Navigation Sidebar"
+                    aria-label="Expand Navigation Sidebar"
+                >
+                    <span className="material-icons" style={{ fontSize: '22px' }}>
+                        menu
+                    </span>
+                </button>
+            )}
+
             {/* --- MOBILE PROFILE NAVIGATION DROPDOWN (<1024px) --- */}
             <div className="mobile-profile-nav-toggle-bar">
                 <button
@@ -318,7 +353,21 @@ export function ProfilePage({
             </div>
 
             {/* --- LEFT SIDEBAR (DESKTOP NAVIGATION) --- */}
-            <aside className="dashboard-sidebar section-card desktop-profile-sidebar">
+            <aside className={`dashboard-sidebar section-card desktop-profile-sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 12px 10px', borderBottom: '1px solid var(--border)', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
+                        Navigation
+                    </span>
+                    <button
+                        type="button"
+                        onClick={handleToggleSidebar}
+                        className="ghost-btn compact-btn"
+                        title="Collapse sidebar"
+                        style={{ padding: '6px', borderRadius: '8px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                        <span className="material-icons" style={{ fontSize: '18px' }}>menu_open</span>
+                    </button>
+                </div>
 
                 <nav className="sidebar-nav">
                     {navItems.map((item) => (
@@ -413,24 +462,38 @@ export function ProfilePage({
                                         <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Store Tools & Insights</p>
                                     </div>
                                 </div>
-                                <button
-                                    type="button"
-                                    className="primary-btn compact-btn"
-                                    onClick={() => navigate(`/store/${businessProfile.userId}`)}
-                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px' }}
-                                >
-                                    <span className="material-icons" style={{ fontSize: '18px' }}>storefront</span>
-                                    Preview Storefront
-                                </button>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                    <button
+                                        type="button"
+                                        className="secondary-btn compact-btn"
+                                        onClick={() => setStoreTab('customizer')}
+                                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', background: 'var(--panel)', border: '1px solid var(--border)', cursor: 'pointer', borderRadius: '8px', fontWeight: 600 }}
+                                    >
+                                        <span className="material-icons" style={{ fontSize: '18px', color: '#2563eb' }}>palette</span>
+                                        Customize Theme
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="primary-btn compact-btn"
+                                        onClick={() => window.open(`/store/${businessProfile.userId}`, '_blank')}
+                                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px' }}
+                                    >
+                                        <span className="material-icons" style={{ fontSize: '18px' }}>open_in_new</span>
+                                        Preview Storefront
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Tab controls */}
                             <div style={{ display: 'flex', overflowX: 'auto', gap: '8px', paddingBottom: '8px', marginBottom: '16px', borderBottom: '1px solid var(--border)', WebkitOverflowScrolling: 'touch' }}>
                                 <button className={`dashboard-tab-btn ${storeTab === 'analytics' ? 'active' : ''}`} onClick={() => setStoreTab('analytics')}>Performance Dashboard</button>
-                                <button className={`dashboard-tab-btn ${storeTab === 'departments' ? 'active' : ''}`} onClick={() => setStoreTab('departments')}>Departments Manager</button>
                                 <button className={`dashboard-tab-btn ${storeTab === 'catalog' ? 'active' : ''}`} onClick={() => setStoreTab('catalog')}>Catalogs Manager</button>
                                 <button className={`dashboard-tab-btn ${storeTab === 'ads' ? 'active' : ''}`} onClick={() => setStoreTab('ads')}>Advertising Manager</button>
                                 <button className={`dashboard-tab-btn ${storeTab === 'social' ? 'active' : ''}`} onClick={() => setStoreTab('social')}>Followers & Following</button>
+                                <button className={`dashboard-tab-btn ${storeTab === 'customizer' ? 'active' : ''}`} onClick={() => setStoreTab('customizer')}>
+                                    <span className="material-icons" style={{ fontSize: '16px', verticalAlign: 'middle', marginRight: '4px' }}>palette</span>
+                                    Storefront Customizer
+                                </button>
                             </div>
 
                             {/* ANALYTICS TAB */}
@@ -568,352 +631,6 @@ export function ProfilePage({
                                                     )}
                                                 </div>
                                             </div>
-                                        </div>
-                                    </div>
-                                )
-                            })()}
-
-                            {/* DEPARTMENTS MANAGER TAB */}
-                            {storeTab === 'departments' && (() => {
-                                const currentCols = businessProfile.collections || []
-                                const storeCatalogListings = myListings
-
-                                const handleCreateDept = () => {
-                                    if (!newDeptName.trim()) return
-                                    const created = {
-                                        id: String(Date.now()),
-                                        name: newDeptName.trim(),
-                                        description: newDeptDesc.trim() || undefined
-                                    }
-                                    void storeSetupProps.onSave({
-                                        ...businessProfile,
-                                        collections: [...currentCols, created]
-                                    })
-                                    setNewDeptName('')
-                                    setNewDeptDesc('')
-                                }
-
-                                const handleRenameDept = (id: string) => {
-                                    if (!editingDeptName.trim()) return
-                                    const updated = currentCols.map(c => c.id === id ? { ...c, name: editingDeptName.trim() } : c)
-                                    void storeSetupProps.onSave({
-                                        ...businessProfile,
-                                        collections: updated
-                                    })
-                                    setEditingDeptId(null)
-                                    setEditingDeptName('')
-                                }
-
-                                const handleDeleteDept = async (id: string) => {
-                                    if (!confirm('Are you sure you want to delete this department? All items inside will become unassigned general store listings.')) return
-                                    const affected = storeCatalogListings.filter(l => l.collection_id === id)
-                                    for (const l of affected) {
-                                        if (onUpdateListingCollection) {
-                                            await onUpdateListingCollection(l.id, null)
-                                        }
-                                    }
-                                    void storeSetupProps.onSave({
-                                        ...businessProfile,
-                                        collections: currentCols.filter(c => c.id !== id)
-                                    })
-                                }
-
-                                const filteredListings = storeCatalogListings.filter(l => {
-                                    if (deptListingsFilter === 'all') return true
-                                    if (deptListingsFilter === 'unassigned') return !l.collection_id
-                                    return l.collection_id === deptListingsFilter
-                                })
-
-                                return (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                        {/* Add New Department Card */}
-                                        <div style={{ background: 'var(--panel)', padding: '20px', borderRadius: '16px', border: '1px solid var(--border)' }}>
-                                            <h3 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <span className="material-icons" style={{ color: '#2563eb' }}>add_business</span>
-                                                Create Store Department
-                                            </h3>
-                                            <p style={{ margin: '0 0 16px 0', fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
-                                                Organize your store catalog into departments (e.g. "Footwear", "New Arrivals", "Electronics", "Beauty & Care").
-                                            </p>
-                                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                                                <input
-                                                    type="text"
-                                                    value={newDeptName}
-                                                    onChange={e => setNewDeptName(e.target.value)}
-                                                    placeholder="Department Name (e.g. Summer Essentials)"
-                                                    style={{ flex: 1, minWidth: '220px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.9rem' }}
-                                                />
-                                                <input
-                                                    type="text"
-                                                    value={newDeptDesc}
-                                                    onChange={e => setNewDeptDesc(e.target.value)}
-                                                    placeholder="Optional description"
-                                                    style={{ flex: 1, minWidth: '220px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.9rem' }}
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={handleCreateDept}
-                                                    disabled={!newDeptName.trim()}
-                                                    className="primary-btn"
-                                                    style={{ padding: '10px 20px', borderRadius: '8px', whiteSpace: 'nowrap' }}
-                                                >
-                                                    Add Department
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        {/* Existing Departments List */}
-                                        <div style={{ background: 'var(--panel)', padding: '20px', borderRadius: '16px', border: '1px solid var(--border)' }}>
-                                            <h3 style={{ margin: '0 0 14px 0', fontSize: '1.05rem', fontWeight: 700 }}>
-                                                Store Departments ({currentCols.length})
-                                            </h3>
-                                            {currentCols.length === 0 ? (
-                                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem' }}>No departments created yet. Create one above to start organizing your store catalog.</p>
-                                            ) : (
-                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
-                                                    {currentCols.map(col => {
-                                                        const count = storeCatalogListings.filter(l => l.collection_id === col.id).length
-                                                        const isEditing = editingDeptId === col.id
-                                                        return (
-                                                            <div
-                                                                key={col.id}
-                                                                style={{
-                                                                    background: 'var(--surface)',
-                                                                    padding: '14px 16px',
-                                                                    borderRadius: '12px',
-                                                                    border: '1px solid var(--border)',
-                                                                    display: 'flex',
-                                                                    flexDirection: 'column',
-                                                                    gap: '8px'
-                                                                }}
-                                                            >
-                                                                {isEditing ? (
-                                                                    <div style={{ display: 'flex', gap: '6px' }}>
-                                                                        <input
-                                                                            type="text"
-                                                                            value={editingDeptName}
-                                                                            onChange={e => setEditingDeptName(e.target.value)}
-                                                                            style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
-                                                                        />
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => handleRenameDept(col.id)}
-                                                                            className="primary-btn"
-                                                                            style={{ padding: '6px 12px', fontSize: '0.8rem' }}
-                                                                        >
-                                                                            Save
-                                                                        </button>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => setEditingDeptId(null)}
-                                                                            className="outline-btn"
-                                                                            style={{ padding: '6px 10px', fontSize: '0.8rem' }}
-                                                                        >
-                                                                            Cancel
-                                                                        </button>
-                                                                    </div>
-                                                                ) : (
-                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                                        <strong style={{ fontSize: '0.98rem' }}>{col.name}</strong>
-                                                                        <span style={{ fontSize: '0.78rem', background: 'rgba(37, 99, 235, 0.12)', color: '#2563eb', padding: '3px 8px', borderRadius: '12px', fontWeight: 700 }}>
-                                                                            {count} {count === 1 ? 'item' : 'items'}
-                                                                        </span>
-                                                                    </div>
-                                                                )}
-                                                                {col.description && (
-                                                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{col.description}</span>
-                                                                )}
-                                                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
-                                                                    {!isEditing && (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => { setEditingDeptId(col.id); setEditingDeptName(col.name) }}
-                                                                            style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}
-                                                                        >
-                                                                            <span className="material-icons" style={{ fontSize: '14px' }}>edit</span> Rename
-                                                                        </button>
-                                                                    )}
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleDeleteDept(col.id)}
-                                                                        style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}
-                                                                    >
-                                                                        <span className="material-icons" style={{ fontSize: '14px' }}>delete_outline</span> Remove
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        )
-                                                    })}
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Organize / Move Listings in Departments */}
-                                        <div style={{ background: 'var(--panel)', padding: '20px', borderRadius: '16px', border: '1px solid var(--border)' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '16px' }}>
-                                                <div>
-                                                    <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Manage & Move Store Listings</h3>
-                                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                                                        Move listings between departments, assign unassigned products, or remove items from a department.
-                                                    </span>
-                                                </div>
-
-                                                {/* Filter pills */}
-                                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setDeptListingsFilter('all')}
-                                                        style={{
-                                                            padding: '6px 12px',
-                                                            borderRadius: '8px',
-                                                            border: 'none',
-                                                            fontSize: '0.8rem',
-                                                            fontWeight: 600,
-                                                            cursor: 'pointer',
-                                                            background: deptListingsFilter === 'all' ? '#2563eb' : 'var(--surface)',
-                                                            color: deptListingsFilter === 'all' ? '#ffffff' : 'var(--text)'
-                                                        }}
-                                                    >
-                                                        All ({storeCatalogListings.length})
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setDeptListingsFilter('unassigned')}
-                                                        style={{
-                                                            padding: '6px 12px',
-                                                            borderRadius: '8px',
-                                                            border: 'none',
-                                                            fontSize: '0.8rem',
-                                                            fontWeight: 600,
-                                                            cursor: 'pointer',
-                                                            background: deptListingsFilter === 'unassigned' ? '#2563eb' : 'var(--surface)',
-                                                            color: deptListingsFilter === 'unassigned' ? '#ffffff' : 'var(--text)'
-                                                        }}
-                                                    >
-                                                        Unassigned ({storeCatalogListings.filter(l => !l.collection_id).length})
-                                                    </button>
-                                                    {currentCols.map(col => {
-                                                        const count = storeCatalogListings.filter(l => l.collection_id === col.id).length
-                                                        return (
-                                                            <button
-                                                                key={col.id}
-                                                                type="button"
-                                                                onClick={() => setDeptListingsFilter(col.id)}
-                                                                style={{
-                                                                    padding: '6px 12px',
-                                                                    borderRadius: '8px',
-                                                                    border: 'none',
-                                                                    fontSize: '0.8rem',
-                                                                    fontWeight: 600,
-                                                                    cursor: 'pointer',
-                                                                    background: deptListingsFilter === col.id ? '#2563eb' : 'var(--surface)',
-                                                                    color: deptListingsFilter === col.id ? '#ffffff' : 'var(--text)'
-                                                                }}
-                                                            >
-                                                                {col.name} ({count})
-                                                            </button>
-                                                        )
-                                                    })}
-                                                </div>
-                                            </div>
-
-                                            {/* Listings Grid */}
-                                            {filteredListings.length === 0 ? (
-                                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', padding: '16px 0' }}>
-                                                    No listings match this department filter.
-                                                </p>
-                                            ) : (
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                                    {filteredListings.map(item => {
-                                                        const currentDept = currentCols.find(c => c.id === item.collection_id)
-                                                        return (
-                                                            <div
-                                                                key={item.id}
-                                                                style={{
-                                                                    display: 'flex',
-                                                                    alignItems: 'center',
-                                                                    justifyContent: 'space-between',
-                                                                    gap: '12px',
-                                                                    background: 'var(--surface)',
-                                                                    padding: '12px 16px',
-                                                                    borderRadius: '10px',
-                                                                    border: '1px solid var(--border)',
-                                                                    flexWrap: 'wrap'
-                                                                }}
-                                                            >
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: '220px' }}>
-                                                                    <div style={{ width: '44px', height: '44px', borderRadius: '8px', overflow: 'hidden', background: 'var(--border)', flexShrink: 0 }}>
-                                                                        {item.images && item.images[0] ? (
-                                                                            <img src={item.images[0]} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                                                        ) : (
-                                                                            <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', color: 'var(--text-secondary)' }}>
-                                                                                <span className="material-icons" style={{ fontSize: '20px' }}>inventory_2</span>
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                    <div>
-                                                                        <strong style={{ display: 'block', fontSize: '0.92rem' }}>{item.title}</strong>
-                                                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                                                                            ZMW {item.price} • {item.category}
-                                                                        </span>
-                                                                    </div>
-                                                                </div>
-
-                                                                {/* Move to Department Action */}
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Department:</span>
-                                                                        <select
-                                                                            value={item.collection_id || ''}
-                                                                            onChange={(e) => {
-                                                                                const targetVal = e.target.value || null
-                                                                                if (onUpdateListingCollection) {
-                                                                                    void onUpdateListingCollection(item.id, targetVal)
-                                                                                }
-                                                                            }}
-                                                                            style={{
-                                                                                padding: '6px 10px',
-                                                                                borderRadius: '6px',
-                                                                                border: '1px solid var(--border)',
-                                                                                background: 'var(--panel)',
-                                                                                color: 'var(--text)',
-                                                                                fontSize: '0.84rem',
-                                                                                fontWeight: 600
-                                                                            }}
-                                                                        >
-                                                                            <option value="">Unassigned (General Store)</option>
-                                                                            {currentCols.map(c => (
-                                                                                <option key={c.id} value={c.id}>{c.name}</option>
-                                                                            ))}
-                                                                        </select>
-                                                                    </div>
-
-                                                                    {item.collection_id && (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => {
-                                                                                if (onUpdateListingCollection) {
-                                                                                    void onUpdateListingCollection(item.id, null)
-                                                                                }
-                                                                            }}
-                                                                            style={{
-                                                                                background: 'none',
-                                                                                border: 'none',
-                                                                                color: 'var(--text-secondary)',
-                                                                                fontSize: '0.78rem',
-                                                                                cursor: 'pointer',
-                                                                                textDecoration: 'underline'
-                                                                            }}
-                                                                        >
-                                                                            Remove from {currentDept?.name || 'Department'}
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        )
-                                                    })}
-                                                </div>
-                                            )}
                                         </div>
                                     </div>
                                 )
@@ -1114,6 +831,22 @@ export function ProfilePage({
                                             )}
                                         </div>
                                     </div>
+                                </div>
+                            )}
+
+                            {/* CUSTOMIZER TAB */}
+                            {storeTab === 'customizer' && (
+                                <div style={{ marginTop: '10px' }}>
+                                    <StoreThemeCustomizer
+                                        businessProfile={businessProfile}
+                                        myListings={myListings}
+                                        onSaveTheme={async (config) => {
+                                            if (onSaveStoreTheme) {
+                                                await onSaveStoreTheme(config)
+                                            }
+                                        }}
+                                        onClose={() => setStoreTab('analytics')}
+                                    />
                                 </div>
                             )}
                         </div>

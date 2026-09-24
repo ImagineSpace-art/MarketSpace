@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { CATEGORY_OPTIONS, CONDITION_OPTIONS } from '../features/marketplace/constants'
 import type { Listing } from '../types'
@@ -33,14 +33,26 @@ export function ListingDetailPage({
   onDeleteListing
 }: ListingDetailPageProps) {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const preset = searchParams.get('preset') || ''
+  const storeId = searchParams.get('store') || ''
+  const isXtraPreset = preset === 'xtra'
+
   const [selectedColors, setSelectedColors] = useState<string[]>([])
+  const [selectedSize, setSelectedSize] = useState<string>('')
   const [quantity, setQuantity] = useState(1)
-  const [deliveryOption, setDeliveryOption] = useState(selectedListing?.delivery_option || '')
   const [phone, setPhone] = useState('')
-  const [locationAddress, setLocationAddress] = useState('')
   const [offerAmount, setOfferAmount] = useState('')
+  const [freeFormMessage, setFreeFormMessage] = useState('')
+  const [formError, setFormError] = useState('')
   const [copied, setCopied] = useState(false)
   const [activeImageIdx, setActiveImageIdx] = useState(0)
+
+  useEffect(() => {
+    if (storeId && selectedListing?.id) {
+      navigate(`/store/${storeId}?listing=${selectedListing.id}`, { replace: true })
+    }
+  }, [storeId, selectedListing?.id, navigate])
 
   if (!selectedListing) return null
 
@@ -61,11 +73,67 @@ export function ListingDetailPage({
   }
 
   const isService = selectedListing.listing_type === 'service'
-  const deliveryOptionsList = isService
-    ? ["Online/Remote", "At Buyer's Location", "At Seller's Location", "Flexible"]
-    : ["In-Person Meetup", "Local Delivery", "Courier Shipping", "Pickup Available"]
 
-  const [offerError, setOfferError] = useState('')
+  const availableSizes = selectedListing?.available_sizes || (selectedListing?.category === 'Fashion & Apparel' || selectedListing?.category === 'Footwear' ? ['S', 'M', 'L', 'XL'] : [])
+  const hasSizes = availableSizes.length > 0
+  const hasColors = Boolean(selectedListing?.available_colors && selectedListing.available_colors.length > 0)
+  const acceptsOffers = Boolean(selectedListing?.lowest_acceptable_price != null && Number(selectedListing.lowest_acceptable_price) > 0)
+
+  const handleSendInquiry = () => {
+    if (!session) {
+      alert('Please sign in to send inquiries or chat with sellers.')
+      navigate('/login')
+      return
+    }
+    setFormError('')
+
+    // Mandatory validations
+    if (hasColors && selectedColors.length === 0) {
+      setFormError('Please select at least one color.')
+      return
+    }
+
+    if (hasSizes && !selectedSize) {
+      setFormError('Please select a size.')
+      return
+    }
+
+    if (!quantity || quantity < 1) {
+      setFormError('Please specify a valid quantity (minimum 1).')
+      return
+    }
+
+    if (!phone.trim()) {
+      setFormError('Please provide your mobile phone number so the seller can reach you.')
+      return
+    }
+
+    const numOffer = offerAmount ? Number(offerAmount) : null
+    if (acceptsOffers && numOffer != null && numOffer > 0) {
+      const lowest = Number(selectedListing.lowest_acceptable_price)
+      if (numOffer < lowest) {
+        setFormError(`Offer too low. The seller requires at least ZMW ${lowest.toLocaleString()}.`)
+        return
+      }
+    }
+
+    const payload = {
+      listingId: selectedListing.id,
+      title: selectedListing.title,
+      price: selectedListing.price,
+      image: selectedListing.images?.[0] || '',
+      colors: selectedColors,
+      size: hasSizes ? selectedSize : null,
+      quantity,
+      phone: phone.trim(),
+      message: freeFormMessage.trim() || null,
+      offer: (acceptsOffers && numOffer && numOffer > 0) ? numOffer : null,
+      isService
+    }
+
+    const inquiryCard = `[INQUIRY_CARD]${JSON.stringify(payload)}`
+    onMessageSeller(inquiryCard)
+  }
 
   const handleBuyNow = () => {
     if (!session) {
@@ -75,33 +143,10 @@ export function ListingDetailPage({
     }
     const selectedColsText = selectedColors.length > 0 ? selectedColors.join(', ') : 'Default'
     const orderDetails = `[ORDER_CARD]{"listingId":${selectedListing.id},"title":"${selectedListing.title.replace(/"/g, '\\"')
-      }","price":${selectedListing.price},"quantity":${quantity},"deliveryOption":"${deliveryOption || 'Flexible'
-      }","phone":"${phone}","location":"${locationAddress}","colors":"${selectedColsText}","totalPrice":${selectedListing.price * quantity}}`
+      }","price":${selectedListing.price},"quantity":${quantity},"deliveryOption":"${selectedListing.delivery_option || 'Flexible'
+      }","phone":"${phone || 'Provided via chat'}","location":"Standard delivery / contact via chat","colors":"${selectedColsText}","totalPrice":${selectedListing.price * quantity}}`
 
     onMessageSeller(orderDetails)
-  }
-
-  const handleMakeOffer = () => {
-    if (!session) {
-      alert('Please sign in to make offers.')
-      navigate('/login')
-      return
-    }
-    setOfferError('')
-    const numOffer = Number(offerAmount)
-    if (!offerAmount || numOffer <= 0) {
-      setOfferError('Please enter a valid offer amount in ZMW.')
-      return
-    }
-
-    const lowestPrice = selectedListing.lowest_acceptable_price
-    if (lowestPrice != null && Number(lowestPrice) > 0 && numOffer < Number(lowestPrice)) {
-      setOfferError('Offer too low. The seller is not accepting offers this far below the asking price.')
-      return
-    }
-
-    const offerMsg = `[OFFER] Proposed Offer: ZMW ${offerAmount} for "${selectedListing.title}" (Original: ZMW ${selectedListing.price}) | Phone: ${phone || 'Not provided'}`
-    onMessageSeller(offerMsg)
   }
 
   useEffect(() => {
@@ -145,11 +190,39 @@ export function ListingDetailPage({
   const daysRemaining = Math.max(0, 7 - daysSinceRenewed)
 
   return (
-    <section className="section-card detail-card" style={{ maxWidth: '1100px', margin: '0 auto' }}>
-      <button className="ghost-btn" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '4px' }} onClick={onBack}>
-        <span className="material-icons">arrow_back</span>
-        Back to feed
-      </button>
+    <section className="section-card detail-card" style={{
+      maxWidth: '1100px',
+      margin: '0 auto',
+      ...(isXtraPreset ? { background: '#0B0F19', borderColor: '#1F2937', color: '#F9FAFB' } : {})
+    }}>
+      {storeId ? (
+        <button
+          type="button"
+          className="ghost-btn"
+          style={{
+            marginBottom: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontWeight: 600,
+            color: isXtraPreset ? '#FACC15' : 'var(--primary)'
+          }}
+          onClick={() => navigate(`/store/${storeId}`)}
+        >
+          <span className="material-icons">storefront</span>
+          Back to Store
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="ghost-btn"
+          style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '4px' }}
+          onClick={onBack}
+        >
+          <span className="material-icons">arrow_back</span>
+          Back to feed
+        </button>
+      )}
 
       <div className="listing-detail-container">
         {/* Left Column: Media, Details, Metadata */}
@@ -308,26 +381,43 @@ export function ListingDetailPage({
           </div>
         </div>
 
-        {/* Right Column: Sticky Buy Box Card */}
-        <div className="buy-box-panel">
+        {/* Right Column: Sticky Buy Box Card with Inquiry Form */}
+        <div className="buy-box-panel" style={isXtraPreset ? { background: '#111827', borderColor: '#1F2937', color: '#F9FAFB' } : undefined}>
           <div>
-            <span style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Total Price</span>
-            <h3 style={{ color: '#2563eb', marginTop: '4px' }}>{formatZMWPrice(selectedListing.price)}</h3>
+            <span style={{ fontSize: '0.86rem', color: isXtraPreset ? '#9CA3AF' : 'var(--text-secondary)', fontWeight: 600 }}>Total Price</span>
+            <h3 style={{ color: isXtraPreset ? '#FACC15' : '#2563eb', marginTop: '4px' }}>{formatZMWPrice(selectedListing.price)}</h3>
           </div>
 
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+          <div style={{ borderTop: `1px solid ${isXtraPreset ? '#1F2937' : 'var(--border)'}`, paddingTop: '12px' }}>
             <span style={{ fontSize: '0.84rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
               <span className="material-icons" style={{ fontSize: '16px' }}>check_circle</span>
               {isService ? 'Service Available' : (selectedListing.status === 'Sold' ? 'Sold out' : 'In Stock & Ready')}
             </span>
           </div>
 
-          {/* Color Selection (Multi-select) */}
-          {selectedListing.available_colors && selectedListing.available_colors.length > 0 && (
+          {/* Validation Error Banner */}
+          {formError && (
+            <div style={{ padding: '10px 12px', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid #ef4444', borderRadius: '8px', color: '#ef4444', fontSize: '0.84rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span className="material-icons" style={{ fontSize: '18px' }}>error_outline</span>
+              <span>{formError}</span>
+            </div>
+          )}
+
+          {/* Color Selection (Mandatory if listing has available_colors) */}
+          {hasColors && (
             <label style={{ display: 'block' }}>
-              <span style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text)' }}>Available Color Options</span>
-              <div style={{ display: 'flex', gap: '10px', marginTop: '6px', flexWrap: 'wrap' }}>
-                {selectedListing.available_colors.map((color) => {
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.86rem', fontWeight: 600, color: isXtraPreset ? '#F9FAFB' : 'var(--text)' }}>
+                  Color(s) <span style={{ color: '#ef4444' }}>*</span>
+                </span>
+                {selectedColors.length > 0 && (
+                  <span style={{ fontSize: '0.74rem', color: isXtraPreset ? '#9CA3AF' : 'var(--text-secondary)' }}>
+                    {selectedColors.length} chosen
+                  </span>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+                {selectedListing.available_colors!.map((color) => {
                   const isChosen = selectedColors.includes(color)
                   return (
                     <button
@@ -340,24 +430,80 @@ export function ListingDetailPage({
                         borderRadius: '50%',
                         backgroundColor: color,
                         border: isChosen ? '3px solid #2563eb' : '1px solid var(--border)',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                        boxShadow: isChosen ? '0 0 0 2px rgba(37,99,235,0.4)' : '0 2px 4px rgba(0,0,0,0.15)',
                         cursor: 'pointer',
                         position: 'relative',
                         outline: 'none',
-                        transition: 'transform 0.1s'
+                        transition: 'transform 0.1s',
+                        display: 'grid',
+                        placeItems: 'center'
                       }}
                       title={color}
-                    />
+                    >
+                      {isChosen && (
+                        <span className="material-icons" style={{ fontSize: '16px', color: color.toLowerCase() === '#ffffff' || color.toLowerCase() === 'white' ? '#000000' : '#ffffff' }}>check</span>
+                      )}
+                    </button>
                   )
                 })}
               </div>
             </label>
           )}
 
-          {/* Quantity Selector */}
+          {/* Size Selection (Mandatory if listing has sizes) */}
+          {hasSizes && (
+            <label style={{ display: 'block' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.86rem', fontWeight: 600, color: isXtraPreset ? '#F9FAFB' : 'var(--text)' }}>
+                  Size <span style={{ color: '#ef4444' }}>*</span>
+                </span>
+                {selectedSize && (
+                  <span style={{ fontSize: '0.74rem', color: isXtraPreset ? '#FACC15' : '#2563eb', fontWeight: 600 }}>
+                    Selected: {selectedSize}
+                  </span>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+                {availableSizes.map((sizeOption) => {
+                  const isChosen = selectedSize === sizeOption
+                  return (
+                    <button
+                      key={sizeOption}
+                      type="button"
+                      onClick={() => {
+                        setSelectedSize(sizeOption)
+                        setFormError('')
+                      }}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '8px',
+                        border: isChosen ? (isXtraPreset ? '2px solid #FACC15' : '2px solid #2563eb') : `1px solid ${isXtraPreset ? '#374151' : 'var(--border)'}`,
+                        background: isChosen ? (isXtraPreset ? '#FACC15' : '#2563eb') : (isXtraPreset ? '#1F2937' : 'var(--surface)'),
+                        color: isChosen ? (isXtraPreset ? '#0B0F19' : '#ffffff') : (isXtraPreset ? '#F9FAFB' : 'var(--text)'),
+                        fontWeight: isChosen ? 700 : 500,
+                        fontSize: '0.86rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      {sizeOption}
+                    </button>
+                  )
+                })}
+              </div>
+            </label>
+          )}
+
+          {/* Quantity Selector (Mandatory) */}
           <label style={{ display: 'block' }}>
-            <span style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text)' }}>Quantity</span>
-            <select value={quantity} onChange={(e) => setQuantity(Number(e.target.value))}>
+            <span style={{ fontSize: '0.86rem', fontWeight: 600, color: isXtraPreset ? '#F9FAFB' : 'var(--text)' }}>
+              Quantity <span style={{ color: '#ef4444' }}>*</span>
+            </span>
+            <select
+              value={quantity}
+              onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
+              style={isXtraPreset ? { background: '#1F2937', color: '#F9FAFB', borderColor: '#374151' } : undefined}
+            >
               {[...Array(10)].map((_, i) => (
                 <option key={i + 1} value={i + 1}>
                   {i + 1}
@@ -366,87 +512,133 @@ export function ListingDetailPage({
             </select>
           </label>
 
-          {/* Delivery Option Selector */}
+          {/* Customer Mobile Phone Input (Mandatory) */}
           <label style={{ display: 'block' }}>
-            <span style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text)' }}>Delivery Option</span>
-            <select value={deliveryOption} onChange={(e) => setDeliveryOption(e.target.value)}>
-              <option value="">Select Option</option>
-              {deliveryOptionsList.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {/* Make an Offer Section - Excluded if seller never set lowest_acceptable_price */}
-          {selectedListing.lowest_acceptable_price != null && Number(selectedListing.lowest_acceptable_price) > 0 && (
-            <div style={{ padding: '12px', background: 'var(--panel)', borderRadius: '10px', border: '1px solid var(--border)' }}>
-              <span style={{ display: 'block', fontSize: '0.86rem', fontWeight: 600, color: 'var(--text)', marginBottom: '6px' }}>Make an Offer (ZMW)</span>
-              {offerError && (
-                <div style={{ padding: '8px 10px', backgroundColor: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444', color: '#ef4444', borderRadius: '6px', fontSize: '0.82rem', marginBottom: '8px' }}>
-                  {offerError}
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  type="number"
-                  placeholder={`Min acceptable: ZMW ${selectedListing.lowest_acceptable_price}`}
-                  value={offerAmount}
-                  onChange={(e) => {
-                    setOfferAmount(e.target.value)
-                    setOfferError('')
-                  }}
-                  style={{ flex: 1, padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.9rem' }}
-                />
-                <button
-                  type="button"
-                  className="secondary-btn"
-                  onClick={handleMakeOffer}
-                  style={{ padding: '10px 14px', fontSize: '0.86rem', fontWeight: 600, background: '#2563eb', color: '#fff', border: 'none' }}
-                >
-                  Send Offer
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Mobile Phone Input */}
-          <label style={{ display: 'block' }}>
-            <span style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text)' }}>Your Mobile Number</span>
+            <span style={{ fontSize: '0.86rem', fontWeight: 600, color: isXtraPreset ? '#F9FAFB' : 'var(--text)' }}>
+              Your Phone Number <span style={{ color: '#ef4444' }}>*</span>
+            </span>
             <input
               type="tel"
               placeholder="e.g. +260977123456"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => {
+                setPhone(e.target.value)
+                setFormError('')
+              }}
+              style={isXtraPreset ? { background: '#1F2937', color: '#F9FAFB', borderColor: '#374151' } : undefined}
             />
           </label>
 
-          {/* Buyer Location Input */}
-          <label style={{ display: 'block' }}>
-            <span style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text)' }}>Your Delivery / Service Location</span>
+          {/* Offer Input (Inactive/disabled if seller does not accept offers) */}
+          <div style={{ padding: '12px', background: isXtraPreset ? '#1F2937' : 'var(--panel)', borderRadius: '10px', border: `1px solid ${isXtraPreset ? '#374151' : 'var(--border)'}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <span style={{ fontSize: '0.86rem', fontWeight: 600, color: isXtraPreset ? '#F9FAFB' : 'var(--text)' }}>
+                Make an Offer (ZMW)
+              </span>
+              {!acceptsOffers && (
+                <span style={{ fontSize: '0.72rem', color: isXtraPreset ? '#9CA3AF' : 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                  <span className="material-icons" style={{ fontSize: '13px' }}>lock</span> Not accepted
+                </span>
+              )}
+            </div>
+
             <input
-              type="text"
-              placeholder="e.g. Cairo Road Branch"
-              value={locationAddress}
-              onChange={(e) => setLocationAddress(e.target.value)}
+              type="number"
+              disabled={!acceptsOffers}
+              placeholder={acceptsOffers ? `Optional (Min: ZMW ${selectedListing.lowest_acceptable_price})` : "Offers disabled for this item"}
+              value={offerAmount}
+              onChange={(e) => {
+                setOfferAmount(e.target.value)
+                setFormError('')
+              }}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                border: `1px solid ${isXtraPreset ? '#374151' : 'var(--border)'}`,
+                background: !acceptsOffers ? (isXtraPreset ? '#111827' : 'rgba(0,0,0,0.04)') : (isXtraPreset ? '#0B0F19' : 'var(--surface)'),
+                color: !acceptsOffers ? (isXtraPreset ? '#6B7280' : 'var(--text-secondary)') : (isXtraPreset ? '#F9FAFB' : 'var(--text)'),
+                cursor: !acceptsOffers ? 'not-allowed' : 'text',
+                fontSize: '0.9rem',
+                opacity: !acceptsOffers ? 0.75 : 1
+              }}
+            />
+            {!acceptsOffers ? (
+              <p style={{ margin: '6px 0 0', fontSize: '0.76rem', color: isXtraPreset ? '#9CA3AF' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span className="material-icons" style={{ fontSize: '14px' }}>info</span>
+                Seller is not accepting offers on this item.
+              </p>
+            ) : (
+              <p style={{ margin: '6px 0 0', fontSize: '0.76rem', color: isXtraPreset ? '#9CA3AF' : 'var(--text-secondary)' }}>
+                Accepts counter-offers at or above ZMW {selectedListing.lowest_acceptable_price}.
+              </p>
+            )}
+          </div>
+
+          {/* Free-form Message Input (Optional) */}
+          <label style={{ display: 'block' }}>
+            <span style={{ fontSize: '0.86rem', fontWeight: 600, color: isXtraPreset ? '#F9FAFB' : 'var(--text)' }}>
+              Message for Seller <span style={{ fontSize: '0.76rem', fontWeight: 400, color: isXtraPreset ? '#9CA3AF' : 'var(--text-secondary)' }}>(Optional)</span>
+            </span>
+            <textarea
+              placeholder="Ask questions or specify delivery preferences..."
+              value={freeFormMessage}
+              onChange={(e) => setFreeFormMessage(e.target.value)}
+              rows={2}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                border: `1px solid ${isXtraPreset ? '#374151' : 'var(--border)'}`,
+                background: isXtraPreset ? '#1F2937' : 'var(--surface)',
+                color: isXtraPreset ? '#F9FAFB' : 'var(--text)',
+                fontSize: '0.88rem',
+                resize: 'vertical'
+              }}
             />
           </label>
 
           {/* Actions */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
-            <button className="primary-btn" style={{ width: '100%', padding: '12px' }} onClick={handleBuyNow}>
-              Buy Now
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }}>
+            <button
+              type="button"
+              className="primary-btn"
+              style={{
+                width: '100%',
+                padding: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                background: isXtraPreset ? '#FACC15' : '#2563eb',
+                color: isXtraPreset ? '#0B0F19' : '#ffffff',
+                fontWeight: 700
+              }}
+              onClick={handleSendInquiry}
+            >
+              <span className="material-icons" style={{ fontSize: '20px' }}>chat</span>
+              Chat with Seller / Send Inquiry
+            </button>
+
+            <button
+              type="button"
+              className="secondary-btn"
+              style={{ width: '100%', padding: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+              onClick={handleBuyNow}
+            >
+              <span className="material-icons" style={{ fontSize: '18px' }}>shopping_bag</span>
+              Instant Buy
             </button>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              <button className="secondary-btn" onClick={() => onToggleSave(Number(selectedListing.id))} style={{ padding: '10px' }}>
+              <button type="button" className="secondary-btn" onClick={() => onToggleSave(Number(selectedListing.id))} style={{ padding: '10px' }}>
                 Wishlist
               </button>
-              <button className="secondary-btn" onClick={handleShare} style={{ padding: '10px' }}>
+              <button type="button" className="secondary-btn" onClick={handleShare} style={{ padding: '10px' }}>
                 {copied ? 'Link Copied!' : 'Share Listing'}
               </button>
             </div>
+          </div>
 
             {/* Visit Store / Seller Profile Button */}
             {selectedListing.user_id && (
@@ -463,12 +655,12 @@ export function ListingDetailPage({
               ) : (
                 <button
                   type="button"
-                  onClick={() => navigate(`/seller/${selectedListing.user_id}`)}
+                  onClick={() => onVisitStore(selectedListing.user_id || '')}
                   className="secondary-btn"
                   style={{ width: '100%', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                 >
-                  <span className="material-icons" style={{ fontSize: '18px' }}>person</span>
-                  Seller Profile
+                  <span className="material-icons" style={{ fontSize: '18px' }}>storefront</span>
+                  Visit Seller Store
                 </button>
               )
             )}
@@ -525,7 +717,6 @@ export function ListingDetailPage({
             )}
           </div>
         </div>
-      </div>
 
       {/* Buyer Ratings & Reviews Section */}
       <div style={{ marginTop: '32px', borderTop: '1px solid var(--border)', paddingTop: '24px' }}>

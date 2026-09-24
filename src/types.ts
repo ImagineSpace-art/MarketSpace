@@ -15,6 +15,7 @@ export type Listing = {
   images?: string[]
   sponsored?: boolean
   available_colors?: string[]
+  available_sizes?: string[]
   lowest_acceptable_price?: number
   delivery_paid_by?: 'buyer' | 'seller' | 'split'
   last_renewed_at?: string
@@ -93,6 +94,10 @@ export type StoreCustomerCare = {
   address?: string
   deliveryPolicy?: string
   returnPolicy?: string
+  hours?: string
+  delivery?: string
+  returns?: string
+  payment?: string
 }
 
 export type ListingReview = {
@@ -104,6 +109,94 @@ export type ListingReview = {
   comment: string
   isAnonymous: boolean
   createdAt: string
+}
+
+export type StoreSectionType =
+  | 'hero_banner'
+  | 'featured_products'
+  | 'promo_banner'
+  | 'categories_grid'
+  | 'rich_text'
+  | 'testimonials'
+  | 'faq'
+  | 'announcement'
+  | 'countdown_deal'
+  | 'editorial_grid'
+  | 'featured_collection_split'
+  | 'bento_grid'
+
+export type StoreSection = {
+  id: string
+  type: StoreSectionType
+  enabled: boolean
+  settings: Record<string, any>
+}
+
+export type StoreNavLink = {
+  id: string
+  label: string
+  url: string // e.g. '#products', '#departments', '#story', '#faq', '#reviews', 'category:Shoes', 'https://...'
+  type?: 'all' | 'category' | 'section' | 'external'
+}
+
+export type StoreInfoPanelHighlight = {
+  icon: string
+  title: string
+  desc: string
+}
+
+export type StoreInfoPanelConfig = {
+  enabled?: boolean
+  title?: string
+  subtitle?: string
+  badgeText?: string
+  highlights?: StoreInfoPanelHighlight[]
+}
+
+export type StoreCartItem = {
+  listing: Listing
+  quantity: number
+  selectedVariant?: string
+}
+
+export type StoreCartDrawerConfig = {
+  enabled?: boolean
+  headline?: string
+  freeShippingThreshold?: number
+  freeShippingMessage?: string
+  checkoutNote?: string
+  emptyMessage?: string
+}
+
+export type StoreNavConfig = {
+  layout?: 'logo-left' | 'logo-center' | 'minimal'
+  backgroundColor?: string
+  textColor?: string
+  accentColor?: string
+  isSticky?: boolean
+  showSearch?: boolean
+  showContactBtn?: boolean
+  showFollowBtn?: boolean
+  showNotificationsBtn?: boolean
+  showPanelBtn?: boolean
+  showCartBtn?: boolean
+  showCategorySelector?: boolean
+  logoStyle?: 'both' | 'logo-only' | 'name-only'
+  links: StoreNavLink[]
+  subnavLinks?: StoreNavLink[]
+  panel?: StoreInfoPanelConfig
+  cartDrawer?: StoreCartDrawerConfig
+}
+
+export type StoreThemeConfig = {
+  presetName?: 'arctos' | 'hyper' | 'xtra' | 'modern' | 'boutique' | 'bold' | 'minimal'
+  primaryColor?: string
+  fontFamily?: string
+  bannerStyle?: 'full-bleed' | 'contained' | 'minimal'
+  navigation?: StoreNavConfig
+  panel?: StoreInfoPanelConfig
+  cartDrawer?: StoreCartDrawerConfig
+  sections: StoreSection[]
 }
 
 export type BusinessProfile = {
@@ -123,6 +216,7 @@ export type BusinessProfile = {
   catalog: CatalogItem[]
   ads: BusinessAd[]
   rating?: number
+  themeConfig?: StoreThemeConfig
 }
 
 export type MessageRecord = {

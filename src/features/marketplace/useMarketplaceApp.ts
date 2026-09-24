@@ -3,7 +3,7 @@ import type { Session } from '@supabase/supabase-js'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { CATEGORY_OPTIONS, CONDITION_OPTIONS, DELIVERY_OPTIONS } from './constants'
-import type { Listing, Profile, View, BusinessProfile, StoreReview, PaymentMethodItem, NotificationConfig } from '../../types'
+import type { Listing, Profile, View, BusinessProfile, StoreReview, PaymentMethodItem, NotificationConfig, StoreThemeConfig } from '../../types'
 import { logAnalyticsEvent, toggleStoreFollowInDb } from '../../services/analytics'
 
 export type NotificationItem = {
@@ -151,6 +151,7 @@ export interface MarketplaceAppModel {
   uploadedImages: string[]
   setUploadedImages: Dispatch<SetStateAction<string[]>>
   handleCreateOrUpdateBusiness: (profile: BusinessProfile) => void
+  handleSaveStoreTheme: (config: StoreThemeConfig, storeUserId?: string) => Promise<void>
   handleDeleteListing: (listingId: number) => Promise<void>
   handleRenewListing: (listingId: number) => Promise<void>
   handleUpdateListingStatus: (listingId: number, status: string) => Promise<void>
@@ -1127,12 +1128,18 @@ export function useMarketplaceApp(): MarketplaceAppModel {
 
     setLoading(true)
     try {
-      const { data: existingChats, error: selectError } = await supabase
+      const validListingId = listing.id && Number(listing.id) > 0 ? Number(listing.id) : null
+      let query = supabase
         .from('chats')
         .select('*')
-        .eq('listing_id', listing.id)
         .eq('buyer_id', session.user.id)
         .eq('seller_id', listing.user_id || '')
+
+      if (validListingId) {
+        query = query.eq('listing_id', validListingId)
+      }
+
+      const { data: existingChats, error: selectError } = await query
 
       if (selectError) throw selectError
 
@@ -1143,24 +1150,16 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         const { data: newChat, error: insertError } = await supabase
           .from('chats')
           .insert({
-            listing_id: listing.id,
+            listing_id: validListingId,
             buyer_id: session.user.id,
             seller_id: listing.user_id || '',
-            title: listing.title
+            title: listing.title || 'Store Inquiry'
           })
           .select()
           .single()
 
         if (insertError) throw insertError
         chatId = newChat.id
-
-        if (!customMessage) {
-          await supabase.from('messages').insert({
-            chat_id: chatId,
-            sender_id: session.user.id,
-            content: "Hi, is this still available?"
-          })
-        }
       }
 
       if (customMessage) {
@@ -1358,9 +1357,65 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         customer_care: updated.customerCare || {},
         catalog: updated.catalog,
         ads: updated.ads,
+        theme_config: updated.themeConfig || {},
       }, { onConflict: 'user_id' })
     }
     navigate('/profile/store-dashboard')
+  }
+
+  const handleSaveStoreTheme = async (themeConfig: StoreThemeConfig, storeUserId?: string) => {
+    const targetUserId = storeUserId || businessProfile?.userId || session?.user?.id
+    if (!targetUserId) return
+
+    const existing: BusinessProfile = allBusinesses[targetUserId] || businessProfile || {
+      userId: targetUserId,
+      shopName: profile?.username ? `${profile.username}'s Store` : 'Official Store',
+      description: 'Official Merchant Storefront',
+      category: 'General Merchant',
+      address: 'Lusaka, Zambia',
+      whatsapp: '',
+      logo: profile?.avatar_url || '',
+      cover: '/banners/store_banner_apparel.png',
+      accentColor: themeConfig.primaryColor || '#2563eb',
+      announcementBar: '',
+      collections: [],
+      customerCare: {},
+      catalog: [],
+      ads: [],
+      themeConfig
+    }
+
+    const updated: BusinessProfile = {
+      ...existing,
+      themeConfig,
+      accentColor: themeConfig.primaryColor || existing.accentColor || '#2563eb'
+    }
+
+    const nextAll = { ...allBusinesses, [targetUserId]: updated }
+    setAllBusinesses(nextAll)
+    if (session?.user?.id === targetUserId || !businessProfile) {
+      setBusinessProfile(updated)
+    }
+
+    try {
+      window.localStorage.setItem('marketspace-all-businesses', JSON.stringify(nextAll))
+      window.localStorage.setItem(`marketspace-store-theme-${targetUserId}`, JSON.stringify(themeConfig))
+    } catch (e) {
+      console.error('Failed to save store theme to localStorage:', e)
+    }
+
+    if (session?.user?.id) {
+      try {
+        await supabase.from('stores').upsert({
+          user_id: targetUserId,
+          shop_name: updated.shopName,
+          theme_config: themeConfig,
+          accent_color: updated.accentColor,
+        }, { onConflict: 'user_id' })
+      } catch (err) {
+        console.error('Error saving store theme to Supabase:', err)
+      }
+    }
   }
 
   const loadBusinesses = async () => {
@@ -1379,6 +1434,12 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     if (data && data.length > 0) {
       const dbStores: Record<string, BusinessProfile> = {}
       data.forEach((s: any) => {
+        let localTheme: StoreThemeConfig | undefined = undefined
+        try {
+          const localStr = window.localStorage.getItem(`marketspace-store-theme-${s.user_id}`)
+          if (localStr) localTheme = JSON.parse(localStr)
+        } catch { }
+
         dbStores[s.user_id] = {
           userId: s.user_id,
           shopName: s.shop_name,
@@ -1394,6 +1455,9 @@ export function useMarketplaceApp(): MarketplaceAppModel {
           customerCare: s.customer_care || s.customerCare || {},
           catalog: s.catalog || [],
           ads: s.ads || [],
+          themeConfig: (s.theme_config && s.theme_config.sections && s.theme_config.sections.length > 0)
+            ? s.theme_config
+            : (localTheme || s.themeConfig || undefined),
         }
       })
       setAllBusinesses(prev => ({ ...prev, ...dbStores }))
@@ -1508,6 +1572,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     uploadedImages,
     setUploadedImages,
     handleCreateOrUpdateBusiness,
+    handleSaveStoreTheme,
     handleDeleteListing,
     handleRenewListing,
     handleUpdateListingStatus,

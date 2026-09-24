@@ -2,6 +2,128 @@ import { useMemo, useState } from 'react'
 import type { ChatThread } from '../features/marketplace/useMarketplaceApp'
 
 function renderMessageContent(content: string) {
+  if (content.startsWith('[INQUIRY_CARD]')) {
+    try {
+      const jsonStr = content.replace('[INQUIRY_CARD]', '')
+      const data = JSON.parse(jsonStr) as {
+        listingId?: number
+        title?: string
+        price?: number
+        image?: string
+        colors?: string[]
+        size?: string | null
+        quantity?: number
+        phone?: string
+        message?: string | null
+        offer?: number | null
+        isService?: boolean
+      }
+
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '14px', background: 'var(--panel, #f8fafc)', borderRadius: '14px', minWidth: '260px', maxWidth: '380px', color: 'var(--text, #0f172a)', border: '1px solid var(--border, rgba(0,0,0,0.1))', boxShadow: '0 3px 12px rgba(0,0,0,0.06)' }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border, rgba(0,0,0,0.08))', paddingBottom: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span className="material-icons" style={{ fontSize: '18px', color: '#2563eb' }}>
+                {data.isService ? 'handyman' : 'inventory_2'}
+              </span>
+              <strong style={{ fontSize: '0.86rem', fontWeight: 700, letterSpacing: '-0.01em' }}>
+                {data.isService ? 'Service Inquiry' : 'Listing Inquiry'}
+              </strong>
+            </div>
+            {data.offer ? (
+              <span style={{ fontSize: '0.72rem', background: 'rgba(37,99,235,0.1)', color: '#2563eb', padding: '2px 8px', borderRadius: '12px', fontWeight: 700 }}>
+                Offer Attached
+              </span>
+            ) : null}
+          </div>
+
+          {/* Product Mini Preview */}
+          {(data.title || data.price != null) && (
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', background: 'var(--surface, #ffffff)', padding: '8px 10px', borderRadius: '10px', border: '1px solid var(--border, rgba(0,0,0,0.08))' }}>
+              {data.image ? (
+                <img src={data.image} alt={data.title || 'Product'} style={{ width: '42px', height: '42px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} />
+              ) : (
+                <div style={{ width: '42px', height: '42px', borderRadius: '8px', background: 'rgba(0,0,0,0.05)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                  <span className="material-icons" style={{ fontSize: '20px', color: 'var(--text-secondary, #64748b)' }}>photo_library</span>
+                </div>
+              )}
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {data.title || 'Listing'}
+                </div>
+                {data.price != null && (
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary, #64748b)', marginTop: '2px' }}>
+                    Listed: <strong style={{ color: '#2563eb' }}>ZMW {data.price.toLocaleString()}</strong>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Structured Attributes */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
+            {data.colors && data.colors.length > 0 && (
+              <div style={{ background: 'var(--surface, #ffffff)', padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--border, rgba(0,0,0,0.08))' }}>
+                <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary, #64748b)', display: 'block' }}>Color(s)</span>
+                <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
+                  {data.colors.map((c) => (
+                    <span key={c} style={{ width: '14px', height: '14px', borderRadius: '50%', backgroundColor: c, border: '1px solid rgba(0,0,0,0.2)' }} title={c} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {data.size && (
+              <div style={{ background: 'var(--surface, #ffffff)', padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--border, rgba(0,0,0,0.08))' }}>
+                <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary, #64748b)', display: 'block' }}>Size</span>
+                <strong style={{ fontSize: '0.82rem', marginTop: '2px', display: 'block' }}>{data.size}</strong>
+              </div>
+            )}
+
+            <div style={{ background: 'var(--surface, #ffffff)', padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--border, rgba(0,0,0,0.08))' }}>
+              <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary, #64748b)', display: 'block' }}>Quantity</span>
+              <strong style={{ fontSize: '0.82rem', marginTop: '2px', display: 'block' }}>{data.quantity || 1}</strong>
+            </div>
+
+            {data.phone && (
+              <div style={{ background: 'var(--surface, #ffffff)', padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--border, rgba(0,0,0,0.08))' }}>
+                <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary, #64748b)', display: 'block' }}>Phone</span>
+                <a href={`tel:${data.phone}`} style={{ fontSize: '0.8rem', color: '#2563eb', textDecoration: 'none', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '2px', marginTop: '2px' }}>
+                  <span className="material-icons" style={{ fontSize: '13px' }}>call</span>
+                  {data.phone}
+                </a>
+              </div>
+            )}
+          </div>
+
+          {/* Offer Highlight */}
+          {data.offer != null && data.offer > 0 && (
+            <div style={{ background: 'rgba(37,99,235,0.06)', border: '1px solid rgba(37,99,235,0.2)', padding: '8px 10px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary, #64748b)' }}>Proposed Offer:</span>
+              <strong style={{ fontSize: '0.9rem', color: '#2563eb' }}>ZMW {Number(data.offer).toLocaleString()}</strong>
+            </div>
+          )}
+
+          {/* Customer Message */}
+          {data.message && (
+            <div style={{ background: 'var(--surface, #ffffff)', padding: '8px 10px', borderRadius: '8px', border: '1px solid var(--border, rgba(0,0,0,0.08))' }}>
+              <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary, #64748b)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span className="material-icons" style={{ fontSize: '12px' }}>chat_bubble_outline</span>
+                Note from buyer
+              </span>
+              <p style={{ margin: '4px 0 0', fontSize: '0.82rem', lineHeight: '1.4', fontStyle: 'italic', color: 'var(--text, #0f172a)' }}>
+                "{data.message}"
+              </p>
+            </div>
+          )}
+        </div>
+      )
+    } catch (e) {
+      return <p style={{ margin: 0 }}>{content}</p>
+    }
+  }
+
   if (content.startsWith('[ORDER_CARD]')) {
     try {
       const jsonStr = content.replace('[ORDER_CARD]', '')

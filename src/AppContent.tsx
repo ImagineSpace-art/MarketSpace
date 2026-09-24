@@ -4,7 +4,6 @@ import './App.css'
 import { Shell } from './components/Shell'
 import { ProfilePanel } from './components/ProfilePanel'
 import { useMarketplaceApp } from './features/marketplace/useMarketplaceApp'
-import { HomePage } from './pages/HomePage'
 import { ListingDetailPage, ListingFormPage } from './pages/ListingPage'
 import { SavedItemsPage } from './pages/SavedNotificationsPage'
 import { MessagesPage } from './pages/MessagesPage'
@@ -12,10 +11,143 @@ import { AuthPage } from './pages/AuthenticationPage'
 import { OnboardingPage } from './pages/OnboardingPage'
 import { StoreViewPage } from './pages/StoreViewPage'
 import { StoresPage } from './pages/StoresPage'
+import { DiscoveryPage } from './pages/DiscoveryPage'
+import { BrowsePage } from './pages/BrowsePage'
+import { CartDrawer } from './components/CartDrawer'
+import { useCart } from './features/marketplace/useCart'
 import { ProfilePage } from './pages/ProfilePage'
-import { SellerProfilePage } from './pages/SellerProfilePage'
 import { SettingsPage } from './pages/SettingsPage'
 import type { Listing, Profile, BusinessProfile } from './types'
+
+function SlowlyFlashingMarketSpaceTemplate({ message = 'Loading MarketSpace...' }: { message?: string }) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: '100vh',
+        backgroundColor: '#09090b',
+        color: '#f4f4f5',
+        padding: '32px 24px',
+        boxSizing: 'border-box',
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}
+    >
+      <style>{`
+        @keyframes slowTemplateFlash {
+          0%, 100% {
+            opacity: 0.35;
+          }
+          50% {
+            opacity: 0.95;
+          }
+        }
+        .slow-flashing-template {
+          animation: slowTemplateFlash 2.4s ease-in-out infinite;
+        }
+      `}</style>
+
+      <div
+        className="slow-flashing-template"
+        style={{
+          width: '100%',
+          maxWidth: '860px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '24px',
+        }}
+      >
+        {/* Top Navbar Skeleton Wireframe */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '14px 20px',
+            backgroundColor: '#18181b',
+            borderRadius: '12px',
+            border: '1px solid #27272a',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#3f3f46' }} />
+            <div style={{ width: '120px', height: '14px', borderRadius: '6px', backgroundColor: '#27272a' }} />
+          </div>
+          <div style={{ width: '280px', height: '30px', borderRadius: '8px', backgroundColor: '#27272a' }} />
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{ width: '30px', height: '30px', borderRadius: '50%', backgroundColor: '#27272a' }} />
+            <div style={{ width: '30px', height: '30px', borderRadius: '50%', backgroundColor: '#27272a' }} />
+          </div>
+        </div>
+
+        {/* Hero Wireframe Banner */}
+        <div
+          style={{
+            height: '180px',
+            backgroundColor: '#18181b',
+            borderRadius: '16px',
+            border: '1px solid #27272a',
+            padding: '28px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            gap: '12px',
+          }}
+        >
+          <div style={{ width: '180px', height: '20px', borderRadius: '6px', backgroundColor: '#3f3f46' }} />
+          <div style={{ width: '280px', height: '12px', borderRadius: '4px', backgroundColor: '#27272a' }} />
+          <div style={{ width: '100px', height: '32px', borderRadius: '999px', backgroundColor: '#52525b', marginTop: '10px' }} />
+        </div>
+
+        {/* 4 Cards Grid Skeleton */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+            gap: '16px',
+          }}
+        >
+          {[1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+              }}
+            >
+              <div
+                style={{
+                  width: '100%',
+                  aspectRatio: '1 / 1.05',
+                  backgroundColor: '#18181b',
+                  borderRadius: '12px',
+                  border: '1px solid #27272a',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <div style={{ width: '54px', height: '54px', borderRadius: '8px', backgroundColor: '#27272a' }} />
+              </div>
+              <div style={{ width: '45%', height: '10px', borderRadius: '4px', backgroundColor: '#27272a', margin: '0 auto' }} />
+              <div style={{ width: '80%', height: '13px', borderRadius: '4px', backgroundColor: '#3f3f46', margin: '0 auto' }} />
+              <div style={{ width: '40%', height: '11px', borderRadius: '4px', backgroundColor: '#27272a', margin: '0 auto' }} />
+            </div>
+          ))}
+        </div>
+
+        {/* Subdued Status Text */}
+        <div style={{ textAlign: 'center', marginTop: '8px' }}>
+          <span style={{ fontSize: '0.86rem', fontWeight: 600, color: '#a1a1aa', letterSpacing: '0.04em' }}>
+            {message}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function AppContent() {
   const location = useLocation()
@@ -136,23 +268,10 @@ export function AppContent() {
     toggleNotifyStore,
   } = app
 
+  const cart = useCart()
+
   if (loading) {
-    return (
-      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--bg, #f8fafc)', color: 'var(--text, #0f172a)' }}>
-        <style>{`
-          @keyframes spin {
-            to { transform: rotate(360deg); }
-          }
-          .spin-animation {
-            animation: spin 1.5s linear infinite;
-          }
-        `}</style>
-        <div style={{ textAlign: 'center' }}>
-          <span className="material-icons spin-animation" style={{ fontSize: '48px', color: '#2563eb', display: 'inline-block' }}>sync</span>
-          <p style={{ marginTop: '16px', fontWeight: 600, fontFamily: 'sans-serif' }}>Loading MarketSpace...</p>
-        </div>
-      </div>
-    )
+    return <SlowlyFlashingMarketSpaceTemplate message="Loading MarketSpace..." />
   }
 
   const handleAuthSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -168,6 +287,29 @@ export function AppContent() {
 
 
   const isStorePage = location.pathname.startsWith('/store/')
+  const isDiscoveryPage = location.pathname === '/discovery' || location.pathname === '/'
+
+  if (isDiscoveryPage) {
+    return (
+      <>
+        <DiscoveryPage
+          allBusinesses={allBusinesses}
+          onOpenCart={() => cart.setIsCartOpen(true)}
+          cartCount={cart.totalCount}
+          savedCount={savedIds.length}
+        />
+        <CartDrawer
+          isOpen={cart.isCartOpen}
+          onClose={() => cart.setIsCartOpen(false)}
+          items={cart.cartItems}
+          onUpdateQuantity={cart.updateQuantity}
+          onRemoveItem={cart.removeFromCart}
+          onClearCart={cart.clearCart}
+        />
+      </>
+    )
+  }
+
   const storeUserIdParam = isStorePage ? location.pathname.split('/store/')[1]?.split('?')[0] : null
   const currentViewStore = storeUserIdParam
     ? (allBusinesses[storeUserIdParam] || (businessProfile?.userId === storeUserIdParam ? businessProfile : null))
@@ -178,6 +320,69 @@ export function AppContent() {
     shopName: currentViewStore.shopName,
     collections: currentViewStore.collections || []
   } : null
+
+  if (isStorePage) {
+    return (
+      <div className="standalone-store-site" style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+        {message ? <div className="status-banner">{message}</div> : null}
+        <Routes>
+          <Route
+            path="/store/:userId"
+            element={
+              <StoreViewRoute
+                stores={stores}
+                businessProfile={businessProfile}
+                allBusinesses={allBusinesses}
+                listings={listings}
+                navigate={navigate}
+                handleStartChat={handleStartChat}
+                openListing={openListing}
+                toggleSave={toggleSave}
+                savedIds={savedIds}
+                loading={loading}
+                followingIds={followingIds}
+                notifyStoreIds={notifyStoreIds}
+                toggleFollowStore={toggleFollowStore}
+                toggleNotifyStore={toggleNotifyStore}
+                session={session}
+                storeReviews={app.storeReviews}
+                addStoreReview={app.addStoreReview}
+                replyToStoreReview={app.replyToStoreReview}
+                handleUpdateListingCollection={app.handleUpdateListingCollection}
+              />
+            }
+          />
+        </Routes>
+        {showScrollTop && (
+          <button
+            onClick={scrollToTop}
+            style={{
+              position: 'fixed',
+              bottom: '24px',
+              right: '24px',
+              width: '48px',
+              height: '48px',
+              borderRadius: '50%',
+              backgroundColor: '#2563eb',
+              color: '#ffffff',
+              border: 'none',
+              boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+              cursor: 'pointer',
+              display: 'grid',
+              placeItems: 'center',
+              zIndex: 999,
+              transition: 'background-color 0.2s, transform 0.2s',
+            }}
+            title="Back to Top"
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1d4ed8'; e.currentTarget.style.transform = 'scale(1.08)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#2563eb'; e.currentTarget.style.transform = 'scale(1)'; }}
+          >
+            <span className="material-icons" style={{ fontSize: '24px' }}>arrow_upward</span>
+          </button>
+        )}
+      </div>
+    )
+  }
 
   return (
     <>
@@ -203,27 +408,51 @@ export function AppContent() {
         searchQuery={app.searchQuery}
         onSearchQueryChange={app.setSearchQuery}
         storeContext={storeContext}
+        cartItems={cart.cartItems}
+        isCartOpen={cart.isCartOpen}
+        onToggleCart={() => cart.setIsCartOpen(!cart.isCartOpen)}
+        onUpdateCartQty={cart.updateQuantity}
+        onRemoveCartItem={cart.removeFromCart}
+        onClearCart={cart.clearCart}
       >
         {message ? <div className="status-banner">{message}</div> : null}
         <Routes>
           <Route
             path="/"
             element={
-              <HomePage
-                loading={loading}
-                filteredListings={app.filteredListings}
-                savedIds={savedIds}
-                openListing={openListing}
-                toggleSave={toggleSave}
-                distanceFilter={distanceFilter}
-                toggleCategory={toggleCategory}
-                searchQuery={app.searchQuery}
-                activeCategories={activeCategories}
+              <DiscoveryPage
                 allBusinesses={allBusinesses}
-                clearAllFilters={app.clearAllFilters}
+                onOpenCart={() => cart.setIsCartOpen(true)}
+                cartCount={cart.totalCount}
+                savedCount={savedIds.length}
               />
             }
           />
+          <Route
+            path="/discovery"
+            element={
+              <DiscoveryPage
+                allBusinesses={allBusinesses}
+                onOpenCart={() => cart.setIsCartOpen(true)}
+                cartCount={cart.totalCount}
+                savedCount={savedIds.length}
+              />
+            }
+          />
+          <Route
+            path="/browse"
+            element={
+              <BrowsePage
+                listings={listings}
+                allBusinesses={allBusinesses}
+                savedIds={savedIds}
+                onToggleSave={(id) => toggleSave(Number(id))}
+                onAddToCart={(it) => cart.addToCart(it)}
+                onOpenListing={openListing}
+              />
+            }
+          />
+          <Route path="/shop" element={<Navigate to="/browse" replace />} />
           <Route
             path="/listings/:id"
             element={
@@ -302,13 +531,20 @@ export function AppContent() {
                 allBusinesses={allBusinesses}
                 onVisitShop={(shop) => {
                   setSelectedStore(shop)
-                  navigate(`/store/${shop.userId}`)
+                  window.open(`/store/${shop.userId}`, '_blank')
                 }}
-                onOpenProfile={(userId) => navigate(`/seller/${userId}`)}
+                onOpenProfile={(userId) => window.open(`/store/${userId}`, '_blank')}
                 listingKindFilter={listingKindFilter}
                 listings={listings}
+                openListing={openListing}
+                toggleSave={toggleSave}
+                savedIds={savedIds}
               />
             }
+          />
+          <Route
+            path="/discovery"
+            element={<DiscoveryPage allBusinesses={allBusinesses} />}
           />
           <Route
             path="/store/:userId"
@@ -333,22 +569,13 @@ export function AppContent() {
                 addStoreReview={app.addStoreReview}
                 replyToStoreReview={app.replyToStoreReview}
                 handleUpdateListingCollection={app.handleUpdateListingCollection}
+                onSaveStoreTheme={app.handleSaveStoreTheme}
               />
             }
           />
           <Route
             path="/seller/:userId"
-            element={
-              <SellerProfileRoute
-                stores={stores}
-                listings={listings}
-                allBusinesses={allBusinesses}
-                navigate={navigate}
-                openListing={openListing}
-                toggleSave={toggleSave}
-                savedIds={savedIds}
-              />
-            }
+            element={<SellerProfileRoute />}
           />
           <Route
             path="/profile/:tab?"
@@ -376,6 +603,7 @@ export function AppContent() {
                 onToggleSave={toggleSave}
                 onLogout={handleLogout}
                 onUpdateListingCollection={app.handleUpdateListingCollection}
+                onSaveStoreTheme={app.handleSaveStoreTheme}
                 onOpenDashboardPanel={() => setIsProfilePanelOpen(true)}
                 theme={theme}
                 locationString="Lusaka"
@@ -645,7 +873,7 @@ function ListingDetailRoute({ listings, loading, session, navigate, handleStartC
       onToggleSave={toggleSave}
       onEditListing={openEditListing}
       allBusinesses={allBusinesses}
-      onVisitStore={(userId) => navigate(`/store/${userId}`)}
+      onVisitStore={(userId) => window.open(`/store/${userId}`, '_blank')}
       onRenewListing={handleRenewListing}
       onDeleteListing={handleDeleteListing}
     />
@@ -777,7 +1005,7 @@ function ListingEditRoute({
   )
 }
 
-function StoreViewRoute({ stores, businessProfile, allBusinesses, listings, navigate, handleStartChat, openListing, toggleSave, savedIds, loading, followingIds, notifyStoreIds, toggleFollowStore, toggleNotifyStore, session, storeReviews, addStoreReview, replyToStoreReview, handleUpdateListingCollection }: any) {
+function StoreViewRoute({ stores, businessProfile, allBusinesses, listings, navigate, handleStartChat, openListing, toggleSave, savedIds, loading, followingIds, notifyStoreIds, toggleFollowStore, toggleNotifyStore, session, storeReviews, addStoreReview, replyToStoreReview, handleUpdateListingCollection, onSaveStoreTheme }: any) {
   const { userId } = useParams()
 
   const regStore: BusinessProfile | null =
@@ -786,33 +1014,76 @@ function StoreViewRoute({ stores, businessProfile, allBusinesses, listings, navi
     Object.values(allBusinesses).find((b: any) => b.userId === userId) ||
     null
 
-  if (!regStore) {
-    const sellerExists = stores.some((s: Profile) => s.user_id === userId)
-    if (sellerExists) {
-      return <Navigate to={`/seller/${userId}`} replace />
+  const seller = stores.find((s: Profile) => s.user_id === userId)
+
+  if (!regStore && !seller) {
+    if (loading) {
+      return <SlowlyFlashingMarketSpaceTemplate message="Loading Storefront..." />
     }
-    if (loading) return <p style={{ padding: '24px' }}>Loading store...</p>
-    return <p style={{ padding: '24px' }}>Store not found.</p>
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '80vh', alignItems: 'center', justifyContent: 'center', gap: '16px', color: 'var(--text)', padding: '24px', textAlign: 'center' }}>
+        <span className="material-icons" style={{ fontSize: '56px', color: 'var(--text-muted)' }}>storefront</span>
+        <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>Store Not Found</h2>
+        <p style={{ color: 'var(--text-secondary)', margin: 0, maxWidth: '420px' }}>
+          The store you are looking for does not exist or may have been moved.
+        </p>
+        <a href="/" target="_blank" rel="noopener noreferrer" className="primary-btn" style={{ textDecoration: 'none', padding: '10px 22px', borderRadius: '10px' }}>
+          Explore MarketSpace Marketplace
+        </a>
+      </div>
+    )
+  }
+
+  const effectiveStore: BusinessProfile = regStore || {
+    userId: seller!.user_id,
+    shopName: seller!.username ? `${seller!.username}'s Store` : 'Official Merchant Store',
+    description: `Welcome to the official storefront of ${seller!.username || 'our store'}. Browse our active inventory below.`,
+    category: 'General Merchant',
+    address: 'Lusaka, Zambia',
+    whatsapp: '',
+    logo: seller!.avatar_url || '',
+    cover: '/banners/store_banner_apparel.png',
+    accentColor: '#2563eb',
+    announcementBar: '',
+    collections: [],
+    customerCare: {},
+    catalog: [],
+    ads: [],
+    themeConfig: undefined
+  }
+
+  let savedLocalTheme: any = undefined
+  try {
+    const localStr = window.localStorage.getItem(`marketspace-store-theme-${effectiveStore.userId}`)
+    if (localStr) savedLocalTheme = JSON.parse(localStr)
+  } catch { }
+
+  const storeWithTheme: BusinessProfile = {
+    ...effectiveStore,
+    themeConfig: effectiveStore.themeConfig || savedLocalTheme || undefined
   }
 
   return (
     <StoreViewPage
-      shop={regStore}
+      shop={storeWithTheme}
       listings={listings}
       onBack={() => navigate('/stores')}
       onMessageSeller={() => {
-        const shopListing = listings.find((l: Listing) => l.user_id === regStore.userId)
+        if (session?.user?.id === effectiveStore.userId) {
+          navigate('/inbox')
+          return
+        }
+        const shopListing = listings.find((l: Listing) => l.user_id === effectiveStore.userId)
         if (shopListing) {
           void handleStartChat(shopListing)
         } else {
           void handleStartChat({
-            id: -1,
-            title: `Shop inquiry: ${regStore.shopName}`,
-            description: `Direct message to ${regStore.shopName}`,
+            id: 0,
+            title: `Shop inquiry: ${effectiveStore.shopName}`,
+            description: `Direct message to ${effectiveStore.shopName}`,
             price: 0,
-            category: regStore.category,
-            location: regStore.address,
-            user_id: regStore.userId,
+            category: effectiveStore.category,
+            user_id: effectiveStore.userId,
           })
         }
       }}
@@ -828,49 +1099,12 @@ function StoreViewRoute({ stores, businessProfile, allBusinesses, listings, navi
       onAddReview={addStoreReview}
       onReplyToReview={replyToStoreReview}
       onUpdateListingCollection={handleUpdateListingCollection}
+      onSaveStoreTheme={(config) => onSaveStoreTheme?.(config, effectiveStore.userId)}
     />
   )
 }
 
-function SellerProfileRoute({ stores, listings, allBusinesses, navigate, openListing, toggleSave, savedIds }: any) {
+function SellerProfileRoute() {
   const { userId } = useParams()
-  // Find the seller user profile in Supabase profiles (stores list)
-  const seller = stores.find((s: Profile) => s.user_id === userId)
-  // Check if they have a business store setup
-  const bizProfile = allBusinesses[userId || ''] || null
-
-  if (!seller) {
-    if (bizProfile) {
-      const mockSeller: Profile = {
-        user_id: bizProfile.userId,
-        username: bizProfile.shopName.replace(/\s+/g, '_').toLowerCase(),
-        email: 'business@marketspace.zm',
-        avatar_url: bizProfile.logo,
-      }
-      return (
-        <SellerProfilePage
-          seller={mockSeller}
-          listings={listings}
-          businessProfile={bizProfile}
-          onBack={() => navigate(-1)}
-          onOpenListing={openListing}
-          onToggleSave={toggleSave}
-          savedIds={savedIds}
-        />
-      )
-    }
-    return <p style={{ padding: '24px' }}>Seller profile not found.</p>
-  }
-
-  return (
-    <SellerProfilePage
-      seller={seller}
-      listings={listings}
-      businessProfile={bizProfile}
-      onBack={() => navigate(-1)}
-      onOpenListing={openListing}
-      onToggleSave={toggleSave}
-      savedIds={savedIds}
-    />
-  )
+  return <Navigate to={`/store/${userId}`} replace />
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { ListingCard } from '../components/ListingCard'
 import type { MarketplaceAppModel } from '../features/marketplace/useMarketplaceApp'
 
@@ -27,10 +28,14 @@ export function HomePage({
   toggleCategory,
   searchQuery,
   activeCategories = ['All'],
-  allBusinesses,
+  allBusinesses = {},
   clearAllFilters: globalClearAllFilters
 }: Omit<HomePageProps, 'setSearchQuery'>) {
+  const navigate = useNavigate()
   const [currentSlide, setCurrentSlide] = useState(0)
+
+  // Marketplace Mode Switcher: All | Stores Only | Community Sellers
+  const [storeVsSellerFilter, setStoreVsSellerFilter] = useState<'all' | 'stores' | 'sellers'>('all')
 
   // Quick Filter Popover States
   const [activePopover, setActivePopover] = useState<'price' | 'rating' | 'type' | 'date' | 'seller' | 'sort' | null>(null)
@@ -63,31 +68,38 @@ export function HomePage({
 
   const promoSlides = [
     {
+      id: 'discovery',
+      image: '/illustrations/discovery_golden_bridge.jpg',
+      badge: 'Editorial Discovery Feed',
+      title: "Discover the world's hidden wonders, stories & local merchant crafts.",
+      link: '/discovery',
+    },
+    {
+      id: 'stores',
+      image: '/banners/banner_community.png',
+      badge: 'Official Merchant Stores',
+      title: 'Explore curated collections and designer storefronts.',
+      link: '/stores',
+    },
+    {
       id: 'electronics',
       image: '/banners/banner_electronics.png',
-      badge: 'Local Electronics',
-      title: 'Find computers, audio systems, and gaming gear in Lusaka.',
+      badge: 'Tech & Electronics',
+      title: 'Find computers, smartphones, audio systems & gaming gear.',
       cat: 'Electronics',
     },
     {
       id: 'fashion',
       image: '/banners/banner_fashion.png',
       badge: 'Fashion & Trends',
-      title: 'Update your wardrobe with sneakers and stylish wear.',
+      title: 'Upgrade your look with sneakers, boutique wear & jewelry.',
       cat: 'Fashion',
-    },
-    {
-      id: 'stores',
-      image: '/banners/banner_community.png',
-      badge: 'Verified Local Stores',
-      title: 'Support local Zambian merchants and browse full shop catalogs.',
-      link: '/stores',
     },
     {
       id: 'sell',
       image: '/banners/banner_electronics.png',
       badge: 'Sell on MarketSpace',
-      title: 'List your goods instantly and get messages directly from buyers.',
+      title: 'Open your branded online store or sell goods directly to buyers.',
       link: '/onboarding',
     },
   ]
@@ -95,7 +107,7 @@ export function HomePage({
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % promoSlides.length)
-    }, 4500)
+    }, 5000)
     return () => clearInterval(timer)
   }, [promoSlides.length])
 
@@ -117,6 +129,9 @@ export function HomePage({
   })
   const sellersList = Array.from(uniqueSellersMap.entries()).map(([id, name]) => ({ id, name }))
 
+  // Registered business stores list
+  const registeredStores = Object.values(allBusinesses || {}).filter(b => Boolean(b && b.shopName))
+
   const toggleSellerSelection = (sellerId: string) => {
     setSelectedSellers((prev) =>
       prev.includes(sellerId) ? prev.filter((id) => id !== sellerId) : [...prev, sellerId]
@@ -124,7 +139,6 @@ export function HomePage({
   }
 
   const isSearchActive = Boolean(searchQuery && searchQuery.trim().length > 0)
-
   const isGlobalCatActive = !activeCategories.includes('All')
   const isGlobalSearchActive = Boolean(searchQuery && searchQuery.trim().length > 0)
 
@@ -137,6 +151,7 @@ export function HomePage({
     (typeFilter !== 'all' ? 1 : 0) +
     (dateFilter !== 'anytime' ? 1 : 0) +
     (selectedSellers.length > 0 ? 1 : 0) +
+    (storeVsSellerFilter !== 'all' ? 1 : 0) +
     (!includeItems || !includeServices || !includeSellers ? 1 : 0)
 
   const clearAllFilters = () => {
@@ -145,6 +160,7 @@ export function HomePage({
     setTypeFilter('all')
     setDateFilter('anytime')
     setSelectedSellers([])
+    setStoreVsSellerFilter('all')
     setIncludeItems(true)
     setIncludeServices(true)
     setIncludeSellers(true)
@@ -157,6 +173,11 @@ export function HomePage({
   const DAY_MS = 24 * 60 * 60 * 1000
 
   let displayListings = filteredListings.filter((l) => {
+    // Mode Switcher: Stores vs Standalone Sellers
+    const isStoreListing = Boolean(l.user_id && allBusinesses[l.user_id]?.shopName)
+    if (storeVsSellerFilter === 'stores' && !isStoreListing) return false
+    if (storeVsSellerFilter === 'sellers' && isStoreListing) return false
+
     const p = Number(String(l.price).replace(/[^\d.]/g, ''))
     if (priceMax < 3000 && p > priceMax) return false
     if (minRating > 0) {
@@ -195,11 +216,19 @@ export function HomePage({
     displayListings = [...displayListings].sort((a, b) => Number(b.id) - Number(a.id))
   }
 
-  const latestListings = displayListings
-  const electronicsListings = displayListings.filter(l => l.category === 'Electronics' || l.category === 'Gaming')
-  const fashionListings = displayListings.filter(l => l.category === 'Fashion')
-  const vehiclesListings = displayListings.filter(l => l.category === 'Vehicles')
-  const trendingListings = displayListings.filter(l => l.sponsored || (l.status ?? 'Available') === 'Available').slice(0, 8)
+  // Counts for tabs
+  const storeListingsTotal = filteredListings.filter(l => Boolean(l.user_id && allBusinesses[l.user_id]?.shopName)).length
+  const sellerListingsTotal = filteredListings.filter(l => !Boolean(l.user_id && allBusinesses[l.user_id]?.shopName)).length
+
+  // Curated category definitions with modern assets
+  const categoryHighlights = [
+    { name: 'Electronics', label: 'Electronics & Tech', icon: 'devices', img: '/banners/banner_electronics.png', desc: 'Computers, gaming & gadgets' },
+    { name: 'Fashion', label: 'Fashion & Apparel', icon: 'checkroom', img: '/banners/banner_fashion.png', desc: 'Sneakers, apparel & watches' },
+    { name: 'Home & Garden', label: 'Home & Living', icon: 'chair', img: '/banners/banner_community.png', desc: 'Furniture, decor & appliances' },
+    { name: 'Vehicles', label: 'Motors & Vehicles', icon: 'directions_car', img: '/banners/banner_electronics.png', desc: 'Cars, bikes & accessories' },
+    { name: 'Sports', label: 'Sports & Outdoors', icon: 'fitness_center', img: '/banners/banner_community.png', desc: 'Fitness equipment & gear' },
+    { name: 'Services', label: 'Professional Services', icon: 'handshake', img: '/banners/banner_fashion.png', desc: 'Verified local pros & agencies' }
+  ]
 
   return (
     <div className="marketplace-home">
@@ -248,6 +277,58 @@ export function HomePage({
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
               {/* Left: Quick Filter Pills */}
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                {/* Mode Switcher Filter inside Search */}
+                <div style={{ display: 'flex', gap: '4px', background: 'var(--surface)', padding: '3px', borderRadius: '20px', border: '1px solid var(--border)' }}>
+                  <button
+                    type="button"
+                    onClick={() => setStoreVsSellerFilter('all')}
+                    style={{
+                      padding: '5px 12px',
+                      borderRadius: '16px',
+                      border: 'none',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      background: storeVsSellerFilter === 'all' ? '#2563eb' : 'transparent',
+                      color: storeVsSellerFilter === 'all' ? '#fff' : 'var(--text-secondary)'
+                    }}
+                  >
+                    All ({filteredListings.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStoreVsSellerFilter('stores')}
+                    style={{
+                      padding: '5px 12px',
+                      borderRadius: '16px',
+                      border: 'none',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      background: storeVsSellerFilter === 'stores' ? '#2563eb' : 'transparent',
+                      color: storeVsSellerFilter === 'stores' ? '#fff' : 'var(--text-secondary)'
+                    }}
+                  >
+                    Stores ({storeListingsTotal})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStoreVsSellerFilter('sellers')}
+                    style={{
+                      padding: '5px 12px',
+                      borderRadius: '16px',
+                      border: 'none',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      background: storeVsSellerFilter === 'sellers' ? '#2563eb' : 'transparent',
+                      color: storeVsSellerFilter === 'sellers' ? '#fff' : 'var(--text-secondary)'
+                    }}
+                  >
+                    Sellers ({sellerListingsTotal})
+                  </button>
+                </div>
+
                 {/* Price Pill Dropdown */}
                 <div className="filter-popover-wrapper" style={{ position: 'relative' }}>
                   <button
@@ -352,236 +433,33 @@ export function HomePage({
                             display: 'flex',
                             alignItems: 'center',
                             gap: '6px',
-                            fontSize: '0.86rem'
+                            fontSize: '0.82rem'
                           }}
                         >
                           <span className="material-icons" style={{ fontSize: '16px', color: '#f59e0b' }}>star</span>
-                          <span>{star === 0 ? 'Any Rating' : `${star}+ Stars`}</span>
+                          {star === 0 ? 'Any Rating' : `${star}+ Stars`}
                         </button>
                       ))}
                     </div>
                   )}
                 </div>
-
-                {/* Date Listed Pill Dropdown */}
-                <div className="filter-popover-wrapper" style={{ position: 'relative' }}>
-                  <button
-                    type="button"
-                    className={`filter-pill-btn ${dateFilter !== 'anytime' ? 'active' : ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setActivePopover(activePopover === 'date' ? null : 'date')
-                    }}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      padding: '8px 14px',
-                      borderRadius: '20px',
-                      border: dateFilter !== 'anytime' ? '2px solid #2563eb' : '1px solid var(--border)',
-                      background: dateFilter !== 'anytime' ? 'rgba(37, 99, 235, 0.12)' : 'var(--surface)',
-                      color: 'var(--text)',
-                      fontSize: '0.86rem',
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Date Listed {dateFilter !== 'anytime' ? `(${dateFilter})` : ''}
-                    <span className="material-icons" style={{ fontSize: '16px' }}>{activePopover === 'date' ? 'expand_less' : 'expand_more'}</span>
-                  </button>
-
-                  {activePopover === 'date' && (
-                    <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '6px', width: '200px', background: '#181818', border: '1px solid #333', borderRadius: '10px', padding: '8px', zIndex: 99, boxShadow: '0 10px 25px rgba(0,0,0,0.7)', color: '#fff' }}>
-                      {[
-                        { label: 'Anytime', val: 'anytime' },
-                        { label: 'Past 24 Hours', val: '24h' },
-                        { label: 'Past 7 Days', val: '7d' },
-                        { label: 'Past 30 Days', val: '30d' },
-                      ].map((d) => (
-                        <button
-                          key={d.val}
-                          type="button"
-                          onClick={() => {
-                            setDateFilter(d.val as any)
-                            setActivePopover(null)
-                          }}
-                          style={{
-                            width: '100%',
-                            textAlign: 'left',
-                            padding: '8px 10px',
-                            background: dateFilter === d.val ? 'rgba(37, 99, 235, 0.2)' : 'transparent',
-                            border: 'none',
-                            color: '#fff',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '0.86rem'
-                          }}
-                        >
-                          {d.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Specific Sellers & Stores Pill Dropdown */}
-                {sellersList.length > 0 && (
-                  <div className="filter-popover-wrapper" style={{ position: 'relative' }}>
-                    <button
-                      type="button"
-                      className={`filter-pill-btn ${selectedSellers.length > 0 ? 'active' : ''}`}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setActivePopover(activePopover === 'seller' ? null : 'seller')
-                      }}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '8px 14px',
-                        borderRadius: '20px',
-                        border: selectedSellers.length > 0 ? '2px solid #2563eb' : '1px solid var(--border)',
-                        background: selectedSellers.length > 0 ? 'rgba(37, 99, 235, 0.12)' : 'var(--surface)',
-                        color: 'var(--text)',
-                        fontSize: '0.86rem',
-                        fontWeight: 600,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Sellers & Stores {selectedSellers.length > 0 ? `(${selectedSellers.length})` : ''}
-                      <span className="material-icons" style={{ fontSize: '16px' }}>{activePopover === 'seller' ? 'expand_less' : 'expand_more'}</span>
-                    </button>
-
-                    {activePopover === 'seller' && (
-                      <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '6px', width: '240px', background: '#181818', border: '1px solid #333', borderRadius: '10px', padding: '10px', zIndex: 99, boxShadow: '0 10px 25px rgba(0,0,0,0.7)', color: '#fff', maxHeight: '240px', overflowY: 'auto' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', borderBottom: '1px solid #333', paddingBottom: '6px' }}>
-                          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#aaa' }}>Select Sellers/Stores</span>
-                          {selectedSellers.length > 0 && (
-                            <button type="button" onClick={() => setSelectedSellers([])} style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.74rem', cursor: 'pointer' }}>Clear</button>
-                          )}
-                        </div>
-                        {sellersList.map((s) => {
-                          const checked = selectedSellers.includes(s.id)
-                          return (
-                            <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 4px', cursor: 'pointer', fontSize: '0.84rem' }}>
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => toggleSellerSelection(s.id)}
-                              />
-                              <span style={{ color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name}</span>
-                            </label>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
 
-              {/* Right: Sort By Dropdown */}
-              <div className="filter-popover-wrapper" style={{ position: 'relative' }}>
+              {activeFiltersCount > 0 && (
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setActivePopover(activePopover === 'sort' ? null : 'sort')
-                  }}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '8px 14px',
-                    borderRadius: '8px',
-                    border: '1px solid var(--border)',
-                    background: 'var(--surface)',
-                    color: 'var(--text)',
-                    fontSize: '0.86rem',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
+                  onClick={clearAllFilters}
+                  style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: '0.84rem', fontWeight: 700 }}
                 >
-                  Sort by: {sortOption}
-                  <span className="material-icons" style={{ fontSize: '16px' }}>{activePopover === 'sort' ? 'expand_less' : 'expand_more'}</span>
+                  Clear all filters
                 </button>
-
-                {activePopover === 'sort' && (
-                  <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '6px', width: '200px', background: '#181818', border: '1px solid #333', borderRadius: '10px', padding: '8px', zIndex: 99, boxShadow: '0 10px 25px rgba(0,0,0,0.7)', color: '#fff' }}>
-                    {['Relevance', 'Price: Low to High', 'Price: High to Low', 'Latest'].map((opt) => (
-                      <button
-                        key={opt}
-                        type="button"
-                        onClick={() => {
-                          setSortOption(opt)
-                          setActivePopover(null)
-                        }}
-                        style={{
-                          width: '100%',
-                          textAlign: 'left',
-                          padding: '8px 10px',
-                          background: sortOption === opt ? 'rgba(37, 99, 235, 0.2)' : 'transparent',
-                          border: 'none',
-                          color: '#fff',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          fontSize: '0.86rem'
-                        }}
-                      >
-                        {opt}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           </div>
 
-          {/* APPLIED FILTERS TAGS ROW (Visible whenever activeFiltersCount > 0) */}
-          {activeFiltersCount > 0 && (
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '20px', padding: '10px 14px', background: 'var(--panel)', borderRadius: '10px', border: '1px solid var(--border)' }}>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Active Filters:</span>
-
-              {priceMax < 3000 && (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 10px', borderRadius: '16px', background: 'var(--surface)', border: '1px solid var(--border)', fontSize: '0.78rem', color: 'var(--text)' }}>
-                  Under ZMW {priceMax}
-                  <button type="button" onClick={() => setPriceMax(3000)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '14px', fontWeight: 700 }}>×</button>
-                </span>
-              )}
-
-              {minRating > 0 && (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 10px', borderRadius: '16px', background: 'var(--surface)', border: '1px solid var(--border)', fontSize: '0.78rem', color: 'var(--text)' }}>
-                  {minRating}+ Stars
-                  <button type="button" onClick={() => setMinRating(0)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '14px', fontWeight: 700 }}>×</button>
-                </span>
-              )}
-
-              {dateFilter !== 'anytime' && (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 10px', borderRadius: '16px', background: 'var(--surface)', border: '1px solid var(--border)', fontSize: '0.78rem', color: 'var(--text)' }}>
-                  Date: {dateFilter}
-                  <button type="button" onClick={() => setDateFilter('anytime')} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '14px', fontWeight: 700 }}>×</button>
-                </span>
-              )}
-
-              {selectedSellers.length > 0 && (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 10px', borderRadius: '16px', background: 'var(--surface)', border: '1px solid var(--border)', fontSize: '0.78rem', color: 'var(--text)' }}>
-                  Sellers: {selectedSellers.length} selected
-                  <button type="button" onClick={() => setSelectedSellers([])} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '14px', fontWeight: 700 }}>×</button>
-                </span>
-              )}
-
-              <button
-                type="button"
-                onClick={clearAllFilters}
-                style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700, marginLeft: 'auto' }}
-              >
-                Clear
-              </button>
-            </div>
-          )}
-
-          {/* Search Grid Layout (Left Sidebar on Desktop + Results Grid) */}
+          {/* Search Grid Layout */}
           <div className="search-grid-layout" style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: '24px' }}>
-            {/* Left Sidebar (Desktop Only) */}
+            {/* Left Sidebar */}
             <aside className="search-left-sidebar" style={{ background: 'var(--panel)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)', height: 'fit-content' }}>
               <h3 style={{ margin: '0 0 14px 0', fontSize: '0.95rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text)' }}>
                 Filter Breakdown
@@ -618,18 +496,10 @@ export function HomePage({
                         <span>Items</span>
                       </div>
                     </label>
-
                     <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontSize: '0.84rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <input type="checkbox" checked={includeServices} onChange={(e) => setIncludeServices(e.target.checked)} />
                         <span>Services</span>
-                      </div>
-                    </label>
-
-                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontSize: '0.84rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <input type="checkbox" checked={includeSellers} onChange={(e) => setIncludeSellers(e.target.checked)} />
-                        <span>Sellers</span>
                       </div>
                     </label>
                   </div>
@@ -655,10 +525,11 @@ export function HomePage({
                 <div style={{ padding: '40px 20px', textAlign: 'center', background: 'var(--panel)', borderRadius: '12px', border: '1px solid var(--border)' }}>
                   <span className="material-icons" style={{ fontSize: '48px', color: 'var(--text-muted)' }}>search_off</span>
                   <h3 style={{ margin: '12px 0 6px 0', fontSize: '1.1rem' }}>No matching listings found</h3>
-                  <p style={{ margin: 0, fontSize: '0.86rem', color: 'var(--text-secondary)' }}>Try broadening your search term or clearing filters.</p>
+                  <p style={{ margin: '0 0 16px', fontSize: '0.86rem', color: 'var(--text-secondary)' }}>Try broadening your search term or clearing filters.</p>
+                  <button type="button" onClick={clearAllFilters} className="primary-btn compact-btn">Reset Filters</button>
                 </div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '16px' }}>
                   {displayListings.map((listing) => (
                     <ListingCard
                       key={listing.id}
@@ -666,6 +537,7 @@ export function HomePage({
                       saved={savedIds.includes(String(listing.id))}
                       onOpen={openListing}
                       onToggleSave={toggleSave}
+                      allBusinesses={allBusinesses}
                     />
                   ))}
                 </div>
@@ -679,16 +551,15 @@ export function HomePage({
           {/* Full-Bleed Sticky Background Underlay Hero Banner */}
           <div style={{
             position: 'sticky',
-            top: '105px',
+            top: '70px',
             marginLeft: 'calc(-50vw + 50%)',
             marginRight: 'calc(-50vw + 50%)',
             overflow: 'hidden',
-            height: '400px',
+            height: '420px',
             marginTop: '-24px',
             zIndex: 1,
           }}>
-            {/* Gradient */}
-            <div style={{ position: 'absolute', bottom: '0', left: 0, width: '100%', height: '100px', background: 'linear-gradient(to bottom, transparent 0%, rgba(11, 15, 23, 0.4) 40%, var(--bg) 100%)', pointerEvents: 'none', zIndex: 4 }} />
+            <div style={{ position: 'absolute', bottom: '0', left: 0, width: '100%', height: '140px', background: 'linear-gradient(to bottom, transparent 0%, rgba(11, 15, 23, 0.6) 40%, var(--bg) 100%)', pointerEvents: 'none', zIndex: 4 }} />
             <div
               style={{
                 display: 'flex',
@@ -710,233 +581,595 @@ export function HomePage({
                     backgroundPosition: 'center',
                     display: 'flex',
                     alignItems: 'center',
-                    padding: '0 max(28px, calc((100vw - 1200px) / 2))',
+                    padding: '0 max(28px, calc((100vw - 1280px) / 2))',
                     boxSizing: 'border-box',
                   }}
                 >
-                  {/* Left Side Contrast Overlay */}
-                  <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'linear-gradient(90deg, rgba(15, 23, 42, 0.85) 0%, rgba(15, 23, 42, 0.5) 55%, rgba(15, 23, 42, 0.15) 100%)' }} />
+                  <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'linear-gradient(90deg, rgba(15, 23, 42, 0.90) 0%, rgba(15, 23, 42, 0.65) 50%, rgba(15, 23, 42, 0.2) 100%)' }} />
 
-                  {/* Banner Content */}
-                  <div style={{ position: 'relative', zIndex: 5, maxWidth: '560px', color: '#ffffff', marginBottom: '80px' }}>
-                    <span style={{ display: 'inline-block', padding: '5px 14px', backgroundColor: '#2563eb', color: '#ffffff', borderRadius: '14px', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>
+                  <div style={{ position: 'relative', zIndex: 5, maxWidth: '620px', color: '#ffffff', marginBottom: '60px' }}>
+                    <span style={{ display: 'inline-block', padding: '6px 14px', backgroundColor: '#2563eb', color: '#ffffff', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '14px', boxShadow: '0 4px 12px rgba(37,99,235,0.4)' }}>
                       {slide.badge}
                     </span>
-                    <h2 style={{ fontFamily: 'Times New Roman', fontSize: '2.1rem', fontWeight: 600, margin: '0 0 16px 0', lineHeight: 1.25, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+                    <h2 style={{ fontSize: 'clamp(2rem, 4vw, 3.2rem)', fontWeight: 900, letterSpacing: '-0.02em', margin: '0 0 18px 0', lineHeight: 1.15, textShadow: '0 2px 8px rgba(0,0,0,0.6)' }}>
                       {slide.title}
                     </h2>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                      {slide.link ? (
+                        <Link
+                          to={slide.link}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            background: '#ffffff',
+                            color: '#0f172a',
+                            padding: '10px 20px',
+                            borderRadius: '24px',
+                            fontWeight: 800,
+                            fontSize: '0.9rem',
+                            textDecoration: 'none',
+                            boxShadow: '0 4px 14px rgba(0,0,0,0.3)',
+                            transition: 'transform 0.15s ease'
+                          }}
+                        >
+                          <span>Explore Now</span>
+                          <span className="material-icons" style={{ fontSize: '18px' }}>arrow_forward</span>
+                        </Link>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => slide.cat && toggleCategory(slide.cat)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            background: '#ffffff',
+                            color: '#0f172a',
+                            padding: '10px 20px',
+                            borderRadius: '24px',
+                            fontWeight: 800,
+                            fontSize: '0.9rem',
+                            border: 'none',
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 14px rgba(0,0,0,0.3)'
+                          }}
+                        >
+                          <span>Browse {slide.cat}</span>
+                          <span className="material-icons" style={{ fontSize: '18px' }}>arrow_forward</span>
+                        </button>
+                      )}
+                      <Link
+                        to="/stores"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: 'rgba(255,255,255,0.15)',
+                          color: '#ffffff',
+                          padding: '10px 18px',
+                          borderRadius: '24px',
+                          fontWeight: 700,
+                          fontSize: '0.9rem',
+                          textDecoration: 'none',
+                          border: '1px solid rgba(255,255,255,0.3)',
+                          backdropFilter: 'blur(8px)'
+                        }}
+                      >
+                        <span className="material-icons" style={{ fontSize: '18px' }}>storefront</span>
+                        <span>Official Stores Directory</span>
+                      </Link>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Carousel Navigation Indicator Dots */}
-            <div style={{ position: 'absolute', bottom: '150px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '8px', zIndex: 10 }}>
+            {/* Carousel Indicator Dots */}
+            <div style={{ position: 'absolute', bottom: '130px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '8px', zIndex: 10 }}>
               {promoSlides.map((_, idx) => (
                 <button
                   key={idx}
                   type="button"
                   onClick={() => setCurrentSlide(idx)}
                   style={{
-                    width: idx === currentSlide ? '24px' : '8px',
+                    width: idx === currentSlide ? '28px' : '8px',
                     height: '8px',
                     borderRadius: '4px',
-                    backgroundColor: idx === currentSlide ? '#2563eb' : 'rgba(255, 255, 255, 0.5)',
+                    backgroundColor: idx === currentSlide ? '#2563eb' : 'rgba(255, 255, 255, 0.45)',
                     border: 'none',
                     cursor: 'pointer',
-                    transition: 'all 0.3s'
+                    transition: 'all 0.3s ease'
                   }}
                 />
               ))}
             </div>
           </div>
 
-          {/* Overlapping Elevated Content Sheet (Scrolls Over Faded Hero Background) */}
+          {/* Elevated Content Sheet Overlapping Hero */}
           <div style={{
             position: 'relative',
             zIndex: 10,
-            marginTop: '-100px',
-            borderTopLeftRadius: '24px',
-            borderTopRightRadius: '24px',
+            marginTop: '-110px',
+            borderTopLeftRadius: '28px',
+            borderTopRightRadius: '28px',
             marginLeft: 'calc(-50vw + 50%)',
             marginRight: 'calc(-50vw + 50%)',
-            padding: '20px',
+            padding: '28px 24px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '36px',
+            gap: '40px',
             backgroundColor: 'var(--bg, #ffffff)',
-            //background: 'linear-gradient(to bottom, transparent 0%, var(--bg) 10%)'
+            boxShadow: '0 -10px 40px rgba(0,0,0,0.1)'
           }}>
-            {/* SECTION 1: TODAY'S PICKS */}
-            {latestListings.length > 0 && (
-              <section className="marketplace-feed">
-                <div className="marketplace-feed-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+
+            {/* ========================================================================= */}
+            {/* 1. DISCOVER OFFICIAL MERCHANT STORES SHOWCASE                             */}
+            {/* ========================================================================= */}
+            <section style={{ maxWidth: '1280px', width: '100%', margin: '0 auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '18px', flexWrap: 'wrap', gap: '10px' }}>
+                <div>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(37,99,235,0.08)', color: '#2563eb', padding: '4px 10px', borderRadius: '14px', fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+                    <span className="material-icons" style={{ fontSize: '15px' }}>storefront</span>
+                    <span>Merchant Ecosystem</span>
+                  </div>
+                  <h2 style={{ fontSize: '1.6rem', fontWeight: 900, margin: 0, color: 'var(--text)' }}>
+                    Discover Official Merchant Stores
+                  </h2>
+                  <p style={{ margin: '4px 0 0', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                    Explore verified branded storefronts powered by modern customizable templates.
+                  </p>
+                </div>
+                <Link
+                  to="/stores"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    color: '#2563eb',
+                    fontWeight: 700,
+                    fontSize: '0.88rem',
+                    textDecoration: 'none',
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    background: 'rgba(37,99,235,0.06)'
+                  }}
+                >
+                  <span>View All Stores Directory</span>
+                  <span className="material-icons" style={{ fontSize: '18px' }}>arrow_forward</span>
+                </Link>
+              </div>
+
+              {registeredStores.length > 0 ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '16px' }}>
+                  {registeredStores.slice(0, 4).map((shop) => {
+                    const storeProductsCount = filteredListings.filter(l => l.user_id === shop.userId).length
+                    return (
+                      <div
+                        key={shop.userId}
+                        onClick={() => navigate(`/store/${shop.userId}`)}
+                        style={{
+                          borderRadius: '16px',
+                          border: '1px solid var(--border)',
+                          background: 'var(--panel)',
+                          overflow: 'hidden',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+                          transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-4px)'
+                          e.currentTarget.style.boxShadow = '0 10px 24px rgba(0,0,0,0.12)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)'
+                          e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.06)'
+                        }}
+                      >
+                        {/* Cover Image */}
+                        <div style={{
+                          height: '90px',
+                          position: 'relative',
+                          backgroundColor: '#1e293b',
+                          backgroundImage: shop.cover ? `url(${shop.cover})` : 'linear-gradient(135deg, #1e3a8a, #2563eb)',
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center'
+                        }}>
+                          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.5))' }} />
+                          <span style={{
+                            position: 'absolute',
+                            top: '8px',
+                            right: '8px',
+                            background: 'rgba(0,0,0,0.65)',
+                            color: '#ffffff',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            padding: '3px 8px',
+                            borderRadius: '12px',
+                            backdropFilter: 'blur(6px)'
+                          }}>
+                            {shop.category || 'Retail Store'}
+                          </span>
+                        </div>
+
+                        {/* Store Body */}
+                        <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '-30px', position: 'relative', zIndex: 2 }}>
+                            {shop.logo ? (
+                              <img
+                                src={shop.logo}
+                                alt={shop.shopName}
+                                style={{ width: '52px', height: '52px', borderRadius: '12px', objectFit: 'cover', border: '3px solid var(--panel)', boxShadow: '0 2px 8px rgba(0,0,0,0.2)', backgroundColor: '#fff' }}
+                              />
+                            ) : (
+                              <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 900, fontSize: '1.2rem', border: '3px solid var(--panel)', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
+                                {shop.shopName.slice(0, 1).toUpperCase()}
+                              </div>
+                            )}
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <strong style={{ fontSize: '1.02rem', fontWeight: 800, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {shop.shopName}
+                                </strong>
+                                <span className="material-icons" style={{ fontSize: '16px', color: '#2563eb' }} title="Verified Store">verified</span>
+                              </div>
+                              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                                {storeProductsCount} catalog listing{storeProductsCount !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          </div>
+
+                          {shop.description && (
+                            <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                              {shop.description}
+                            </p>
+                          )}
+
+                          <div style={{ marginTop: 'auto', paddingTop: '8px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                              Template: {(shop as any).theme?.preset === 'xtra' ? 'Xtra' : 'Hyper'}
+                            </span>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#2563eb', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                              Visit Store <span className="material-icons" style={{ fontSize: '14px' }}>arrow_forward</span>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div style={{ padding: '24px', borderRadius: '16px', border: '1px solid var(--border)', background: 'var(--panel)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
                   <div>
-                    <h2 style={{ fontSize: '1.4rem', margin: 0 }}>Latest Picks</h2>
-                    <p style={{ margin: '4px 0 0', fontSize: '0.86rem', color: 'var(--text-secondary)' }}>
-                      Lusaka, Zambia • {distanceFilter === 100 ? 'Any distance' : `Within ${distanceFilter} km`} • Latest
+                    <h3 style={{ margin: '0 0 4px', fontSize: '1.1rem', fontWeight: 800 }}>Be the First Store on MarketSpace</h3>
+                    <p style={{ margin: 0, fontSize: '0.86rem', color: 'var(--text-secondary)' }}>
+                      Launch your branded online storefront with our curated Hyper and Xtra templates.
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    className="ghost-btn"
-                    onClick={() => toggleCategory('All')}
-                    style={{ fontSize: '0.88rem', fontWeight: 600 }}
-                  >
-                    See all
-                  </button>
+                  <Link to="/onboarding" className="primary-btn" style={{ textDecoration: 'none', padding: '10px 20px', borderRadius: '20px' }}>
+                    Open Your Store
+                  </Link>
                 </div>
-                {loading ? (
-                  <p>Loading latest listings...</p>
-                ) : (
-                  <div className="horizontal-scroll-feed-container">
-                    <div className="horizontal-scroll-rail">
-                      {latestListings.slice(0, 10).map((listing) => (
-                        <ListingCard
-                          key={listing.id}
-                          listing={listing}
-                          saved={savedIds.includes(String(listing.id))}
-                          onOpen={openListing}
-                          onToggleSave={toggleSave}
-                        />
-                      ))}
+              )}
+            </section>
+
+            {/* ========================================================================= */}
+            {/* 2. CATEGORY DISCOVERY HUB                                                 */}
+            {/* ========================================================================= */}
+            <section style={{ maxWidth: '1280px', width: '100%', margin: '0 auto' }}>
+              <div style={{ marginBottom: '16px' }}>
+                <h2 style={{ fontSize: '1.4rem', fontWeight: 900, margin: 0, color: 'var(--text)' }}>
+                  Explore by Category
+                </h2>
+                <p style={{ margin: '4px 0 0', fontSize: '0.86rem', color: 'var(--text-secondary)' }}>
+                  Browse goods from merchant catalogs and local peer-to-peer sellers.
+                </p>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
+                {categoryHighlights.map((cat) => {
+                  const isSelected = activeCategories.includes(cat.name)
+                  const count = filteredListings.filter(l => l.category === cat.name).length
+                  return (
+                    <div
+                      key={cat.name}
+                      onClick={() => toggleCategory(cat.name)}
+                      style={{
+                        position: 'relative',
+                        borderRadius: '14px',
+                        overflow: 'hidden',
+                        height: '120px',
+                        cursor: 'pointer',
+                        border: isSelected ? '2px solid #2563eb' : '1px solid var(--border)',
+                        boxShadow: isSelected ? '0 0 0 2px rgba(37,99,235,0.2)' : 'none',
+                        transition: 'transform 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)' }}
+                    >
+                      <div
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          backgroundImage: `url(${cat.img})`,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                          filter: 'brightness(0.65)'
+                        }}
+                      />
+                      <div style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background: 'linear-gradient(to top, rgba(15,23,42,0.85) 0%, rgba(15,23,42,0.2) 100%)',
+                        padding: '12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'flex-end',
+                        color: '#ffffff'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                          <span className="material-icons" style={{ fontSize: '18px', color: '#60a5fa' }}>{cat.icon}</span>
+                          <strong style={{ fontSize: '0.94rem', fontWeight: 800 }}>{cat.name}</strong>
+                        </div>
+                        <span style={{ fontSize: '0.74rem', color: '#cbd5e1' }}>
+                          {count} listing{count !== 1 ? 's' : ''}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </section>
-            )}
+                  )
+                })}
+              </div>
+            </section>
 
-            {/* SECTION 2: TRENDING & POPULAR */}
-            {trendingListings.length > 0 && (
-              <section className="marketplace-feed">
-                <div className="marketplace-feed-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <div>
-                    <h2 style={{ fontSize: '1.4rem', margin: 0 }}>Trending & Popular</h2>
-                    <p style={{ margin: '4px 0 0', fontSize: '0.86rem', color: 'var(--text-secondary)' }}>Most viewed & featured listings in your region</p>
-                  </div>
+            {/* ========================================================================= */}
+            {/* 3. MARKETPLACE FEED WITH MODE SWITCHER (ALL / STORES / STANDALONE SELLERS)*/}
+            {/* ========================================================================= */}
+            <section style={{ maxWidth: '1280px', width: '100%', margin: '0 auto' }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '12px',
+                marginBottom: '18px',
+                paddingBottom: '14px',
+                borderBottom: '1px solid var(--border)'
+              }}>
+                <div>
+                  <h2 style={{ fontSize: '1.45rem', fontWeight: 900, margin: 0, color: 'var(--text)' }}>
+                    Browse Marketplace
+                  </h2>
+                  <p style={{ margin: '4px 0 0', fontSize: '0.86rem', color: 'var(--text-secondary)' }}>
+                    Lusaka, Zambia • {distanceFilter === 100 ? 'Any distance' : `Within ${distanceFilter} km`} • Showing {displayListings.length} items
+                  </p>
+                </div>
+
+                {/* Platform Identity Mode Filter Switcher */}
+                <div style={{
+                  display: 'flex',
+                  gap: '4px',
+                  background: 'var(--panel)',
+                  padding: '4px',
+                  borderRadius: '24px',
+                  border: '1px solid var(--border)'
+                }}>
                   <button
                     type="button"
-                    className="ghost-btn"
-                    onClick={() => toggleCategory('All')}
-                    style={{ fontSize: '0.88rem', fontWeight: 600 }}
+                    onClick={() => setStoreVsSellerFilter('all')}
+                    style={{
+                      padding: '7px 16px',
+                      borderRadius: '20px',
+                      border: 'none',
+                      fontSize: '0.84rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: storeVsSellerFilter === 'all' ? '#2563eb' : 'transparent',
+                      color: storeVsSellerFilter === 'all' ? '#ffffff' : 'var(--text-secondary)',
+                      transition: 'all 0.15s ease'
+                    }}
                   >
-                    See all
+                    <span className="material-icons" style={{ fontSize: '15px' }}>grid_view</span>
+                    <span>All Items ({filteredListings.length})</span>
                   </button>
-                </div>
-                <div className="horizontal-scroll-feed-container">
-                  <div className="horizontal-scroll-rail">
-                    {trendingListings.map((listing) => (
-                      <ListingCard
-                        key={listing.id}
-                        listing={listing}
-                        saved={savedIds.includes(String(listing.id))}
-                        onOpen={openListing}
-                        onToggleSave={toggleSave}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </section>
-            )}
 
-            {/* SECTION 3: ELECTRONICS & TECH */}
-            {electronicsListings.length > 0 && (
-              <section className="marketplace-feed">
-                <div className="marketplace-feed-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <div>
-                    <h2 style={{ fontSize: '1.4rem', margin: 0 }}>Electronics & Tech</h2>
-                    <p style={{ margin: '4px 0 0', fontSize: '0.86rem', color: 'var(--text-secondary)' }}>Computers, mobile phones, audio gear & accessories</p>
-                  </div>
                   <button
                     type="button"
-                    className="ghost-btn"
-                    onClick={() => toggleCategory('Electronics')}
-                    style={{ fontSize: '0.88rem', fontWeight: 600 }}
+                    onClick={() => setStoreVsSellerFilter('stores')}
+                    style={{
+                      padding: '7px 16px',
+                      borderRadius: '20px',
+                      border: 'none',
+                      fontSize: '0.84rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: storeVsSellerFilter === 'stores' ? '#2563eb' : 'transparent',
+                      color: storeVsSellerFilter === 'stores' ? '#ffffff' : 'var(--text-secondary)',
+                      transition: 'all 0.15s ease'
+                    }}
+                    title="Show listings from registered merchant stores only"
                   >
-                    See all Electronics
+                    <span className="material-icons" style={{ fontSize: '15px' }}>storefront</span>
+                    <span>Official Stores ({storeListingsTotal})</span>
                   </button>
-                </div>
-                <div className="horizontal-scroll-feed-container">
-                  <div className="horizontal-scroll-rail">
-                    {electronicsListings.map((listing) => (
-                      <ListingCard
-                        key={listing.id}
-                        listing={listing}
-                        saved={savedIds.includes(String(listing.id))}
-                        onOpen={openListing}
-                        onToggleSave={toggleSave}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </section>
-            )}
 
-            {/* SECTION 4: FASHION & APPAREL */}
-            {fashionListings.length > 0 && (
-              <section className="marketplace-feed">
-                <div className="marketplace-feed-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <div>
-                    <h2 style={{ fontSize: '1.4rem', margin: 0 }}>Fashion & Apparel</h2>
-                    <p style={{ margin: '4px 0 0', fontSize: '0.86rem', color: 'var(--text-secondary)' }}>Clothing, sneakers, watches & boutique collections</p>
-                  </div>
                   <button
                     type="button"
-                    className="ghost-btn"
-                    onClick={() => toggleCategory('Fashion')}
-                    style={{ fontSize: '0.88rem', fontWeight: 600 }}
+                    onClick={() => setStoreVsSellerFilter('sellers')}
+                    style={{
+                      padding: '7px 16px',
+                      borderRadius: '20px',
+                      border: 'none',
+                      fontSize: '0.84rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: storeVsSellerFilter === 'sellers' ? '#2563eb' : 'transparent',
+                      color: storeVsSellerFilter === 'sellers' ? '#ffffff' : 'var(--text-secondary)',
+                      transition: 'all 0.15s ease'
+                    }}
+                    title="Show listings from independent community sellers"
                   >
-                    See all Fashion
+                    <span className="material-icons" style={{ fontSize: '15px' }}>person</span>
+                    <span>Community Sellers ({sellerListingsTotal})</span>
                   </button>
                 </div>
-                <div className="horizontal-scroll-feed-container">
-                  <div className="horizontal-scroll-rail">
-                    {fashionListings.map((listing) => (
-                      <ListingCard
-                        key={listing.id}
-                        listing={listing}
-                        saved={savedIds.includes(String(listing.id))}
-                        onOpen={openListing}
-                        onToggleSave={toggleSave}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </section>
-            )}
+              </div>
 
-            {/* SECTION 5: VEHICLES & MOTORS */}
-            {vehiclesListings.length > 0 && (
-              <section className="marketplace-feed">
-                <div className="marketplace-feed-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              {/* Feed Grid or Non-Empty Inspiring State */}
+              {loading ? (
+                <div style={{ padding: '60px 20px', textAlign: 'center' }}>
+                  <div className="skeleton-line" style={{ width: '200px', height: '20px', margin: '0 auto 12px' }} />
+                  <p style={{ color: 'var(--text-secondary)' }}>Loading marketplace inventory...</p>
+                </div>
+              ) : displayListings.length === 0 ? (
+                /* INSPIRING NON-EMPTY FALLBACK STATE (NEVER AWKWARD BLANK GAP) */
+                <div style={{
+                  padding: '48px 24px',
+                  borderRadius: '20px',
+                  background: 'var(--panel)',
+                  border: '1px solid var(--border)',
+                  textAlign: 'center',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '16px'
+                }}>
+                  <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(37,99,235,0.1)', color: '#2563eb', display: 'grid', placeItems: 'center' }}>
+                    <span className="material-icons" style={{ fontSize: '32px' }}>
+                      {storeVsSellerFilter === 'stores' ? 'storefront' : storeVsSellerFilter === 'sellers' ? 'person_search' : 'inventory_2'}
+                    </span>
+                  </div>
                   <div>
-                    <h2 style={{ fontSize: '1.4rem', margin: 0 }}>Vehicles & Motors</h2>
-                    <p style={{ margin: '4px 0 0', fontSize: '0.86rem', color: 'var(--text-secondary)' }}>Cars, motorbikes, trucks, and genuine spare parts</p>
+                    <h3 style={{ margin: '0 0 6px 0', fontSize: '1.25rem', fontWeight: 800 }}>
+                      {storeVsSellerFilter === 'stores'
+                        ? 'No official store products in this category yet'
+                        : storeVsSellerFilter === 'sellers'
+                          ? 'No community seller items in this view'
+                          : 'No matching listings found'}
+                    </h3>
+                    <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-secondary)', maxWidth: '440px' }}>
+                      Try selecting "All Items", clearing your active filters, or exploring our registered merchant storefronts.
+                    </p>
                   </div>
-                  <button
-                    type="button"
-                    className="ghost-btn"
-                    onClick={() => toggleCategory('Vehicles')}
-                    style={{ fontSize: '0.88rem', fontWeight: 600 }}
-                  >
-                    See all Vehicles
-                  </button>
-                </div>
-                <div className="horizontal-scroll-feed-container">
-                  <div className="horizontal-scroll-rail">
-                    {vehiclesListings.map((listing) => (
-                      <ListingCard
-                        key={listing.id}
-                        listing={listing}
-                        saved={savedIds.includes(String(listing.id))}
-                        onOpen={openListing}
-                        onToggleSave={toggleSave}
-                      />
-                    ))}
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={clearAllFilters}
+                      className="primary-btn"
+                      style={{ padding: '10px 20px', borderRadius: '20px' }}
+                    >
+                      Clear All Filters
+                    </button>
+                    <Link
+                      to="/stores"
+                      className="outline-btn"
+                      style={{ textDecoration: 'none', padding: '10px 20px', borderRadius: '20px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <span className="material-icons" style={{ fontSize: '16px' }}>storefront</span>
+                      Browse Store Directory
+                    </Link>
                   </div>
                 </div>
-              </section>
-            )}
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '16px' }}>
+                  {displayListings.map((listing) => (
+                    <ListingCard
+                      key={listing.id}
+                      listing={listing}
+                      saved={savedIds.includes(String(listing.id))}
+                      onOpen={openListing}
+                      onToggleSave={toggleSave}
+                      allBusinesses={allBusinesses}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* ========================================================================= */}
+            {/* 4. SELL ON MARKETSPACE SPOTLIGHT (FOR STORES & COMMUNITY SELLERS)         */}
+            {/* ========================================================================= */}
+            <section style={{
+              maxWidth: '1280px',
+              width: '100%',
+              margin: '10px auto 0',
+              borderRadius: '24px',
+              background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #1d4ed8 100%)',
+              padding: '36px 32px',
+              color: '#ffffff',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '24px',
+              boxShadow: '0 12px 32px rgba(15,23,42,0.3)'
+            }}>
+              <div style={{ maxWidth: '640px' }}>
+                <span style={{ display: 'inline-block', padding: '4px 12px', background: 'rgba(255,255,255,0.15)', borderRadius: '16px', fontSize: '0.78rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '10px' }}>
+                  Platform Spotlight
+                </span>
+                <h3 style={{ margin: '0 0 10px', fontSize: 'clamp(1.4rem, 2.5vw, 2rem)', fontWeight: 900, lineHeight: 1.2 }}>
+                  Start Selling on MarketSpace Today
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.92rem', color: '#cbd5e1', lineHeight: 1.5 }}>
+                  Whether you are an established business looking to launch a branded online store with customizable Hyper or Xtra templates, or a standalone seller with pre-owned items, MarketSpace connects you directly to buyers.
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <Link
+                  to="/onboarding"
+                  style={{
+                    background: '#ffffff',
+                    color: '#0f172a',
+                    fontWeight: 800,
+                    fontSize: '0.9rem',
+                    padding: '12px 22px',
+                    borderRadius: '24px',
+                    textDecoration: 'none',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                  }}
+                >
+                  <span className="material-icons" style={{ fontSize: '18px' }}>storefront</span>
+                  <span>Launch an Online Store</span>
+                </Link>
+
+                <Link
+                  to="/profile/create"
+                  style={{
+                    background: 'rgba(255,255,255,0.12)',
+                    color: '#ffffff',
+                    fontWeight: 700,
+                    fontSize: '0.9rem',
+                    padding: '12px 20px',
+                    borderRadius: '24px',
+                    textDecoration: 'none',
+                    border: '1px solid rgba(255,255,255,0.25)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    backdropFilter: 'blur(8px)'
+                  }}
+                >
+                  <span className="material-icons" style={{ fontSize: '18px' }}>add_circle</span>
+                  <span>List a Standalone Product</span>
+                </Link>
+              </div>
+            </section>
+
           </div>
         </div>
       )}
@@ -945,7 +1178,6 @@ export function HomePage({
       {isMobileFilterOpen && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.75)', zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'flex-end', boxSizing: 'border-box' }}>
           <div style={{ width: '100%', maxWidth: '440px', background: '#181818', borderTopLeftRadius: '20px', borderTopRightRadius: '20px', border: '1px solid #333', padding: '16px 16px 24px 16px', color: '#fff', maxHeight: '88vh', overflowY: 'auto', boxSizing: 'border-box', margin: '0 auto' }}>
-            {/* Drag handle indicator */}
             <div style={{ width: '36px', height: '4px', background: '#444', borderRadius: '2px', margin: '0 auto 12px auto' }} />
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #333', paddingBottom: '10px' }}>
@@ -956,6 +1188,34 @@ export function HomePage({
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', boxSizing: 'border-box' }}>
+              {/* Marketplace Mode */}
+              <div style={{ boxSizing: 'border-box' }}>
+                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 700, marginBottom: '6px' }}>Seller Type</label>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setStoreVsSellerFilter('all')}
+                    style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', fontSize: '0.8rem', fontWeight: 700, background: storeVsSellerFilter === 'all' ? '#2563eb' : '#252525', color: '#fff', cursor: 'pointer' }}
+                  >
+                    All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStoreVsSellerFilter('stores')}
+                    style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', fontSize: '0.8rem', fontWeight: 700, background: storeVsSellerFilter === 'stores' ? '#2563eb' : '#252525', color: '#fff', cursor: 'pointer' }}
+                  >
+                    Stores
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStoreVsSellerFilter('sellers')}
+                    style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', fontSize: '0.8rem', fontWeight: 700, background: storeVsSellerFilter === 'sellers' ? '#2563eb' : '#252525', color: '#fff', cursor: 'pointer' }}
+                  >
+                    Sellers
+                  </button>
+                </div>
+              </div>
+
               {/* Sort Option */}
               <div style={{ boxSizing: 'border-box' }}>
                 <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 700, marginBottom: '6px' }}>Sort Results By</label>

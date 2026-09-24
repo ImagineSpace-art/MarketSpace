@@ -1,6 +1,5 @@
 import type { Profile, Listing, BusinessProfile } from '../types'
 import { ListingCard } from '../components/ListingCard'
-import { useNavigate } from 'react-router-dom'
 
 type SellerProfilePageProps = {
     seller: Profile
@@ -21,7 +20,6 @@ export function SellerProfilePage({
     onToggleSave,
     savedIds,
 }: SellerProfilePageProps) {
-    const navigate = useNavigate()
     const sellerListings = listings.filter((l) => l.user_id === seller.user_id)
 
     return (
@@ -58,7 +56,7 @@ export function SellerProfilePage({
                 {businessProfile && (
                     <button 
                         className="primary-btn" 
-                        onClick={() => navigate(`/store/${businessProfile.userId}`)}
+                        onClick={() => window.open(`/store/${businessProfile.userId}`, '_blank')}
                         style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '12px 20px' }}
                     >
                         <span className="material-icons">storefront</span>

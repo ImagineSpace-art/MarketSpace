@@ -44,7 +44,8 @@ ALTER TABLE public.stores
   ADD COLUMN IF NOT EXISTS accent_color TEXT DEFAULT '#2563eb',
   ADD COLUMN IF NOT EXISTS announcement_bar TEXT,
   ADD COLUMN IF NOT EXISTS collections JSONB DEFAULT '[]'::jsonb,
-  ADD COLUMN IF NOT EXISTS customer_care JSONB DEFAULT '{}'::jsonb;
+  ADD COLUMN IF NOT EXISTS customer_care JSONB DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS theme_config JSONB DEFAULT '{}'::jsonb;
 
 -- Migration for profiles table:
 ALTER TABLE public.profiles
@@ -189,8 +190,23 @@ BEGIN
 END;
 $$;
 
--- Migration: Add renewal_frequency column to listings table
+-- Migration: Add listings columns
 ALTER TABLE public.listings ADD COLUMN IF NOT EXISTS renewal_frequency VARCHAR(20) DEFAULT 'weekly';
+ALTER TABLE public.listings ADD COLUMN IF NOT EXISTS use_global_renewal BOOLEAN DEFAULT false;
+ALTER TABLE public.listings ADD COLUMN IF NOT EXISTS collection_id TEXT;
+ALTER TABLE public.listings ADD COLUMN IF NOT EXISTS publish_as TEXT DEFAULT 'store';
+ALTER TABLE public.listings ADD COLUMN IF NOT EXISTS how_it_works TEXT;
+
+-- Migration: Add stores theme customization columns
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS theme_config JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS collections JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS customer_care JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS accent_color TEXT DEFAULT '#2563eb';
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS announcement_bar TEXT;
+
+-- Migration: Add global renewal preferences to profiles
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS global_renewal_frequency TEXT DEFAULT 'weekly';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS global_renewal_day TEXT DEFAULT 'Monday';
 
 -- 9. ANALYTICS_EVENTS TABLE (Real User Actions & Metrics)
 CREATE TABLE IF NOT EXISTS public.analytics_events (
@@ -210,7 +226,9 @@ CREATE INDEX IF NOT EXISTS idx_analytics_listing_id ON public.analytics_events(l
 CREATE INDEX IF NOT EXISTS idx_analytics_event_type ON public.analytics_events(event_type);
 
 ALTER TABLE public.analytics_events ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public insert analytics" ON public.analytics_events;
 CREATE POLICY "Public insert analytics" ON public.analytics_events FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Sellers read own analytics" ON public.analytics_events;
 CREATE POLICY "Sellers read own analytics" ON public.analytics_events FOR SELECT USING (seller_id = auth.uid() OR auth.uid() IS NULL);
 
 -- 10. STORE_FOLLOWERS TABLE (Real Database Follow Tracking)
@@ -226,8 +244,12 @@ CREATE INDEX IF NOT EXISTS idx_store_followers_store ON public.store_followers(s
 CREATE INDEX IF NOT EXISTS idx_store_followers_user ON public.store_followers(user_id);
 
 ALTER TABLE public.store_followers ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public read store followers" ON public.store_followers;
 CREATE POLICY "Public read store followers" ON public.store_followers FOR SELECT USING (true);
+DROP POLICY IF EXISTS "User follow store" ON public.store_followers;
 CREATE POLICY "User follow store" ON public.store_followers FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "User unfollow store" ON public.store_followers;
 CREATE POLICY "User unfollow store" ON public.store_followers FOR DELETE USING (auth.uid() = user_id);
+
 
 
