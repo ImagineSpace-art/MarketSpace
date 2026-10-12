@@ -16,10 +16,8 @@ type StoresPageProps = {
 }
 
 export function StoresPage({
-  stores: _stores,
   allBusinesses,
   onVisitShop,
-  onOpenProfile: _onOpenProfile,
   listingKindFilter,
   listings,
   openListing = () => {},
@@ -94,90 +92,144 @@ export function StoresPage({
 
   const categories = ['All', 'Electronics', 'Fashion', 'Home & Garden', 'Vehicles', 'Sports', 'Services']
 
+  const storeCategories = [
+    { name: 'Electronics', image: slides[2], description: 'Tech and accessories' },
+    { name: 'Home & Garden', image: '/illustrations/cat_homedecor.jpg', description: 'Make yourself at home' },
+    { name: 'Fashion', image: slides[1], description: 'Style from local boutiques' },
+    { name: 'Sports', image: '/illustrations/banner_summer_collection.jpg', description: 'Gear for active days' },
+  ]
+
+  const scrollToCatalog = () => {
+    document.getElementById('stores-catalog')?.scrollIntoView({ behavior: 'smooth' })
+  }
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%', boxSizing: 'border-box' }}>
-      {/* Sliding Store Hero Banner */}
-      <div style={{
-        position: 'sticky',
-        top: '70px',
-        marginLeft: 'calc(-50vw + 50%)',
-        marginRight: 'calc(-50vw + 50%)',
-        overflow: 'hidden',
-        height: '380px',
-        marginTop: '-24px',
+    <div
+      style={{
+        width: '100%',
         boxSizing: 'border-box',
-        zIndex: 1
-      }}>
-        <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '180px', background: 'linear-gradient(to bottom, transparent 0%, rgba(11, 15, 23, 0.6) 40%, var(--bg) 100%)', pointerEvents: 'none', zIndex: 4 }} />
-        <div
-          style={{
-            display: 'flex',
-            width: `${slides.length * 100}%`,
-            transform: `translateX(-${(currentSlide * 100) / slides.length}%)`,
-            transition: 'transform 0.6s cubic-bezier(0.25, 1, 0.5, 1)',
-            height: '100%'
-          }}
-        >
-          {slides.map((slide, idx) => (
-            <div
-              key={idx}
-              style={{
-                width: `${100 / slides.length}%`,
-                position: 'relative',
-                height: '100%',
-                backgroundImage: `url(${slide})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                display: 'flex',
-                alignItems: 'center',
-                padding: '0 max(28px, calc((100vw - 1280px) / 2))',
-                boxSizing: 'border-box'
-              }}
+        backgroundColor: '#ffffff',
+        color: '#0f172a',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+      }}
+    >
+      <section
+        style={{
+          maxWidth: '1280px',
+          margin: '24px auto 48px',
+          padding: '0 24px',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+          gap: '40px',
+          alignItems: 'center',
+        }}
+      >
+        <div>
+          <span style={{ display: 'inline-block', color: '#ea580c', fontWeight: 800, fontSize: '0.78rem', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '12px' }}>
+            Shop Local, Shop Verified
+          </span>
+          <h1 style={{ fontSize: 'clamp(2.4rem, 4.8vw, 3.8rem)', fontWeight: 900, lineHeight: 1.12, letterSpacing: '-0.03em', margin: '0 0 16px', color: '#0f172a' }}>
+            Discover Stores You’ll Love
+          </h1>
+          <p style={{ fontSize: '1rem', lineHeight: 1.6, color: '#64748b', margin: '0 0 28px', maxWidth: '480px' }}>
+            Explore Zambia’s independent businesses, browse their latest products, and shop directly from verified local merchants.
+          </p>
+          <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginBottom: '32px' }}>
+            <button
+              type="button"
+              onClick={() => { setViewMode('shops'); scrollToCatalog() }}
+              style={{ backgroundColor: '#0f172a', color: '#ffffff', border: 'none', borderRadius: '999px', padding: '13px 26px', fontSize: '0.94rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
             >
-              <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'linear-gradient(90deg, rgba(15, 23, 42, 0.88) 0%, rgba(15, 23, 42, 0.5) 60%, rgba(15, 23, 42, 0.15) 100%)' }} />
-              <div style={{ position: 'relative', zIndex: 5, color: '#ffffff', maxWidth: '640px' }}>
-                <span style={{ display: 'inline-block', padding: '6px 14px', backgroundColor: '#2563eb', color: '#ffffff', borderRadius: '16px', fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>
-                  Official Stores & Catalog
-                </span>
-                <h1 style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)', fontWeight: 900, margin: '0 0 10px 0', lineHeight: 1.2, textShadow: '0 2px 6px rgba(0,0,0,0.5)' }}>
-                  Verified Merchant Stores & Catalogs
-                </h1>
-                <p style={{ margin: 0, fontSize: '0.95rem', color: '#cbd5e1', lineHeight: 1.4 }}>
-                  Browse goods offered exclusively by registered businesses and explore their custom storefronts.
-                </p>
+              Explore Stores
+              <span className="material-icons" style={{ fontSize: '18px' }}>arrow_forward</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setViewMode('listings'); scrollToCatalog() }}
+              style={{ backgroundColor: '#ffffff', color: '#0f172a', border: '1px solid #e2e8f0', borderRadius: '999px', padding: '12px 24px', fontSize: '0.94rem', fontWeight: 700, cursor: 'pointer' }}
+            >
+              Shop Store Products
+            </button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#64748b', fontSize: '0.84rem', fontWeight: 600 }}>
+            <span className="material-icons" style={{ color: '#2563eb', fontSize: '20px' }}>verified</span>
+            Trusted local businesses, all in one place
+          </div>
+        </div>
+
+        <div style={{ position: 'relative', minHeight: '360px', display: 'flex', justifyContent: 'center' }}>
+          <div style={{ width: '100%', maxWidth: '560px', height: '380px', borderRadius: '32px', overflow: 'hidden', backgroundColor: '#f8fafc', boxShadow: '0 20px 50px rgba(15, 23, 42, 0.08)' }}>
+            <img src={slides[currentSlide]} alt="Local stores and their products" style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'opacity 0.4s ease' }} />
+          </div>
+          <div style={{ position: 'absolute', left: '8px', bottom: '28px', backgroundColor: '#ffffff', borderRadius: '16px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}>
+            <span className="material-icons" style={{ color: '#2563eb', fontSize: '24px' }}>storefront</span>
+            <div>
+              <strong style={{ display: 'block', fontSize: '0.84rem', color: '#0f172a' }}>Made for local shopping</strong>
+              <span style={{ fontSize: '0.76rem', color: '#64748b' }}>Discover independent merchants</span>
+            </div>
+          </div>
+          <div style={{ position: 'absolute', right: '8px', top: '24px', backgroundColor: '#ffffff', borderRadius: '16px', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}>
+            <span className="material-icons" style={{ color: '#16a34a', fontSize: '20px' }}>verified</span>
+            <strong style={{ fontSize: '0.8rem', color: '#0f172a' }}>Verified stores</strong>
+          </div>
+        </div>
+      </section>
+
+      <section style={{ borderTop: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', backgroundColor: '#fcfcfd', padding: '22px 24px' }}>
+        <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '24px' }}>
+          {[
+            { icon: 'verified_user', title: 'Verified merchants', detail: 'Shop with local businesses' },
+            { icon: 'storefront', title: 'Unique storefronts', detail: 'Discover independent brands' },
+            { icon: 'local_shipping', title: 'Local convenience', detail: 'Find shops across Zambia' },
+            { icon: 'support_agent', title: 'Direct merchant chat', detail: 'Connect with sellers' },
+          ].map((benefit) => (
+            <div key={benefit.title} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span className="material-icons" style={{ fontSize: '28px', color: '#0f172a' }}>{benefit.icon}</span>
+              <div>
+                <strong style={{ display: 'block', fontSize: '0.88rem', color: '#0f172a' }}>{benefit.title}</strong>
+                <span style={{ fontSize: '0.78rem', color: '#64748b' }}>{benefit.detail}</span>
               </div>
             </div>
           ))}
         </div>
-      </div>
+      </section>
 
-      {/* Main Content Area */}
-      <div
-        className="section-card"
-        style={{
-          position: 'relative',
-          zIndex: 10,
-          borderTopLeftRadius: '28px',
-          borderTopRightRadius: '28px',
-          marginTop: '-100px',
-          marginLeft: 'calc(-50vw + 50%)',
-          marginRight: 'calc(-50vw + 50%)',
-          padding: '28px 24px',
-          display: 'flex',
-          overflow: 'hidden',
-          flexDirection: 'column',
-          gap: '32px',
-          backgroundColor: 'var(--bg, #ffffff)',
-          boxShadow: '0 -10px 40px rgba(0,0,0,0.1)'
-        }}
-      >
-        <div style={{ maxWidth: '1280px', width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '28px' }}>
+      <section style={{ maxWidth: '1280px', margin: '48px auto 40px', padding: '0 24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '22px', gap: '12px', flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 900, margin: 0, color: '#0f172a', letterSpacing: '-0.02em' }}>Shop by Category</h2>
+            <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: '0.88rem' }}>Find a local store for whatever you need.</p>
+          </div>
+          <button type="button" onClick={() => { setSelectedCategory('All'); setViewMode('listings'); scrollToCatalog() }} style={{ background: 'none', border: 'none', color: '#0f172a', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            View all stores <span className="material-icons" style={{ fontSize: '16px' }}>arrow_forward</span>
+          </button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '18px' }}>
+          {storeCategories.map((category) => (
+            <button
+              key={category.name}
+              type="button"
+              onClick={() => { setSelectedCategory(category.name); setViewMode('listings'); scrollToCatalog() }}
+              style={{ padding: 0, borderRadius: '20px', overflow: 'hidden', border: '1px solid #e2e8f0', backgroundColor: '#ffffff', boxShadow: '0 4px 14px rgba(0,0,0,0.03)', cursor: 'pointer', textAlign: 'center' }}
+            >
+              <div style={{ height: '150px', overflow: 'hidden', backgroundColor: '#f1f5f9' }}>
+                <img src={category.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              </div>
+              <span style={{ display: 'block', padding: '12px 10px 2px', fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>{category.name}</span>
+              <span style={{ display: 'block', padding: '0 10px 14px', fontSize: '0.76rem', color: '#ea580c', fontWeight: 700 }}>{category.description}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section id="stores-catalog" style={{ maxWidth: '1280px', margin: '48px auto 64px', padding: '0 24px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
           
           {/* Header Controls: Switcher + Search */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', paddingBottom: '18px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', paddingBottom: '18px', borderBottom: '1px solid #f1f5f9' }}>
             
             {/* View Switcher: Store Listings vs Storefronts Directory */}
-            <div style={{ display: 'flex', gap: '4px', background: 'var(--panel)', padding: '4px', borderRadius: '24px', border: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', gap: '4px', background: '#f8fafc', padding: '4px', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
               <button
                 type="button"
                 onClick={() => setViewMode('listings')}
@@ -191,8 +243,8 @@ export function StoresPage({
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
-                  background: viewMode === 'listings' ? '#2563eb' : 'transparent',
-                  color: viewMode === 'listings' ? '#ffffff' : 'var(--text-secondary)',
+                  background: viewMode === 'listings' ? '#0f172a' : 'transparent',
+                  color: viewMode === 'listings' ? '#ffffff' : '#64748b',
                   transition: 'all 0.15s ease'
                 }}
               >
@@ -213,8 +265,8 @@ export function StoresPage({
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
-                  background: viewMode === 'shops' ? '#2563eb' : 'transparent',
-                  color: viewMode === 'shops' ? '#ffffff' : 'var(--text-secondary)',
+                  background: viewMode === 'shops' ? '#0f172a' : 'transparent',
+                  color: viewMode === 'shops' ? '#ffffff' : '#64748b',
                   transition: 'all 0.15s ease'
                 }}
               >
@@ -224,17 +276,17 @@ export function StoresPage({
             </div>
 
             {/* Filter Search Input */}
-            <div style={{ display: 'flex', alignItems: 'center', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '24px', padding: '6px 14px', width: '280px', maxWidth: '100%' }}>
-              <span className="material-icons" style={{ fontSize: '18px', color: 'var(--text-muted)', marginRight: '6px' }}>search</span>
+            <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '8px 14px', width: '320px', maxWidth: '100%', boxSizing: 'border-box' }}>
+              <span className="material-icons" style={{ fontSize: '18px', color: '#64748b', marginRight: '6px' }}>search</span>
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={viewMode === 'listings' ? 'Search store products...' : 'Search stores by name or type...'}
-                style={{ border: 'none', outline: 'none', background: 'transparent', color: 'var(--text)', fontSize: '0.86rem', width: '100%' }}
+                style={{ border: 'none', outline: 'none', background: 'transparent', color: '#0f172a', fontSize: '0.86rem', width: '100%' }}
               />
               {searchQuery && (
-                <button type="button" onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px', display: 'flex' }}>
+                <button type="button" onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '2px', display: 'flex' }}>
                   <span className="material-icons" style={{ fontSize: '16px' }}>close</span>
                 </button>
               )}
@@ -256,9 +308,9 @@ export function StoresPage({
                     style={{
                       padding: '6px 14px',
                       borderRadius: '16px',
-                      border: selectedCategory === cat ? '1px solid #2563eb' : '1px solid var(--border)',
-                      background: selectedCategory === cat ? 'rgba(37,99,235,0.12)' : 'var(--panel)',
-                      color: selectedCategory === cat ? '#2563eb' : 'var(--text)',
+                      border: selectedCategory === cat ? '1px solid #0f172a' : '1px solid #e2e8f0',
+                      background: selectedCategory === cat ? '#0f172a' : '#ffffff',
+                      color: selectedCategory === cat ? '#ffffff' : '#334155',
                       fontWeight: selectedCategory === cat ? 700 : 500,
                       fontSize: '0.82rem',
                       cursor: 'pointer',
@@ -271,10 +323,10 @@ export function StoresPage({
               </div>
 
               {storeOnlyListings.length === 0 ? (
-                <div style={{ padding: '60px 20px', textAlign: 'center', background: 'var(--panel)', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                <div style={{ padding: '60px 20px', textAlign: 'center', background: '#ffffff', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
                   <span className="material-icons" style={{ fontSize: '48px', color: '#2563eb', opacity: 0.8 }}>storefront</span>
                   <h3 style={{ margin: '12px 0 6px', fontSize: '1.2rem', fontWeight: 800 }}>No Store Listings Found</h3>
-                  <p style={{ margin: '0 0 16px', color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
+                  <p style={{ margin: '0 0 16px', color: '#64748b', fontSize: '0.88rem' }}>
                     {searchQuery ? `No products match "${searchQuery}" in our verified stores.` : 'No store products in this category yet.'}
                   </p>
                   <button
@@ -308,27 +360,27 @@ export function StoresPage({
           {viewMode === 'shops' && (
             <div>
               {filteredShops.length === 0 ? (
-                <div style={{ padding: '60px 20px', textAlign: 'center', background: 'var(--panel)', borderRadius: '16px', border: '1px solid var(--border)' }}>
-                  <span className="material-icons" style={{ fontSize: '48px', color: 'var(--text-muted)' }}>search_off</span>
+                <div style={{ padding: '60px 20px', textAlign: 'center', background: '#ffffff', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+                  <span className="material-icons" style={{ fontSize: '48px', color: '#94a3b8' }}>search_off</span>
                   <h3 style={{ margin: '12px 0 6px', fontSize: '1.2rem', fontWeight: 800 }}>No Stores Match Your Search</h3>
-                  <p style={{ margin: '0 0 16px', color: 'var(--text-secondary)', fontSize: '0.88rem' }}>Try clearing the search query to view all merchant shops.</p>
+                  <p style={{ margin: '0 0 16px', color: '#64748b', fontSize: '0.88rem' }}>Try clearing the search query to view all merchant shops.</p>
                   <button type="button" onClick={() => setSearchQuery('')} className="primary-btn compact-btn">Clear Search</button>
                 </div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
                   {filteredShops.map((shop) => {
                     const shopListingsCount = listings.filter(l => l.user_id === shop.userId).length
                     return (
                       <article
                         key={shop.userId}
                         style={{
-                          borderRadius: '16px',
-                          border: '1px solid var(--border)',
-                          background: 'var(--panel)',
+                          borderRadius: '20px',
+                          border: '1px solid #f1f5f9',
+                          background: '#ffffff',
                           overflow: 'hidden',
                           display: 'flex',
                           flexDirection: 'column',
-                          boxShadow: '0 4px 16px rgba(0,0,0,0.06)'
+                          boxShadow: '0 4px 16px rgba(0,0,0,0.04)'
                         }}
                       >
                         {/* Cover Image */}
@@ -364,34 +416,34 @@ export function StoresPage({
                               <img
                                 src={shop.logo}
                                 alt={shop.shopName}
-                                style={{ width: '56px', height: '56px', borderRadius: '14px', objectFit: 'cover', border: '3px solid var(--panel)', boxShadow: '0 2px 10px rgba(0,0,0,0.2)', backgroundColor: '#fff' }}
+                                style={{ width: '56px', height: '56px', borderRadius: '14px', objectFit: 'cover', border: '3px solid #ffffff', boxShadow: '0 2px 10px rgba(0,0,0,0.12)', backgroundColor: '#fff' }}
                               />
                             ) : (
-                              <div style={{ width: '56px', height: '56px', borderRadius: '14px', background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 900, fontSize: '1.3rem', border: '3px solid var(--panel)', boxShadow: '0 2px 10px rgba(0,0,0,0.2)' }}>
+                              <div style={{ width: '56px', height: '56px', borderRadius: '14px', background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 900, fontSize: '1.3rem', border: '3px solid #ffffff', boxShadow: '0 2px 10px rgba(0,0,0,0.12)' }}>
                                 {shop.shopName.slice(0, 1).toUpperCase()}
                               </div>
                             )}
                             <div style={{ minWidth: 0 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <strong style={{ fontSize: '1.08rem', fontWeight: 800, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                <strong style={{ fontSize: '1.08rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                   {shop.shopName}
                                 </strong>
                                 <span className="material-icons" style={{ fontSize: '16px', color: '#2563eb' }} title="Verified Store">verified</span>
                               </div>
-                              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                              <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
                                 {shopListingsCount} product{shopListingsCount !== 1 ? 's' : ''} in catalog
                               </span>
                             </div>
                           </div>
 
                           {shop.description && (
-                            <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.45, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                            <p style={{ margin: 0, fontSize: '0.84rem', color: '#64748b', lineHeight: 1.45, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                               {shop.description}
                             </p>
                           )}
 
-                          <div style={{ marginTop: 'auto', paddingTop: '10px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <div style={{ marginTop: 'auto', paddingTop: '10px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <div style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <span className="material-icons" style={{ fontSize: '14px' }}>location_on</span>
                               <span>{shop.address || 'Zambia'}</span>
                             </div>
@@ -415,7 +467,7 @@ export function StoresPage({
           )}
 
         </div>
-      </div>
+      </section>
     </div>
   )
 }
