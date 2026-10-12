@@ -13,7 +13,6 @@ import { StoreViewPage } from './pages/StoreViewPage'
 import { StoresPage } from './pages/StoresPage'
 import { DiscoveryPage } from './pages/DiscoveryPage'
 import { BrowsePage } from './pages/BrowsePage'
-import { CartDrawer } from './components/CartDrawer'
 import { useCart } from './features/marketplace/useCart'
 import { ProfilePage } from './pages/ProfilePage'
 import { SettingsPage } from './pages/SettingsPage'
@@ -287,29 +286,6 @@ export function AppContent() {
 
 
   const isStorePage = location.pathname.startsWith('/store/')
-  const isDiscoveryPage = location.pathname === '/discovery' || location.pathname === '/'
-
-  if (isDiscoveryPage) {
-    return (
-      <>
-        <DiscoveryPage
-          allBusinesses={allBusinesses}
-          onOpenCart={() => cart.setIsCartOpen(true)}
-          cartCount={cart.totalCount}
-          savedCount={savedIds.length}
-        />
-        <CartDrawer
-          isOpen={cart.isCartOpen}
-          onClose={() => cart.setIsCartOpen(false)}
-          items={cart.cartItems}
-          onUpdateQuantity={cart.updateQuantity}
-          onRemoveItem={cart.removeFromCart}
-          onClearCart={cart.clearCart}
-        />
-      </>
-    )
-  }
-
   const storeUserIdParam = isStorePage ? location.pathname.split('/store/')[1]?.split('?')[0] : null
   const currentViewStore = storeUserIdParam
     ? (allBusinesses[storeUserIdParam] || (businessProfile?.userId === storeUserIdParam ? businessProfile : null))
@@ -401,8 +377,6 @@ export function AppContent() {
         profile={profile}
         listingKindFilter={listingKindFilter}
         onListingKindChange={setListingKindFilter}
-        notifications={app.notifications}
-        onMarkAllRead={app.markAllRead}
         savedCount={savedIds.length}
         unreadChatCount={app.chatThreads.filter((t) => t.unread).length}
         searchQuery={app.searchQuery}
@@ -422,9 +396,10 @@ export function AppContent() {
             element={
               <DiscoveryPage
                 allBusinesses={allBusinesses}
-                onOpenCart={() => cart.setIsCartOpen(true)}
-                cartCount={cart.totalCount}
-                savedCount={savedIds.length}
+                listings={listings}
+                storeReviews={app.storeReviews}
+                addStoreReview={app.addStoreReview}
+                isSignedIn={Boolean(session)}
               />
             }
           />
@@ -433,9 +408,10 @@ export function AppContent() {
             element={
               <DiscoveryPage
                 allBusinesses={allBusinesses}
-                onOpenCart={() => cart.setIsCartOpen(true)}
-                cartCount={cart.totalCount}
-                savedCount={savedIds.length}
+                listings={listings}
+                storeReviews={app.storeReviews}
+                addStoreReview={app.addStoreReview}
+                isSignedIn={Boolean(session)}
               />
             }
           />
@@ -544,7 +520,7 @@ export function AppContent() {
           />
           <Route
             path="/discovery"
-            element={<DiscoveryPage allBusinesses={allBusinesses} />}
+            element={<DiscoveryPage allBusinesses={allBusinesses} listings={listings} storeReviews={app.storeReviews} addStoreReview={app.addStoreReview} isSignedIn={Boolean(session)} />}
           />
           <Route
             path="/store/:userId"

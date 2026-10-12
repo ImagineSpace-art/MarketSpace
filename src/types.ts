@@ -12,6 +12,7 @@ export type Listing = {
   delivery_option?: string
   seller_name?: string
   user_id?: string
+  store_id?: string | null
   images?: string[]
   sponsored?: boolean
   available_colors?: string[]

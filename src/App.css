@@ -3203,9 +3203,9 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 24px;
+    padding: 14px 28px;
     gap: 20px;
-    max-width: 1400px;
+    max-width: 1600px;
     margin: 0 auto;
     width: 100%;
 }
@@ -3214,6 +3214,10 @@ body {
     display: flex;
     align-items: center;
     gap: 12px;
+}
+
+.desktop-header-links {
+    flex-wrap: nowrap;
 }
 
 .header-brand-logo {
@@ -3300,6 +3304,10 @@ body {
     display: flex;
     align-items: center;
     gap: 14px;
+}
+
+.header-actions-group .header-icon-link {
+    color: #475569 !important;
 }
 
 .header-text-link {
@@ -3650,9 +3658,24 @@ body {
         .header-brand-group {
             width: 100%;
             display: flex;
-            justify-content: space-between;
+            flex-wrap: wrap;
+            justify-content: flex-start;
             align-items: center;
             padding-bottom: 4px;
+        }
+
+        .desktop-header-links {
+            width: 100%;
+            overflow-x: auto;
+            justify-content: flex-start;
+            gap: 2px !important;
+            margin-left: 0 !important;
+        }
+
+        .header-nav-pill {
+            flex-shrink: 0;
+            padding: 5px 8px !important;
+            font-size: 0.76rem !important;
         }
 
         .header-actions-group {

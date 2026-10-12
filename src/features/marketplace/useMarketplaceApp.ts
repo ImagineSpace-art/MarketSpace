@@ -558,6 +558,34 @@ export function useMarketplaceApp(): MarketplaceAppModel {
 
   const userEmail = session?.user?.email ?? profile?.email ?? 'Guest'
 
+  async function fetchStoreReviews() {
+    const { data, error } = await supabase.from('reviews').select('*').order('created_at', { ascending: false })
+    if (error || !data) return
+
+    const reviewerIds = Array.from(new Set(data.map((review) => review.reviewer_id).filter(Boolean)))
+    const { data: reviewers } = reviewerIds.length
+      ? await supabase.from('profiles').select('user_id, username').in('user_id', reviewerIds)
+      : { data: [] }
+    const storeIds = Array.from(new Set(data.map((review) => review.store_id).filter(Boolean)))
+    const { data: reviewedStores } = storeIds.length
+      ? await supabase.from('stores').select('id, user_id').in('id', storeIds)
+      : { data: [] }
+    const reviewerNames = new Map((reviewers ?? []).map((reviewer) => [reviewer.user_id, reviewer.username || 'User']))
+    const storeOwners = new Map((reviewedStores ?? []).map((store) => [store.id, store.user_id]))
+
+    setStoreReviews(data.map((review) => ({
+      id: review.id,
+      storeId: review.store_id,
+      targetUserId: review.target_user_id || storeOwners.get(review.store_id),
+      reviewerId: review.reviewer_id,
+      reviewerName: reviewerNames.get(review.reviewer_id) || 'User',
+      rating: review.rating,
+      comment: review.comment,
+      createdAt: review.created_at,
+      reply: review.reply || undefined,
+    })))
+  }
+
   async function fetchListings() {
     const { data, error } = await supabase.from('listings').select('*').order('created_at', { ascending: false })
     if (error) return
@@ -714,8 +742,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         }
       }
 
-      await fetchListings()
-      await fetchStores()
+      await Promise.all([fetchListings(), fetchStores(), fetchStoreReviews()])
       setLoading(false)
 
       const needsOnboarding = currentSession && (
