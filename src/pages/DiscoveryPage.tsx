@@ -640,8 +640,6 @@ export function DiscoveryPage({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <Link to="/browse" style={{ textDecoration: 'none', color: '#6b7280' }}>Browse Catalog</Link>
               <Link to="/stores" style={{ textDecoration: 'none', color: '#6b7280' }}>Verified Stores</Link>
-              <Link to="/browse?filter=new" style={{ textDecoration: 'none', color: '#6b7280' }}>New Arrivals</Link>
-              <Link to="/browse?filter=bestseller" style={{ textDecoration: 'none', color: '#6b7280' }}>Best Sellers</Link>
             </div>
           </div>
 

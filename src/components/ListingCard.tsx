@@ -1,5 +1,6 @@
 import type { Listing, BusinessProfile } from '../types'
 import { formatZMWPrice } from '../utils/formatPrice'
+import { isNewArrival } from '../utils/listingSections'
 
 type ListingCardProps = {
   listing: Listing
@@ -49,8 +50,7 @@ export function ListingCard({ listing, saved = false, onOpen, onToggleSave, onAd
 
   // Determine badges to display
   const isSold = listing.status?.toLowerCase() === 'sold' || listing.status?.toLowerCase() === 'out of stock'
-  const isNew = listing.condition?.toLowerCase().includes('new') ||
-    (listing.created_at && (Date.now() - new Date(listing.created_at).getTime()) < 14 * 24 * 60 * 60 * 1000)
+  const isNew = listing.condition?.toLowerCase().includes('new') || isNewArrival(listing)
   const isBestSeller = Boolean(listing.sponsored) || (listing.rating !== undefined && listing.rating >= 4.5)
 
   // Calculate discount percentage if lowest_acceptable_price or original price is available
@@ -71,7 +71,9 @@ export function ListingCard({ listing, saved = false, onOpen, onToggleSave, onAd
     <article
       className={`listing-card marketplace-listing-card modern-listing-card ${listing.sponsored ? 'sponsored' : ''}`}
       onClick={() => onOpen(listing)}
-      style={{ cursor: 'pointer' }}
+      style={{
+        cursor: 'pointer', 
+      }}
     >
       {/* 1. TOP IMAGE CONTAINER */}
       <div className="modern-card-image-box">
@@ -149,7 +151,7 @@ export function ListingCard({ listing, saved = false, onOpen, onToggleSave, onAd
       <div className="modern-card-info">
         {/* Category & Seller Identity Distinction */}
         {sellerStore ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
             <span style={{
               display: 'inline-flex',
               alignItems: 'center',

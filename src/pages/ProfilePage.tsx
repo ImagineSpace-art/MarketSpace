@@ -250,26 +250,19 @@ export function ProfilePage({
         }
     }
 
-    const [isMobileNavExpanded, setIsMobileNavExpanded] = useState(false)
-    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-        try {
-            return localStorage.getItem('marketspace_sidebar_collapsed') === 'true'
-        } catch {
-            return false
-        }
-    })
+    const [isNavigationOpen, setIsNavigationOpen] = useState(false)
 
-    const handleToggleSidebar = () => {
-        setIsSidebarCollapsed(prev => {
-            const next = !prev
-            try {
-                localStorage.setItem('marketspace_sidebar_collapsed', String(next))
-            } catch { }
-            return next
-        })
-    }
+    useEffect(() => {
+        if (!isNavigationOpen) return
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') setIsNavigationOpen(false)
+        }
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [isNavigationOpen])
 
     const navItems = [
+        { path: '/settings', label: 'Settings', icon: 'settings' },
         { path: '/profile/create', label: 'Create new listing', icon: 'add_circle', isPrimary: true },
         { path: '/profile/create-ad', label: 'Create ad', icon: 'campaign', isPrimary: false },
         { path: '/profile', label: 'Seller dashboard', icon: 'dashboard', exact: true },
@@ -280,95 +273,44 @@ export function ProfilePage({
     ]
 
     return (
-        <div className={`dashboard-layout ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-            {/* --- FLOATING TOP-LEFT SIDEBAR TOGGLE BUTTON (ONLY WHEN COLLAPSED) --- */}
-            {isSidebarCollapsed && (
-                <button
-                    type="button"
-                    className="floating-sidebar-toggle-btn"
-                    onClick={handleToggleSidebar}
-                    title="Expand Navigation Sidebar"
-                    aria-label="Expand Navigation Sidebar"
-                >
-                    <span className="material-icons" style={{ fontSize: '22px' }}>
-                        menu
-                    </span>
-                </button>
-            )}
+        <div className="dashboard-layout">
+            <button
+                type="button"
+                className="floating-sidebar-toggle-btn"
+                onClick={() => setIsNavigationOpen(true)}
+                title="Open navigation"
+                aria-label="Open navigation"
+                aria-expanded={isNavigationOpen}
+                aria-controls="profile-navigation-drawer"
+            >
+                <span className="material-icons" style={{ fontSize: '22px' }}>menu</span>
+            </button>
 
-            {/* --- MOBILE PROFILE NAVIGATION DROPDOWN (<1024px) --- */}
-            <div className="mobile-profile-nav-toggle-bar">
-                <button
-                    className="mobile-profile-nav-btn"
-                    onClick={() => setIsMobileNavExpanded(!isMobileNavExpanded)}
-                >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span className="material-icons" style={{ fontSize: '20px', color: '#1967d2' }}>
-                            {activeSection === 'settings' ? 'settings' :
-                                activeSection === 'create' ? 'add_circle' :
-                                    activeSection === 'create-ad' ? 'campaign' :
-                                        activeSection === 'store-dashboard' ? 'storefront' :
-                                            activeSection === 'store-insights' ? 'insights' :
-                                                activeSection === 'saved-listings' ? 'bookmark' :
-                                                    activeSection === 'notifications' ? 'notifications' : 'dashboard'}
-                        </span>
-                        <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>
-                            {activeSection === 'settings' ? 'Settings Menu' :
-                                activeSection === 'create' ? 'Create New Listing' :
-                                    activeSection === 'create-ad' ? 'Create Ad' :
-                                        activeSection === 'store-dashboard' ? 'Store Dashboard' :
-                                            activeSection === 'store-insights' ? 'Store Insights' :
-                                                activeSection === 'saved-listings' ? 'Saved Listings' :
-                                                    activeSection === 'notifications' ? 'Notifications' : 'Seller Dashboard'}
-                        </span>
-                    </div>
-                    <span className="material-icons" style={{ fontSize: '22px' }}>
-                        {isMobileNavExpanded ? 'expand_less' : 'expand_more'}
-                    </span>
-                </button>
+            <div
+                className={`profile-navigation-backdrop ${isNavigationOpen ? 'open' : ''}`}
+                aria-hidden="true"
+                onClick={() => setIsNavigationOpen(false)}
+            />
 
-                {isMobileNavExpanded && (
-                    <div className="mobile-profile-dropdown-menu">
-                        {navItems.map((item) => (
-                            <NavLink
-                                key={item.path}
-                                className={({ isActive }) => `nav-btn ${item.isPrimary ? 'primary-action' : ''} ${isActive ? 'active' : ''}`}
-                                to={item.path}
-                                end={item.exact}
-                                onClick={() => setIsMobileNavExpanded(false)}
-                                style={{ textDecoration: 'none' }}
-                            >
-                                <span className="material-icons">{item.icon}</span> {item.label}
-                            </NavLink>
-                        ))}
-                        <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', marginTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <div className="mini-avatar-placeholder" style={{ width: '28px', height: '28px', fontSize: '0.8rem' }}>{displayName.slice(0, 1).toUpperCase()}</div>
-                                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{displayName}</span>
-                            </div>
-                            <button className="ghost-btn" style={{ padding: '4px 10px', fontSize: '0.8rem' }} onClick={onLogout}>Log out</button>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* --- LEFT SIDEBAR (DESKTOP NAVIGATION) --- */}
-            <aside className={`dashboard-sidebar section-card desktop-profile-sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 12px 10px', borderBottom: '1px solid var(--border)', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
-                        Navigation
-                    </span>
+            <aside
+                id="profile-navigation-drawer"
+                className={`dashboard-sidebar desktop-profile-sidebar ${isNavigationOpen ? 'open' : ''}`}
+                style={{padding: '15px'}}
+                aria-label="Profile navigation"
+                aria-hidden={!isNavigationOpen}
+            >
+                <div className="profile-navigation-header">
+                    <span>Navigation</span>
                     <button
                         type="button"
-                        onClick={handleToggleSidebar}
+                        onClick={() => setIsNavigationOpen(false)}
                         className="ghost-btn compact-btn"
-                        title="Collapse sidebar"
-                        style={{ padding: '6px', borderRadius: '8px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        title="Close navigation"
+                        aria-label="Close navigation"
                     >
-                        <span className="material-icons" style={{ fontSize: '18px' }}>menu_open</span>
+                        <span className="material-icons" style={{ fontSize: '20px' }}>close</span>
                     </button>
                 </div>
-
                 <nav className="sidebar-nav">
                     {navItems.map((item) => (
                         <NavLink
@@ -376,13 +318,13 @@ export function ProfilePage({
                             className={({ isActive }) => `nav-btn ${item.isPrimary ? 'primary-action' : ''} ${isActive ? 'active' : ''}`}
                             to={item.path}
                             end={item.exact}
+                            onClick={() => setIsNavigationOpen(false)}
                             style={{ textDecoration: 'none' }}
                         >
                             <span className="material-icons">{item.icon}</span> {item.label}
                         </NavLink>
                     ))}
                 </nav>
-
                 <div className="sidebar-footer">
                     <div className="profile-mini">
                         <label className="avatar-upload-label">
@@ -703,47 +645,6 @@ export function ProfilePage({
                             {/* ADS TAB */}
                             {storeTab === 'ads' && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                    <div className="sidebar-card" style={{ background: 'var(--panel)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                                        <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <span className="material-icons">campaign</span> Launch Boost Ad campaign
-                                        </h3>
-                                        <form onSubmit={handleLaunchAd} className="form-stack" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                            <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                <span style={{ fontSize: '0.84rem', fontWeight: 600 }}>Select Listing to Boost</span>
-                                                <select
-                                                    value={adListingId}
-                                                    onChange={e => setAdListingId(Number(e.target.value))}
-                                                    required
-                                                    style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }}
-                                                >
-                                                    <option value="">-- Choose Listing --</option>
-                                                    {myListings.map(l => (
-                                                        <option key={l.id} value={l.id}>{l.title} (ZMW {l.price})</option>
-                                                    ))}
-                                                </select>
-                                            </label>
-
-                                            <input value={adTitle} onChange={e => setAdTitle(e.target.value)} placeholder="Custom Ad Slogan (e.g. Lusaka's Finest Tutors - 10% Off!)" style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
-                                            <input value={adBudget} onChange={e => setAdBudget(e.target.value)} placeholder="Budget in ZMW (e.g. 150)" required style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
-
-                                            <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                <span style={{ fontSize: '0.84rem', fontWeight: 600 }}>Campaign Duration</span>
-                                                <select
-                                                    value={adDuration}
-                                                    onChange={e => setAdDuration(e.target.value)}
-                                                    style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }}
-                                                >
-                                                    <option value="3 Days">3 Days</option>
-                                                    <option value="5 Days">5 Days</option>
-                                                    <option value="7 Days">7 Days</option>
-                                                    <option value="14 Days">14 Days</option>
-                                                </select>
-                                            </label>
-
-                                            <button className="primary-btn" type="submit" style={{ padding: '10px', borderRadius: '8px' }}>Launch Campaign</button>
-                                        </form>
-                                    </div>
-
                                     <div>
                                         <h3>Your Campaigns ({(businessProfile.ads || []).length})</h3>
                                         {(businessProfile.ads || []).length === 0 ? (

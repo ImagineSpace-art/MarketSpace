@@ -17,6 +17,7 @@ import { useCart } from './features/marketplace/useCart'
 import { ProfilePage } from './pages/ProfilePage'
 import { SettingsPage } from './pages/SettingsPage'
 import type { Listing, Profile, BusinessProfile } from './types'
+import { isBestSeller, isNewArrival } from './utils/listingSections'
 
 function SlowlyFlashingMarketSpaceTemplate({ message = 'Loading MarketSpace...' }: { message?: string }) {
   return (
@@ -155,8 +156,8 @@ export function AppContent() {
   useEffect(() => {
     window.scrollTo(0, 0)
     const searchParams = new URLSearchParams(location.search)
-    const query = searchParams.get('search')
-    if (query !== null && query !== app.searchQuery) {
+    const query = searchParams.get('search') || ''
+    if (query !== app.searchQuery) {
       app.setSearchQuery(query)
     }
   }, [location.pathname, location.search])
@@ -381,6 +382,8 @@ export function AppContent() {
         unreadChatCount={app.chatThreads.filter((t) => t.unread).length}
         searchQuery={app.searchQuery}
         onSearchQueryChange={app.setSearchQuery}
+        hasNewArrivals={listings.some((listing) => isNewArrival(listing))}
+        hasBestSellers={listings.some((listing) => isBestSeller(listing))}
         storeContext={storeContext}
         cartItems={cart.cartItems}
         isCartOpen={cart.isCartOpen}
@@ -420,6 +423,8 @@ export function AppContent() {
             element={
               <BrowsePage
                 listings={listings}
+                searchQuery={app.searchQuery}
+                onSearchQueryChange={app.setSearchQuery}
                 allBusinesses={allBusinesses}
                 savedIds={savedIds}
                 onToggleSave={(id) => toggleSave(Number(id))}
@@ -503,15 +508,15 @@ export function AppContent() {
             path="/stores"
             element={
               <StoresPage
-                stores={stores}
                 allBusinesses={allBusinesses}
                 onVisitShop={(shop) => {
                   setSelectedStore(shop)
                   window.open(`/store/${shop.userId}`, '_blank')
                 }}
-                onOpenProfile={(userId) => window.open(`/store/${userId}`, '_blank')}
                 listingKindFilter={listingKindFilter}
                 listings={listings}
+                searchQuery={app.searchQuery}
+                onSearchQueryChange={app.setSearchQuery}
                 openListing={openListing}
                 toggleSave={toggleSave}
                 savedIds={savedIds}

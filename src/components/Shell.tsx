@@ -24,6 +24,8 @@ type ShellProps = {
   unreadChatCount?: number
   searchQuery: string
   onSearchQueryChange: (query: string) => void
+  hasNewArrivals: boolean
+  hasBestSellers: boolean
   storeContext?: { userId: string; shopName: string; collections: import('../types').StoreCollection[] } | null
   cartItems?: CartItem[]
   isCartOpen?: boolean
@@ -88,6 +90,8 @@ export function Shell({
   unreadChatCount = 0,
   searchQuery,
   onSearchQueryChange,
+  hasNewArrivals,
+  hasBestSellers,
   storeContext,
   cartItems = [],
   isCartOpen = false,
@@ -108,8 +112,18 @@ export function Shell({
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSearchQueryChange(searchQuery.trim())
-    navigate(`/?search=${encodeURIComponent(searchQuery.trim())}`)
+    const query = searchQuery.trim()
+    const targetPath = location.pathname === '/stores' ? '/stores' : '/browse'
+    onSearchQueryChange(query)
+    navigate(`${targetPath}${query ? `?search=${encodeURIComponent(query)}` : ''}`)
+  }
+
+  const handleSearchClear = () => {
+    onSearchQueryChange('')
+    const searchParams = new URLSearchParams(location.search)
+    searchParams.delete('search')
+    const remainingSearch = searchParams.toString()
+    navigate(`${location.pathname}${remainingSearch ? `?${remainingSearch}` : ''}`, { replace: true })
   }
 
   const cartCount = cartItems.reduce((acc, it) => acc + it.quantity, 0)
@@ -135,7 +149,7 @@ export function Shell({
           borderBottom: '1px solid rgba(255,255,255,0.08)',
         }}
       >
-        <span>⚡ Free Nationwide Delivery On Orders Over K500</span>
+        <span>Free Nationwide Delivery On Orders Over K500</span>
         <span style={{ opacity: 0.3 }}>|</span>
         <span>Summer Flash Sale Up To 70% Off</span>
         <span style={{ opacity: 0.3 }}>|</span>
@@ -209,40 +223,26 @@ export function Shell({
               >
                 Stores Directory
               </Link>
-              <Link
-                to="/browse?filter=new"
-                className="header-nav-pill"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  color: '#4b5563',
-                  padding: '5px 12px',
-                  borderRadius: '20px',
-                  fontSize: '0.82rem',
-                  fontWeight: 700,
-                  textDecoration: 'none',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                New Arrivals
-              </Link>
-              <Link
-                to="/browse?filter=bestseller"
-                className="header-nav-pill"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  color: '#4b5563',
-                  padding: '5px 12px',
-                  borderRadius: '20px',
-                  fontSize: '0.82rem',
-                  fontWeight: 700,
-                  textDecoration: 'none',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                Best Sellers
-              </Link>
+              {location.pathname === '/browse' && hasNewArrivals && (
+                <button
+                  type="button"
+                  className="header-nav-pill"
+                  onClick={() => document.getElementById('new-arrivals')?.scrollIntoView({ behavior: 'smooth' })}
+                  style={{ display: 'inline-flex', alignItems: 'center', color: '#4b5563', padding: '5px 12px', border: 'none', borderRadius: '20px', background: 'transparent', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700, transition: 'all 0.15s ease' }}
+                >
+                  New Arrivals
+                </button>
+              )}
+              {location.pathname === '/browse' && hasBestSellers && (
+                <button
+                  type="button"
+                  className="header-nav-pill"
+                  onClick={() => document.getElementById('best-sellers')?.scrollIntoView({ behavior: 'smooth' })}
+                  style={{ display: 'inline-flex', alignItems: 'center', color: '#4b5563', padding: '5px 12px', border: 'none', borderRadius: '20px', background: 'transparent', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700, transition: 'all 0.15s ease' }}
+                >
+                  Best Sellers
+                </button>
+              )}
               <Link
                 to="/onboarding"
                 className="header-nav-pill header-open-store-link"
@@ -269,7 +269,7 @@ export function Shell({
           >
               <input
                 type="text"
-                placeholder="Search for items, categories, or stores"
+                placeholder={location.pathname === '/stores' ? 'Search for stores' : 'Search for listings'}
                 value={searchQuery}
                 onChange={(e) => onSearchQueryChange(e.target.value)}
                 className="header-search-input"
@@ -277,7 +277,7 @@ export function Shell({
               {searchQuery && (
                 <button
                   type="button"
-                  onClick={() => onSearchQueryChange('')}
+                  onClick={handleSearchClear}
                   title="Clear search"
                   style={{
                     background: 'none',
@@ -322,7 +322,7 @@ export function Shell({
             )}
 
             <Link to="/profile/saved-listings" className="header-icon-link" title="Favorites" style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-              <span className="material-icons">bookmark_border</span>
+              <span className="material-icons">favorite_border</span>
               {savedCount > 0 && (
                 <span
                   style={{
@@ -433,7 +433,7 @@ export function Shell({
             <form onSubmit={handleSearchSubmit} className="header-search-container">
               <input
                 type="text"
-                placeholder="Search for items, categories, or stores"
+                placeholder={location.pathname === '/stores' ? 'Search for stores' : 'Search for listings'}
                 value={searchQuery}
                 onChange={(e) => onSearchQueryChange(e.target.value)}
                 className="header-search-input"
@@ -441,7 +441,7 @@ export function Shell({
               {searchQuery && (
                 <button
                   type="button"
-                  onClick={() => onSearchQueryChange('')}
+                  onClick={handleSearchClear}
                   title="Clear search"
                   style={{
                     background: 'none',
@@ -689,26 +689,6 @@ export function Shell({
     )}
       </header>
 
-      {/* 3. Sub-header Trust Badge Bar */}
-      {/* <div className="trust-stats-bar">
-        <div className="trust-stat-item">
-          <span className="material-icons" style={{ fontSize: '18px', color: '#1967d2' }}>star_outline</span>
-          <span>Over <strong>13,000</strong> top-rated assets</span>
-        </div>
-        <div className="trust-stat-item">
-          <span className="material-icons" style={{ fontSize: '18px', color: '#10b981' }}>thumb_up_off_alt</span>
-          <span>Rated by <strong>85,000+</strong> customers</span>
-        </div>
-        <div className="trust-stat-item">
-          <span className="material-icons" style={{ fontSize: '18px', color: '#8b5cf6' }}>forum</span>
-          <span>Supported by <strong>100,000+</strong> members</span>
-        </div>
-        <div className="trust-stat-item">
-          <span className="material-icons" style={{ fontSize: '18px', color: '#3b82f6' }}>verified</span>
-          <span>Every item <strong>moderated by MarketSpace</strong></span>
-        </div>
-      </div>*/}
-
       {/* Main Content Pane with Push Sidebar */}
       <div className={`content-grid full-width`}>
         <main className="main-panel">{children}</main>
@@ -730,6 +710,7 @@ export function Shell({
             width: '100%',
             background: '#19222d',
             color: '#fff',
+            'borderRadius': '0px !important',
             border: 'none',
             padding: '15px 0',
             fontSize: '0.88rem',

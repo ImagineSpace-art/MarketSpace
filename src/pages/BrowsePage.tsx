@@ -1,28 +1,34 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import type { Listing, BusinessProfile } from '../types'
+import { ListingCard } from '../components/ListingCard'
+import { isBestSeller, isNewArrival } from '../utils/listingSections'
 
 type BrowsePageProps = {
   listings: Listing[]
+  searchQuery: string
+  onSearchQueryChange: (query: string) => void
   allBusinesses?: Record<string, BusinessProfile>
   savedIds: string[]
-  onToggleSave: (id: string) => void
+  onToggleSave: (id: number) => void
   onAddToCart: (item: { id: number | string; title: string; price: number; image?: string; sellerName?: string; sellerUserId?: string }) => void
   onOpenListing: (listing: Listing) => void
 }
 
 export function BrowsePage({
   listings,
+  searchQuery,
+  onSearchQueryChange,
   allBusinesses = {},
   savedIds,
-  onToggleSave,
+  onToggleSave = () => {},
   onAddToCart,
   onOpenListing,
 }: BrowsePageProps) {
   const [searchParams] = useSearchParams()
-  const initialCategory = searchParams.get('category') || searchParams.get('filter') || 'All'
+  const initialFilter = searchParams.get('category') || searchParams.get('filter')
+  const initialCategory = initialFilter === 'new' || initialFilter === 'bestseller' ? 'All' : initialFilter || 'All'
   const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory)
-  const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState('featured')
   const [quickViewListing, setQuickViewListing] = useState<Listing | null>(null)
 
@@ -92,81 +98,25 @@ export function BrowsePage({
     },
   ]
 
-  // Curated showcase products matching NovaTrend reference
-  const showcaseProducts = [
-    {
-      id: 'showcase-1',
-      title: 'Essential Warm Neutral Hoodie',
-      price: 599.99,
-      originalPrice: 749.99,
-      rating: 4.9,
-      reviews: 128,
-      badge: 'New',
-      category: 'Fashion',
-      image: '/illustrations/cat_fashion.jpg',
-      storeName: 'Urban Bloom Boutique',
-    },
-    {
-      id: 'showcase-2',
-      title: 'Aurora Performance Runner Sneakers',
-      price: 1299.99,
-      originalPrice: 1599.99,
-      rating: 4.8,
-      reviews: 88,
-      badge: '-20%',
-      category: 'Fitness',
-      image: '/illustrations/cat_sneaker.jpg',
-      storeName: 'Performance Lab',
-    },
-    {
-      id: 'showcase-3',
-      title: 'Pro ANC Wireless Over-Ear Headphones',
-      price: 999.99,
-      originalPrice: 1299.99,
-      rating: 5.0,
-      reviews: 156,
-      badge: 'New',
-      category: 'Electronics',
-      image: '/illustrations/cat_electronics.jpg',
-      storeName: 'Pulse Audio Lab',
-    },
-    {
-      id: 'showcase-4',
-      title: 'Smart Titanium Watch Series 9',
-      price: 1999.99,
-      originalPrice: 2349.99,
-      rating: 4.9,
-      reviews: 103,
-      badge: '-15%',
-      category: 'Accessories',
-      image: '/illustrations/cat_accessories.jpg',
-      storeName: 'Titan Tech Store',
-    },
-    {
-      id: 'showcase-5',
-      title: 'Organic Aethel Botanical Face Oil (30ml)',
-      price: 249.99,
-      originalPrice: 299.99,
-      rating: 4.9,
-      reviews: 76,
-      badge: 'Bestseller',
-      category: 'Beauty',
-      image: '/illustrations/cat_beauty.jpg',
-      storeName: 'Aethel Skincare',
-    },
-    {
-      id: 'showcase-6',
-      title: 'Scandinavian Linen Lounge Chair',
-      price: 2499.99,
-      originalPrice: 2899.99,
-      rating: 5.0,
-      reviews: 67,
-      badge: '-10%',
-      category: 'Home Decor',
-      image: '/illustrations/cat_homedecor.jpg',
-      storeName: 'Nordic Living Studio',
-    },
-  ]
+  const newArrivals = useMemo(
+    () => listings
+      .filter((listing) => isNewArrival(listing))
+      .sort((a, b) => Date.parse(b.created_at!) - Date.parse(a.created_at!)),
+    [listings]
+  )
+
+  const bestSellers = useMemo(
+    () => listings
+      .filter((listing) => isBestSeller(listing))
+      .sort((a, b) => Number(b.rating ?? 0) - Number(a.rating ?? 0)),
+    [listings]
+  )
+
+  const newArrivalCards = newArrivals.map((listing) => ({
+    ...listing,
+    image: listing.images?.[0],
+    storeName: (listing.user_id && allBusinesses[listing.user_id]?.shopName) || listing.seller_name || 'Independent Seller',
+  }))
 
   // Filter listings
   const filteredCatalog = useMemo(() => {
@@ -343,7 +293,7 @@ export function BrowsePage({
           </div>
         </div>
 
-        {/* Right Hero Visual with Floating Product Cards */}
+        {/* Right Hero Visual */}
         <div style={{ position: 'relative', minHeight: '440px', display: 'flex', justifyContent: 'center' }}>
           {/* Main Lifestyle Model Image */}
           <div
@@ -365,147 +315,8 @@ export function BrowsePage({
             />
           </div>
 
-          {/* Floating Product Tag 1: Air Max Runner */}
-          <div
-            onClick={() => {
-              setSelectedCategory('Fitness')
-              scrollToCatalog()
-            }}
-            style={{
-              position: 'absolute',
-              top: '20px',
-              left: '10px',
-              backgroundColor: '#ffffff',
-              borderRadius: '16px',
-              padding: '8px 12px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-              cursor: 'pointer',
-              zIndex: 2,
-              animation: 'floatSlow 4s ease-in-out infinite',
-            }}
-          >
-            <img
-              src="/illustrations/cat_sneaker.jpg"
-              alt="Sneaker"
-              style={{ width: '42px', height: '42px', borderRadius: '10px', objectFit: 'cover' }}
-            />
-            <div>
-              <strong style={{ display: 'block', fontSize: '0.8rem', color: '#0f172a' }}>Air Max 270</strong>
-              <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>K1,299.99</span>
-            </div>
-          </div>
-
-          {/* Floating Product Tag 2: Wireless Headphones */}
-          <div
-            onClick={() => {
-              setSelectedCategory('Electronics')
-              scrollToCatalog()
-            }}
-            style={{
-              position: 'absolute',
-              top: '180px',
-              left: '-15px',
-              backgroundColor: '#ffffff',
-              borderRadius: '16px',
-              padding: '8px 12px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-              cursor: 'pointer',
-              zIndex: 2,
-              animation: 'floatSlow 4s ease-in-out infinite 1s',
-            }}
-          >
-            <img
-              src="/illustrations/cat_electronics.jpg"
-              alt="Headphones"
-              style={{ width: '42px', height: '42px', borderRadius: '10px', objectFit: 'cover' }}
-            />
-            <div>
-              <strong style={{ display: 'block', fontSize: '0.8rem', color: '#0f172a' }}>Wireless ANC</strong>
-              <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>K999.99</span>
-            </div>
-          </div>
-
-          {/* Floating Product Tag 3: Smart Watch */}
-          <div
-            onClick={() => {
-              setSelectedCategory('Accessories')
-              scrollToCatalog()
-            }}
-            style={{
-              position: 'absolute',
-              top: '40px',
-              right: '15px',
-              backgroundColor: '#ffffff',
-              borderRadius: '16px',
-              padding: '8px 12px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-              cursor: 'pointer',
-              zIndex: 2,
-              animation: 'floatSlow 4s ease-in-out infinite 2s',
-            }}
-          >
-            <img
-              src="/illustrations/cat_accessories.jpg"
-              alt="Smart Watch"
-              style={{ width: '42px', height: '42px', borderRadius: '10px', objectFit: 'cover' }}
-            />
-            <div>
-              <strong style={{ display: 'block', fontSize: '0.8rem', color: '#0f172a' }}>Smart Watch</strong>
-              <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>K1,999.99</span>
-            </div>
-          </div>
-
-          {/* Floating Product Tag 4: Organic Face Oil */}
-          <div
-            onClick={() => {
-              setSelectedCategory('Beauty')
-              scrollToCatalog()
-            }}
-            style={{
-              position: 'absolute',
-              bottom: '40px',
-              right: '10px',
-              backgroundColor: '#ffffff',
-              borderRadius: '16px',
-              padding: '8px 12px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-              cursor: 'pointer',
-              zIndex: 2,
-              animation: 'floatSlow 4s ease-in-out infinite 3s',
-            }}
-          >
-            <img
-              src="/illustrations/cat_beauty.jpg"
-              alt="Botanical Oil"
-              style={{ width: '42px', height: '42px', borderRadius: '10px', objectFit: 'cover' }}
-            />
-            <div>
-              <strong style={{ display: 'block', fontSize: '0.8rem', color: '#0f172a' }}>Face Elixir</strong>
-              <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>K249.99</span>
-            </div>
-          </div>
         </div>
       </section>
-
-      {/* Floating animation keyframes */}
-      <style>{`
-        @keyframes floatSlow {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-8px); }
-        }
-      `}</style>
 
       {/* ---------------- 2. VALUE PROPOSITIONS BAR ---------------- */}
       <section style={{ borderTop: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', backgroundColor: '#fcfcfd', padding: '24px 0' }}>
@@ -632,8 +443,7 @@ export function BrowsePage({
         </div>
       </section>
 
-      {/* ---------------- 4. NEW ARRIVALS (Curated Showcase) ---------------- */}
-      <section style={{ maxWidth: '1280px', margin: '54px auto 40px', padding: '0 24px' }}>
+      {newArrivals.length > 0 && <section id="new-arrivals" style={{ maxWidth: '1280px', margin: '54px auto 40px', padding: '0 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 900, margin: 0, color: '#0f172a', letterSpacing: '-0.02em' }}>
             New Arrivals
@@ -665,7 +475,7 @@ export function BrowsePage({
             gap: '20px',
           }}
         >
-          {showcaseProducts.slice(0, 4).map((prod) => (
+          {newArrivalCards.slice(0, 4).map((prod) => (
             <div
               key={prod.id}
               style={{
@@ -681,18 +491,20 @@ export function BrowsePage({
             >
               {/* Image & Badges */}
               <div style={{ height: '220px', position: 'relative', backgroundColor: '#f8fafc', overflow: 'hidden' }}>
-                <img
-                  src={prod.image}
-                  alt={prod.title}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
+                {prod.image ? (
+                  <img src={prod.image} alt={prod.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <div style={{ height: '100%', display: 'grid', placeItems: 'center', color: '#94a3b8' }}>
+                    <span className="material-icons" style={{ fontSize: '48px' }}>inventory_2</span>
+                  </div>
+                )}
 
                 <span
                   style={{
                     position: 'absolute',
                     top: '12px',
                     left: '12px',
-                    backgroundColor: prod.badge === 'New' ? '#0f172a' : '#ea580c',
+                    backgroundColor: '#0f172a',
                     color: '#ffffff',
                     padding: '3px 10px',
                     borderRadius: '12px',
@@ -700,12 +512,12 @@ export function BrowsePage({
                     fontWeight: 800,
                   }}
                 >
-                  {prod.badge}
+                  New
                 </span>
 
                 <button
                   type="button"
-                  onClick={() => onToggleSave(prod.id)}
+                  onClick={() => onToggleSave(Number(prod.id))}
                   style={{
                     position: 'absolute',
                     top: '10px',
@@ -720,12 +532,12 @@ export function BrowsePage({
                     justifyContent: 'center',
                     cursor: 'pointer',
                     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                    color: savedIds.includes(prod.id) ? '#ef4444' : '#64748b',
+                    color: savedIds.includes(String(prod.id)) ? '#ef4444' : '#64748b',
                   }}
                   title="Save to Wishlist"
                 >
                   <span className="material-icons" style={{ fontSize: '18px' }}>
-                    {savedIds.includes(prod.id) ? 'favorite' : 'favorite_border'}
+                    {savedIds.includes(String(prod.id)) ? 'favorite' : 'favorite_border'}
                   </span>
                 </button>
               </div>
@@ -746,10 +558,11 @@ export function BrowsePage({
                     {prod.title}
                   </h3>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-                    <span style={{ color: '#f59e0b', fontSize: '0.85rem' }}>★ {prod.rating}</span>
-                    <span style={{ color: '#94a3b8', fontSize: '0.76rem' }}>({prod.reviews})</span>
-                  </div>
+                  {prod.rating !== undefined && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+                      <span style={{ color: '#f59e0b', fontSize: '0.85rem' }}>★ {prod.rating}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
@@ -757,11 +570,6 @@ export function BrowsePage({
                     <strong style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
                       K{prod.price.toFixed(2)}
                     </strong>
-                    {prod.originalPrice && (
-                      <span style={{ fontSize: '0.8rem', color: '#94a3b8', textDecoration: 'line-through', marginLeft: '6px' }}>
-                        K{prod.originalPrice.toFixed(2)}
-                      </span>
-                    )}
                   </div>
 
                   <button
@@ -773,6 +581,7 @@ export function BrowsePage({
                         price: prod.price,
                         image: prod.image,
                         sellerName: prod.storeName,
+                        sellerUserId: prod.user_id,
                       })
                     }
                     style={{
@@ -797,7 +606,37 @@ export function BrowsePage({
             </div>
           ))}
         </div>
-      </section>
+      </section>}
+
+      {bestSellers.length > 0 && (
+        <section id="best-sellers" style={{ maxWidth: '1280px', margin: '54px auto 40px', padding: '0 24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <div>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 900, margin: 0, color: '#0f172a', letterSpacing: '-0.02em' }}>Best Sellers</h2>
+              <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: '0.86rem' }}>Popular listings from verified sellers.</p>
+            </div>
+            <button
+              type="button"
+              onClick={scrollToCatalog}
+              style={{ background: 'none', border: 'none', color: '#0f172a', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+            >
+              Explore all listings <span className="material-icons" style={{ fontSize: '16px' }}>arrow_forward</span>
+            </button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '20px' }}>
+            {bestSellers.slice(0, 4).map((listing) => (
+              <ListingCard
+                key={listing.id}
+                listing={listing}
+                saved={savedIds.includes(String(listing.id))}
+                onOpen={onOpenListing}
+                onToggleSave={(id) => onToggleSave(id)}
+                allBusinesses={allBusinesses}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ---------------- 5. DUAL PROMO FLASH BANNERS (NovaTrend Style) ---------------- */}
       <section style={{ maxWidth: '1280px', margin: '48px auto', padding: '0 24px' }}>
@@ -971,47 +810,8 @@ export function BrowsePage({
             </span>
           </div>
 
-          {/* Search & Sort Controls */}
+          {/* Sort Dropdown */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            {/* Search Input */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                backgroundColor: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                borderRadius: '999px',
-                padding: '6px 14px',
-                gap: '8px',
-              }}
-            >
-              <span className="material-icons" style={{ fontSize: '18px', color: '#64748b' }}>search</span>
-              <input
-                type="text"
-                placeholder="Search catalog..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{
-                  border: 'none',
-                  outline: 'none',
-                  backgroundColor: 'transparent',
-                  fontSize: '0.86rem',
-                  color: '#0f172a',
-                  width: '160px',
-                }}
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 0 }}
-                >
-                  <span className="material-icons" style={{ fontSize: '16px' }}>close</span>
-                </button>
-              )}
-            </div>
-
-            {/* Sort Dropdown */}
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
@@ -1072,7 +872,7 @@ export function BrowsePage({
               type="button"
               onClick={() => {
                 setSelectedCategory('All')
-                setSearchQuery('')
+                onSearchQueryChange('')
               }}
               style={{
                 padding: '8px 20px',
@@ -1104,173 +904,14 @@ export function BrowsePage({
                 '/banners/banner_fashion.png'
 
               return (
-                <div
+                <ListingCard
                   key={item.id}
-                  style={{
-                    borderRadius: '20px',
-                    border: '1px solid #f1f5f9',
-                    backgroundColor: '#ffffff',
-                    overflow: 'hidden',
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-3px)'
-                    e.currentTarget.style.boxShadow = '0 10px 24px rgba(0,0,0,0.08)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)'
-                    e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.03)'
-                  }}
-                >
-                  {/* Image */}
-                  <div
-                    onClick={() => onOpenListing(item)}
-                    style={{
-                      height: '210px',
-                      backgroundColor: '#f8fafc',
-                      position: 'relative',
-                      overflow: 'hidden',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <img
-                      src={displayImg}
-                      alt={item.title}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-
-                    {storeInfo && (
-                      <span
-                        style={{
-                          position: 'absolute',
-                          top: '10px',
-                          left: '10px',
-                          backgroundColor: '#2563eb',
-                          color: '#ffffff',
-                          padding: '3px 8px',
-                          borderRadius: '8px',
-                          fontSize: '0.68rem',
-                          fontWeight: 700,
-                        }}
-                      >
-                        {storeInfo.shopName}
-                      </span>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onToggleSave(String(item.id))
-                      }}
-                      style={{
-                        position: 'absolute',
-                        top: '10px',
-                        right: '10px',
-                        backgroundColor: '#ffffff',
-                        border: 'none',
-                        borderRadius: '50%',
-                        width: '32px',
-                        height: '32px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                        color: isSaved ? '#ef4444' : '#64748b',
-                      }}
-                      title="Save item"
-                    >
-                      <span className="material-icons" style={{ fontSize: '18px' }}>
-                        {isSaved ? 'favorite' : 'favorite_border'}
-                      </span>
-                    </button>
-                  </div>
-
-                  {/* Body */}
-                  <div style={{ padding: '14px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <div>
-                      <span style={{ fontSize: '0.74rem', color: '#64748b' }}>{item.category}</span>
-                      <h4
-                        onClick={() => onOpenListing(item)}
-                        style={{
-                          margin: '4px 0 8px',
-                          fontSize: '0.92rem',
-                          fontWeight: 800,
-                          color: '#0f172a',
-                          lineHeight: 1.35,
-                          cursor: 'pointer',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                        }}
-                      >
-                        {item.title}
-                      </h4>
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
-                      <strong style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>
-                        K{Number(item.price).toFixed(2)}
-                      </strong>
-
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button
-                          type="button"
-                          onClick={() => setQuickViewListing(item)}
-                          style={{
-                            background: '#f1f5f9',
-                            border: 'none',
-                            borderRadius: '50%',
-                            width: '32px',
-                            height: '32px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            color: '#475569',
-                          }}
-                          title="Quick View"
-                        >
-                          <span className="material-icons" style={{ fontSize: '16px' }}>visibility</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            onAddToCart({
-                              id: item.id,
-                              title: item.title,
-                              price: Number(item.price),
-                              image: displayImg,
-                              sellerName: storeInfo?.shopName || item.seller_name || 'Independent Seller',
-                              sellerUserId: item.user_id,
-                            })
-                          }
-                          style={{
-                            backgroundColor: '#0f172a',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: '50%',
-                            width: '32px',
-                            height: '32px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                          }}
-                          title="Add to Cart"
-                        >
-                          <span className="material-icons" style={{ fontSize: '16px' }}>shopping_bag</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  listing={item}
+                  saved={savedIds.includes(String(item.id))}
+                  onOpen={onOpenListing}
+                  onToggleSave={onToggleSave}
+                  allBusinesses={allBusinesses}
+                />
               )
             })}
           </div>

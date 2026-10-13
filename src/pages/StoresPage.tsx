@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react'
-import type { Profile, BusinessProfile, Listing } from '../types'
+import type { BusinessProfile, Listing } from '../types'
 import { ListingCard } from '../components/ListingCard'
 
 // ---------------- STORES & STORE LISTINGS PAGE ----------------
 type StoresPageProps = {
-  stores: Profile[]
   allBusinesses: Record<string, BusinessProfile>
   onVisitShop: (shop: BusinessProfile) => void
-  onOpenProfile: (userId: string) => void
   listingKindFilter: 'all' | 'item' | 'service'
   listings: Listing[]
+  searchQuery: string
+  onSearchQueryChange: (query: string) => void
   openListing?: (listing: Listing) => void
   toggleSave?: (id: number) => void
   savedIds?: string[]
@@ -20,15 +20,18 @@ export function StoresPage({
   onVisitShop,
   listingKindFilter,
   listings,
+  searchQuery,
+  onSearchQueryChange,
   openListing = () => {},
   toggleSave = () => {},
   savedIds = []
 }: StoresPageProps) {
   const activeShops = Object.values(allBusinesses || {}).filter(b => Boolean(b && b.shopName))
-  const [searchQuery, setSearchQuery] = useState('')
   const [currentSlide, setCurrentSlide] = useState(0)
   const [viewMode, setViewMode] = useState<'listings' | 'shops'>('listings')
+  const activeViewMode = searchQuery.trim() ? 'shops' : viewMode
   const [selectedCategory, setSelectedCategory] = useState<string>('All')
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase()
 
   const slides = [
     '/banners/store_banner_grocery.png',
@@ -50,12 +53,11 @@ export function StoresPage({
 
     if (selectedCategory !== 'All' && l.category !== selectedCategory) return false
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
-      const titleMatch = l.title.toLowerCase().includes(q)
-      const catMatch = (l.category || '').toLowerCase().includes(q)
+    if (normalizedSearchQuery) {
+      const titleMatch = l.title.toLowerCase().includes(normalizedSearchQuery)
+      const catMatch = (l.category || '').toLowerCase().includes(normalizedSearchQuery)
       const storeName = allBusinesses[l.user_id!]?.shopName.toLowerCase() || ''
-      const storeMatch = storeName.includes(q)
+      const storeMatch = storeName.includes(normalizedSearchQuery)
       if (!titleMatch && !catMatch && !storeMatch) return false
     }
 
@@ -70,10 +72,10 @@ export function StoresPage({
 
   // Filter storefronts based on search query
   const filteredShops = activeShops.filter((shop) => {
-    const matchesSearch = shop.shopName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (shop.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (shop.category || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (shop.address || '').toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesSearch = shop.shopName.toLowerCase().includes(normalizedSearchQuery) ||
+      (shop.description || '').toLowerCase().includes(normalizedSearchQuery) ||
+      (shop.category || '').toLowerCase().includes(normalizedSearchQuery) ||
+      (shop.address || '').toLowerCase().includes(normalizedSearchQuery)
 
     if (!matchesSearch) return false
 
@@ -145,7 +147,7 @@ export function StoresPage({
             </button>
             <button
               type="button"
-              onClick={() => { setViewMode('listings'); scrollToCatalog() }}
+              onClick={() => { onSearchQueryChange(''); setViewMode('listings'); scrollToCatalog() }}
               style={{ backgroundColor: '#ffffff', color: '#0f172a', border: '1px solid #e2e8f0', borderRadius: '999px', padding: '12px 24px', fontSize: '0.94rem', fontWeight: 700, cursor: 'pointer' }}
             >
               Shop Store Products
@@ -200,7 +202,7 @@ export function StoresPage({
             <h2 style={{ fontSize: '1.5rem', fontWeight: 900, margin: 0, color: '#0f172a', letterSpacing: '-0.02em' }}>Shop by Category</h2>
             <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: '0.88rem' }}>Find a local store for whatever you need.</p>
           </div>
-          <button type="button" onClick={() => { setSelectedCategory('All'); setViewMode('listings'); scrollToCatalog() }} style={{ background: 'none', border: 'none', color: '#0f172a', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <button type="button" onClick={() => { onSearchQueryChange(''); setSelectedCategory('All'); setViewMode('listings'); scrollToCatalog() }} style={{ background: 'none', border: 'none', color: '#0f172a', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
             View all stores <span className="material-icons" style={{ fontSize: '16px' }}>arrow_forward</span>
           </button>
         </div>
@@ -209,7 +211,7 @@ export function StoresPage({
             <button
               key={category.name}
               type="button"
-              onClick={() => { setSelectedCategory(category.name); setViewMode('listings'); scrollToCatalog() }}
+              onClick={() => { onSearchQueryChange(''); setSelectedCategory(category.name); setViewMode('listings'); scrollToCatalog() }}
               style={{ padding: 0, borderRadius: '20px', overflow: 'hidden', border: '1px solid #e2e8f0', backgroundColor: '#ffffff', boxShadow: '0 4px 14px rgba(0,0,0,0.03)', cursor: 'pointer', textAlign: 'center' }}
             >
               <div style={{ height: '150px', overflow: 'hidden', backgroundColor: '#f1f5f9' }}>
@@ -232,19 +234,22 @@ export function StoresPage({
             <div style={{ display: 'flex', gap: '4px', background: '#f8fafc', padding: '4px', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
               <button
                 type="button"
-                onClick={() => setViewMode('listings')}
+                onClick={() => {
+                  setViewMode('listings');
+                  onSearchQueryChange('');
+                }}
                 style={{
                   padding: '8px 18px',
-                  borderRadius: '20px',
-                  border: 'none',
+                  border: '1px solid black',
+                  'borderRadius': '100px !important',
                   fontSize: '0.86rem',
                   fontWeight: 700,
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
-                  background: viewMode === 'listings' ? '#0f172a' : 'transparent',
-                  color: viewMode === 'listings' ? '#ffffff' : '#64748b',
+                  background: activeViewMode === 'listings' ? '#0f172a' : 'transparent',
+                  color: activeViewMode === 'listings' ? '#ffffff' : '#64748b',
                   transition: 'all 0.15s ease'
                 }}
               >
@@ -257,7 +262,7 @@ export function StoresPage({
                 onClick={() => setViewMode('shops')}
                 style={{
                   padding: '8px 18px',
-                  borderRadius: '20px',
+                  borderRadius: '100px',
                   border: 'none',
                   fontSize: '0.86rem',
                   fontWeight: 700,
@@ -265,8 +270,8 @@ export function StoresPage({
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
-                  background: viewMode === 'shops' ? '#0f172a' : 'transparent',
-                  color: viewMode === 'shops' ? '#ffffff' : '#64748b',
+                  background: activeViewMode === 'shops' ? '#0f172a' : 'transparent',
+                  color: activeViewMode === 'shops' ? '#ffffff' : '#64748b',
                   transition: 'all 0.15s ease'
                 }}
               >
@@ -275,28 +280,12 @@ export function StoresPage({
               </button>
             </div>
 
-            {/* Filter Search Input */}
-            <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '8px 14px', width: '320px', maxWidth: '100%', boxSizing: 'border-box' }}>
-              <span className="material-icons" style={{ fontSize: '18px', color: '#64748b', marginRight: '6px' }}>search</span>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={viewMode === 'listings' ? 'Search store products...' : 'Search stores by name or type...'}
-                style={{ border: 'none', outline: 'none', background: 'transparent', color: '#0f172a', fontSize: '0.86rem', width: '100%' }}
-              />
-              {searchQuery && (
-                <button type="button" onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '2px', display: 'flex' }}>
-                  <span className="material-icons" style={{ fontSize: '16px' }}>close</span>
-                </button>
-              )}
-            </div>
           </div>
 
           {/* ========================================================================= */}
           {/* VIEW MODE 1: DEDICATED STORE LISTINGS FEED                                */}
           {/* ========================================================================= */}
-          {viewMode === 'listings' && (
+          {activeViewMode === 'listings' && (
             <div>
               {/* Category Pills Bar */}
               <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '20px', WebkitOverflowScrolling: 'touch' }}>
@@ -331,7 +320,7 @@ export function StoresPage({
                   </p>
                   <button
                     type="button"
-                    onClick={() => { setSelectedCategory('All'); setSearchQuery('') }}
+                    onClick={() => { setSelectedCategory('All'); onSearchQueryChange('') }}
                     className="primary-btn compact-btn"
                   >
                     Reset Filter
@@ -357,14 +346,14 @@ export function StoresPage({
           {/* ========================================================================= */}
           {/* VIEW MODE 2: REGISTERED STOREFRONTS DIRECTORY                             */}
           {/* ========================================================================= */}
-          {viewMode === 'shops' && (
+          {activeViewMode === 'shops' && (
             <div>
               {filteredShops.length === 0 ? (
                 <div style={{ padding: '60px 20px', textAlign: 'center', background: '#ffffff', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
                   <span className="material-icons" style={{ fontSize: '48px', color: '#94a3b8' }}>search_off</span>
                   <h3 style={{ margin: '12px 0 6px', fontSize: '1.2rem', fontWeight: 800 }}>No Stores Match Your Search</h3>
                   <p style={{ margin: '0 0 16px', color: '#64748b', fontSize: '0.88rem' }}>Try clearing the search query to view all merchant shops.</p>
-                  <button type="button" onClick={() => setSearchQuery('')} className="primary-btn compact-btn">Clear Search</button>
+                  <button type="button" onClick={() => onSearchQueryChange('')} className="primary-btn compact-btn">Clear Search</button>
                 </div>
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
