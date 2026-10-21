@@ -107,6 +107,13 @@ export function SettingsPage({
     }
 
     const activeTab = category.toLowerCase()
+    const notificationOptions: Array<{ key: keyof NotificationConfig; label: string; desc: string }> = [
+        { key: 'email', label: 'Email Notifications', desc: 'Receive message alerts and order updates via email' },
+        { key: 'push', label: 'Browser Push Notifications', desc: 'Get instant pop-up alerts on desktop/mobile' },
+        { key: 'sms', label: 'SMS Text Alerts', desc: 'Get text notifications for high-priority inquiries' },
+        { key: 'orders', label: 'Order & Purchase Updates', desc: 'Alerts when someone requests or buys your listings' },
+        { key: 'promos', label: 'Promotional & Store Updates', desc: 'News on feature updates and seller tips' },
+    ]
 
     return (
         <div className="section-card settings-page" style={{ margin: 0, padding: '24px', width: '100%', boxSizing: 'border-box' }}>
@@ -318,7 +325,7 @@ export function SettingsPage({
                                 <select
                                     disabled={!enableGlobalRenewal}
                                     value={globalRenewalFrequency}
-                                    onChange={(e) => setGlobalRenewalFrequency && setGlobalRenewalFrequency(e.target.value as any)}
+                                    onChange={(e) => setGlobalRenewalFrequency && setGlobalRenewalFrequency(e.target.value as NonNullable<SettingsPageProps['globalRenewalFrequency']>)}
                                     style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontWeight: 600 }}
                                 >
                                     <option value="daily">Every 24 Hours (Daily)</option>
@@ -374,13 +381,7 @@ export function SettingsPage({
                     <div className="setting-box" style={{ background: 'var(--panel)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border)' }}>
                         <h3 style={{ marginTop: 0, fontSize: '1.1rem' }}>Notification Preferences</h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
-                            {[
-                                { key: 'email', label: 'Email Notifications', desc: 'Receive message alerts and order updates via email' },
-                                { key: 'push', label: 'Browser Push Notifications', desc: 'Get instant pop-up alerts on desktop/mobile' },
-                                { key: 'sms', label: 'SMS Text Alerts', desc: 'Get text notifications for high-priority inquiries' },
-                                { key: 'orders', label: 'Order & Purchase Updates', desc: 'Alerts when someone requests or buys your listings' },
-                                { key: 'promos', label: 'Promotional & Store Updates', desc: 'News on feature updates and seller tips' },
-                            ].map((item) => (
+                            {notificationOptions.map((item) => (
                                 <label key={item.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                                     <div>
                                         <strong style={{ fontSize: '0.9rem' }}>{item.label}</strong>
@@ -388,7 +389,7 @@ export function SettingsPage({
                                     </div>
                                     <input
                                         type="checkbox"
-                                        checked={(notificationsConfig as any)[item.key]}
+                                        checked={notificationsConfig[item.key]}
                                         onChange={(e) => setNotificationsConfig({ ...notificationsConfig, [item.key]: e.target.checked })}
                                         style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                                     />
@@ -485,7 +486,7 @@ export function SettingsPage({
                         <h3 style={{ marginTop: 0, fontSize: '1.1rem' }}>Add New Payment Method</h3>
                         <form onSubmit={handleAddPaymentSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                <select value={payType} onChange={(e) => setPayType(e.target.value as any)} style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }}>
+                                <select value={payType} onChange={(e) => setPayType(e.target.value as PaymentMethodItem['type'])} style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }}>
                                     <option value="mobile_money">Mobile Money Wallet</option>
                                     <option value="card">Debit / Credit Card</option>
                                     <option value="bank">Bank Account</option>

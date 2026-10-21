@@ -896,13 +896,6 @@ export function BrowsePage({
             }}
           >
             {filteredCatalog.map((item) => {
-              const storeInfo = item.user_id ? allBusinesses[item.user_id] : null
-              const isSaved = savedIds.includes(String(item.id))
-              const displayImg =
-                (item.images && item.images.length > 0 && item.images[0]) ||
-                (item as any).image ||
-                '/banners/banner_fashion.png'
-
               return (
                 <ListingCard
                   key={item.id}
@@ -1000,8 +993,7 @@ export function BrowsePage({
             <div style={{ height: '300px', borderRadius: '18px', overflow: 'hidden', backgroundColor: '#f1f5f9' }}>
               <img
                 src={
-                  (quickViewListing.images && quickViewListing.images[0]) ||
-                  (quickViewListing as any).image ||
+                  quickViewListing.images?.[0] ||
                   '/banners/banner_fashion.png'
                 }
                 alt={quickViewListing.title}
@@ -1046,7 +1038,7 @@ export function BrowsePage({
                       id: quickViewListing.id,
                       title: quickViewListing.title,
                       price: Number(quickViewListing.price),
-                      image: quickViewListing.images?.[0] || (quickViewListing as any).image,
+                      image: quickViewListing.images?.[0],
                       sellerName: quickViewListing.seller_name,
                       sellerUserId: quickViewListing.user_id,
                     })

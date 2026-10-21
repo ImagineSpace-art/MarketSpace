@@ -157,12 +157,6 @@ export function ProfilePage({
     const [catalogDescription, setCatDesc] = useState('')
     const [catalogImage, setCatImage] = useState('')
 
-    // Ads creation states
-    const [adListingId, setAdListingId] = useState<number>(myListings[0]?.id || 0)
-    const [adTitle, setAdTitle] = useState('')
-    const [adBudget, setAdBudget] = useState('150')
-    const [adDuration, setAdDuration] = useState('5 Days')
-
     const handleCatImageChange = async (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             try {
@@ -200,27 +194,6 @@ export function ProfilePage({
             ...businessProfile,
             catalog: (businessProfile.catalog || []).filter(i => i.id !== itemId)
         })
-    }
-
-    const handleLaunchAd = (e: FormEvent) => {
-        e.preventDefault()
-        if (!businessProfile || !adListingId) return
-        const matchedListing = myListings.find(l => l.id === Number(adListingId))
-        const titleText = adTitle || `Boost: ${matchedListing?.title || 'Listing'}`
-        const newAd = {
-            id: String(Date.now()),
-            listingId: Number(adListingId),
-            adTitle: titleText,
-            budget: `ZMW ${adBudget}`,
-            duration: adDuration,
-            status: 'Active' as const
-        }
-        void storeSetupProps.onSave({
-            ...businessProfile,
-            ads: [...(businessProfile.ads || []), newAd]
-        })
-        setAdTitle('')
-        setAdBudget('150')
     }
 
     const handleToggleAdStatus = (adId: string) => {

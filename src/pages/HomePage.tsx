@@ -169,7 +169,8 @@ export function HomePage({
   }
 
   // 1. Filtered Listings Evaluation
-  const now = Date.now()
+  const [now] = useState(() => Date.now())
+
   const DAY_MS = 24 * 60 * 60 * 1000
 
   let displayListings = filteredListings.filter((l) => {
@@ -218,7 +219,7 @@ export function HomePage({
 
   // Counts for tabs
   const storeListingsTotal = filteredListings.filter(l => Boolean(l.user_id && allBusinesses[l.user_id]?.shopName)).length
-  const sellerListingsTotal = filteredListings.filter(l => !Boolean(l.user_id && allBusinesses[l.user_id]?.shopName)).length
+  const sellerListingsTotal = filteredListings.filter(l => !(l.user_id && allBusinesses[l.user_id]?.shopName)).length
 
   // Curated category definitions with modern assets
   const categoryHighlights = [
