@@ -4,6 +4,7 @@ import type { Listing, Profile, BusinessProfile, PaymentMethodItem, Notification
 import { SavedItemsPage, NotificationsPage } from './SavedNotificationsPage'
 import { ListingFormPage } from './ListingPage'
 import { StoreSetupPage } from './StoreSetupPage'
+import { StoreRegistrationWizard } from './StoreRegistrationWizard'
 import { AdCreationPage } from './AdCreationPage'
 import { StoreInsightsView } from '../components/StoreInsightsView'
 import { StoreThemeCustomizer } from '../components/store-theme/StoreThemeCustomizer'
@@ -742,12 +743,19 @@ export function ProfilePage({
                         onToggleSave={onToggleSave}
                     />
                 ) : activeSection === 'business-setup' ? (
-                    <StoreSetupPage
-                        userId={storeSetupProps.userId}
-                        businessProfile={businessProfile}
-                        onSave={storeSetupProps.onSave}
-                        onCancel={() => navigate('/profile')}
-                    />
+                    businessProfile ? (
+                        <StoreSetupPage
+                            userId={storeSetupProps.userId}
+                            businessProfile={businessProfile}
+                            onSave={storeSetupProps.onSave}
+                            onCancel={() => navigate('/profile')}
+                        />
+                    ) : (
+                        <StoreRegistrationWizard
+                            userId={storeSetupProps.userId}
+                            onCancel={() => navigate('/profile')}
+                        />
+                    )
                 ) : (
                     <>
                         {/* BUSINESS OPT-IN CARD */}
@@ -758,7 +766,7 @@ export function ProfilePage({
                                         <h3>
                                             <span className="material-icons store-icon">storefront</span>
                                             {businessProfile.shopName}
-                                            <span className="badge verified-badge">Verified Store</span>
+                                            {businessProfile.verifiedId && <span className="badge verified-badge">Verified ID</span>}
                                         </h3>
                                         <p>Business tools, product catalogs, and advertising active.</p>
                                     </div>

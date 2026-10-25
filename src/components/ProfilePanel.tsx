@@ -137,7 +137,7 @@ export function ProfilePanel({
             </div>
             <p style={{ fontSize: '0.86rem', margin: 0, color: '#e2e8f0' }}>
               {businessProfile ? (
-                <><strong>{businessProfile.shopName}</strong>: <span style={{ color: '#10b981' }}>Verified Seller, Good standing</span></>
+                <><strong>{businessProfile.shopName}</strong>: <span style={{ color: '#10b981' }}>{businessProfile.probationState === 'probation' ? 'New Seller · probation' : 'Storefront open'}</span></>
               ) : (
                 <span style={{ color: '#94a3b8' }}>Standard Profile</span>
               )}

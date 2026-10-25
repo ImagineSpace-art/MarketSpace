@@ -168,7 +168,7 @@ export function ListingCard({ listing, saved = false, onOpen, onToggleSave, onAd
               <span style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {sellerStore.shopName}
               </span>
-              <span className="material-icons" style={{ fontSize: '12px', color: '#3b82f6' }} title="Verified Store">verified</span>
+              {sellerStore.verifiedId && <span className="material-icons" style={{ fontSize: '12px', color: '#3b82f6' }} title="Verified ID">verified</span>}
             </span>
             <span className="modern-card-category" style={{ margin: 0 }}>
               {listing.category || 'General'}

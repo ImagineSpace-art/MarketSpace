@@ -417,7 +417,7 @@ export function StoresPage({
                                 <strong style={{ fontSize: '1.08rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                   {shop.shopName}
                                 </strong>
-                                <span className="material-icons" style={{ fontSize: '16px', color: '#2563eb' }} title="Verified Store">verified</span>
+                                {shop.verifiedId && <span className="material-icons" style={{ fontSize: '16px', color: '#2563eb' }} title="Verified ID">verified</span>}
                               </div>
                               <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
                                 {shopListingsCount} product{shopListingsCount !== 1 ? 's' : ''} in catalog

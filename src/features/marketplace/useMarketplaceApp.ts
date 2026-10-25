@@ -126,7 +126,7 @@ export interface MarketplaceAppModel {
   fetchStores: () => Promise<void>
   loadProfile: (userId: string, userObj?: any) => Promise<Profile>
   handleLogin: () => Promise<void>
-  handleSignup: () => Promise<void>
+  handleSignup: (captchaToken?: string) => Promise<void>
   handleLogout: () => Promise<void>
   resetForm: () => void
   handleCreateListing: (event: FormEvent<HTMLFormElement>) => Promise<void>
@@ -564,7 +564,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
 
     const reviewerIds = Array.from(new Set(data.map((review) => review.reviewer_id).filter(Boolean)))
     const { data: reviewers } = reviewerIds.length
-      ? await supabase.from('profiles').select('user_id, username').in('user_id', reviewerIds)
+      ? await supabase.from('public_profiles').select('user_id, username').in('user_id', reviewerIds)
       : { data: [] }
     const storeIds = Array.from(new Set(data.map((review) => review.store_id).filter(Boolean)))
     const { data: reviewedStores } = storeIds.length
@@ -590,7 +590,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     const { data, error } = await supabase.from('listings').select('*').order('created_at', { ascending: false })
     if (error) return
 
-    const { data: profilesData } = await supabase.from('profiles').select('user_id, username')
+    const { data: profilesData } = await supabase.from('public_profiles').select('user_id, username')
     const sellerMap = new Map<string, string>()
       ; ((profilesData ?? []) as ProfileSummary[]).forEach((profileRow) => {
         if (profileRow.user_id) {
@@ -607,7 +607,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   }
 
   async function fetchStores() {
-    const { data, error } = await supabase.from('profiles').select('*').limit(8)
+    const { data, error } = await supabase.from('public_profiles').select('*').limit(8)
     if (!error) {
       setStores((data ?? []) as Profile[])
     }
@@ -684,7 +684,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     })
 
     const { data: profilesData } = await supabase
-      .from('profiles')
+      .from('public_profiles')
       .select('user_id, username')
       .in('user_id', Array.from(userIds))
 
@@ -746,8 +746,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       setLoading(false)
 
       const needsOnboarding = currentSession && (
-        !loadedProfile?.onboarding_choice ||
-        (loadedProfile.onboarding_choice === 'seller' && !loadedProfile.phone_verified)
+        !loadedProfile?.onboarding_choice
       )
 
       if (needsOnboarding && (window.location.pathname === '/' || window.location.pathname === '/profile')) {
@@ -771,8 +770,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         const loadedProfile = await loadProfile(currentSession.user.id, currentSession.user)
         void fetchListings()
 
-        const needsOnboarding = !loadedProfile?.onboarding_choice ||
-          (loadedProfile.onboarding_choice === 'seller' && !loadedProfile.phone_verified)
+        const needsOnboarding = !loadedProfile?.onboarding_choice
 
         if (needsOnboarding && (window.location.pathname === '/' || window.location.pathname === '/profile')) {
           navigate('/onboarding')
@@ -818,24 +816,17 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     }
   }
 
-  const handleSignup = async () => {
+  const handleSignup = async (captchaToken?: string) => {
     setMessage('')
     if (!authEmail.trim() || !authPassword.trim()) {
       setMessage('Please enter a valid email and password.')
       return
     }
 
-    // Check if an account with this email already exists
-    const { data: existingProfile } = await supabase.from('profiles').select('user_id').eq('email', authEmail.trim()).maybeSingle()
-    if (existingProfile) {
-      setMessage('An account with this email address already exists. Please log in instead.')
-      return
-    }
-
     const { data, error } = await supabase.auth.signUp({
       email: authEmail.trim(),
       password: authPassword,
-      options: { data: { username: authUsername } },
+      options: { data: { username: authUsername }, captchaToken },
     })
 
     if (error) {
@@ -1460,7 +1451,12 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     const { data } = await supabase.from('stores').select('*')
     if (data && data.length > 0) {
       const dbStores: Record<string, BusinessProfile> = {}
+      const nonPublicStoreOwners = new Set<string>()
       data.forEach((s: any) => {
+        if (s.status && s.status !== 'approved') {
+          nonPublicStoreOwners.add(s.user_id)
+          return
+        }
         let localTheme: StoreThemeConfig | undefined = undefined
         try {
           const localStr = window.localStorage.getItem(`marketspace-store-theme-${s.user_id}`)
@@ -1469,6 +1465,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
 
         dbStores[s.user_id] = {
           userId: s.user_id,
+          subdomain: s.subdomain || undefined,
           shopName: s.shop_name,
           description: s.description,
           category: s.category,
@@ -1476,18 +1473,27 @@ export function useMarketplaceApp(): MarketplaceAppModel {
           whatsapp: s.whatsapp,
           logo: s.logo,
           cover: s.cover,
+          operationType: s.operation_type,
           accentColor: s.accent_color || s.accentColor || '#2563eb',
           announcementBar: s.announcement_bar || s.announcementBar || '',
           collections: s.collections || [],
           customerCare: s.customer_care || s.customerCare || {},
           catalog: s.catalog || [],
           ads: s.ads || [],
+          verifiedId: s.verified_id === true,
+          verifiedLocation: s.verified_location === true,
+          registeredBusiness: s.registered_business === true,
+          probationState: s.probation_state === 'probation' ? 'probation' : 'trusted',
           themeConfig: (s.theme_config && s.theme_config.sections && s.theme_config.sections.length > 0)
             ? s.theme_config
             : (localTheme || s.themeConfig || undefined),
         }
       })
-      setAllBusinesses(prev => ({ ...prev, ...dbStores }))
+      setAllBusinesses(prev => {
+        const next = { ...prev, ...dbStores }
+        nonPublicStoreOwners.forEach((ownerId) => delete next[ownerId])
+        return next
+      })
     }
   }
 

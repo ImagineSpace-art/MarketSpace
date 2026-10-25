@@ -16,6 +16,7 @@ import { BrowsePage } from './pages/BrowsePage'
 import { useCart } from './features/marketplace/useCart'
 import { ProfilePage } from './pages/ProfilePage'
 import { SettingsPage } from './pages/SettingsPage'
+import { AdminStoreReviewPage } from './pages/AdminStoreReviewPage'
 import type { Listing, Profile, BusinessProfile } from './types'
 import { isBestSeller, isNewArrival } from './utils/listingSections'
 
@@ -274,14 +275,14 @@ export function AppContent() {
     return <SlowlyFlashingMarketSpaceTemplate message="Loading MarketSpace..." />
   }
 
-  const handleAuthSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleAuthSubmit = async (event: FormEvent<HTMLFormElement>, captchaToken?: string) => {
     event.preventDefault()
     if (location.pathname === '/login' || location.pathname === '/auth') {
       await handleLogin()
       return
     }
 
-    await handleSignup()
+    await handleSignup(captchaToken)
   }
 
 
@@ -297,6 +298,12 @@ export function AppContent() {
     shopName: currentViewStore.shopName,
     collections: currentViewStore.collections || []
   } : null
+  const configuredStoreDomain = (import.meta.env.VITE_STORE_DOMAIN || '').toLowerCase()
+  const hostname = window.location.hostname.toLowerCase()
+  const tenantSlug = configuredStoreDomain && hostname.endsWith(`.${configuredStoreDomain}`)
+    ? hostname.slice(0, -(configuredStoreDomain.length + 1))
+    : ''
+  const tenantStore = tenantSlug ? Object.values(allBusinesses).find((store) => store.subdomain === tenantSlug) : undefined
 
   if (isStorePage) {
     return (
@@ -397,13 +404,15 @@ export function AppContent() {
           <Route
             path="/"
             element={
-              <DiscoveryPage
-                allBusinesses={allBusinesses}
-                listings={listings}
-                storeReviews={app.storeReviews}
-                addStoreReview={app.addStoreReview}
-                isSignedIn={Boolean(session)}
-              />
+              tenantStore
+                ? <Navigate to={`/store/${tenantStore.userId}`} replace />
+                : <DiscoveryPage
+                    allBusinesses={allBusinesses}
+                    listings={listings}
+                    storeReviews={app.storeReviews}
+                    addStoreReview={app.addStoreReview}
+                    isSignedIn={Boolean(session)}
+                  />
             }
           />
           <Route
@@ -760,6 +769,10 @@ export function AppContent() {
                 <Navigate to="/login" replace />
               )
             }
+          />
+          <Route
+            path="/admin/store-review"
+            element={session ? <AdminStoreReviewPage /> : <Navigate to="/login" replace />}
           />
           <Route path="/auth" element={<Navigate to="/login" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />

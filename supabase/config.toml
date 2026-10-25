@@ -1,0 +1,7 @@
+project_id = "marketspace"
+
+[functions.store-registration]
+verify_jwt = true
+
+[functions.purge-store-identity-images]
+verify_jwt = false

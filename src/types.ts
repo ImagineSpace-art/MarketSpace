@@ -202,6 +202,7 @@ export type StoreThemeConfig = {
 
 export type BusinessProfile = {
   userId: string
+  subdomain?: string
   shopName: string
   description: string
   category: string
@@ -217,6 +218,10 @@ export type BusinessProfile = {
   catalog: CatalogItem[]
   ads: BusinessAd[]
   rating?: number
+  verifiedId?: boolean
+  verifiedLocation?: boolean
+  registeredBusiness?: boolean
+  probationState?: 'probation' | 'trusted'
   themeConfig?: StoreThemeConfig
 }
 

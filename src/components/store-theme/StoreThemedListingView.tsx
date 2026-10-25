@@ -762,7 +762,7 @@ export function StoreThemedListingView({
                             </span>
                             <span style={{ color: '#3665f3', fontWeight: 600 }}>99.6% Positive Feedback</span>
                             <span style={{ color: '#707070' }}>•</span>
-                            <span style={{ color: '#707070' }}>Verified Store Merchant</span>
+                            <span style={{ color: '#707070' }}>{shop.verifiedId ? 'Verified ID merchant' : 'MarketSpace store'}</span>
                         </div>
                     </div>
 

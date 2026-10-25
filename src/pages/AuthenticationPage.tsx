@@ -1,6 +1,9 @@
-import { useState, type FormEvent } from 'react'
+import { useCallback, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { validatePassword } from '../utils/passwordValidation'
+import { TurnstileCaptcha } from '../components/TurnstileCaptcha'
+
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
 
 type AuthPageProps = {
   mode: 'login' | 'signup'
@@ -12,7 +15,7 @@ type AuthPageProps = {
   onAuthEmailChange: (value: string) => void
   onAuthPasswordChange: (value: string) => void
   onAuthUsernameChange: (value: string) => void
-  onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void> | void
+  onSubmit: (event: FormEvent<HTMLFormElement>, captchaToken?: string) => Promise<void> | void
   onSwitchMode: () => void
   onLogout: () => void
   onGoProfile: () => void
@@ -50,6 +53,8 @@ export function AuthPage({
   const [forgotEmail, setForgotEmail] = useState('')
   const [forgotSent, setForgotSent] = useState(false)
   const [socialMessage, setSocialMessage] = useState('')
+  const [captchaToken, setCaptchaToken] = useState('')
+  const receiveCaptchaToken = useCallback((token: string) => setCaptchaToken(token), [])
 
   const passwordRules = validatePassword(authPassword)
   const passwordsMatch = authPassword === confirmPassword
@@ -67,10 +72,14 @@ export function AuthPage({
         setLocalError('Passwords do not match. Please verify both fields.')
         return
       }
+      if (TURNSTILE_SITE_KEY && !captchaToken) {
+        setLocalError('Complete the CAPTCHA challenge before creating an account.')
+        return
+      }
     }
 
     try {
-      await onSubmit(e)
+      await onSubmit(e, captchaToken)
     } catch (err: any) {
       setLocalError(err?.message || 'Authentication failed. Please verify your credentials.')
     }
@@ -735,6 +744,12 @@ export function AuthPage({
                       {passwordsMatch && confirmPassword ? '✓' : '✗'} Match
                     </span>
                   </div>
+                </div>
+              )}
+
+              {mode === 'signup' && TURNSTILE_SITE_KEY && (
+                <div style={{ margin: '14px 0' }}>
+                  <TurnstileCaptcha onToken={receiveCaptchaToken} />
                 </div>
               )}
 

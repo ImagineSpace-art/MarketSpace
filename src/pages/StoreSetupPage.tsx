@@ -1,6 +1,8 @@
 import { useState, type FormEvent, type ChangeEvent } from 'react'
 import type { BusinessProfile } from '../types'
 import { uploadImageToSupabase } from '../features/marketplace/ImageUploader'
+import { supabase } from '../lib/supabaseClient'
+import { getFunctionErrorMessage } from '../utils/functionError'
 
 // ---------------- STORE SETUP PAGE ----------------
 type StoreSetupPageProps = {
@@ -27,6 +29,8 @@ export function StoreSetupPage({ userId, businessProfile, onSave, onCancel }: St
     const [returnPolicy, setReturnPolicy] = useState(businessProfile?.customerCare?.returnPolicy || '3-day inspection & exchange guarantee.')
     const [supportPhone, setSupportPhone] = useState(businessProfile?.customerCare?.phone || businessProfile?.whatsapp || '')
     const [supportEmail, setSupportEmail] = useState(businessProfile?.customerCare?.email || '')
+    const [privacyNotice, setPrivacyNotice] = useState('')
+    const [privacyBusy, setPrivacyBusy] = useState(false)
     
     // Store Collections / Department state
     const [collections, setCollections] = useState(businessProfile?.collections || [
@@ -93,6 +97,19 @@ export function StoreSetupPage({ userId, businessProfile, onSave, onCancel }: St
         })
     }
 
+    const handleDeleteVerificationImages = async () => {
+        if (!window.confirm('Delete the private ID, selfie, and location-proof photos for this reviewed store? This cannot be undone.')) return
+        setPrivacyNotice('')
+        setPrivacyBusy(true)
+        const { data, error } = await supabase.functions.invoke<{ success?: boolean; error?: string }>('store-registration', {
+            body: { action: 'delete_identity_images' },
+        })
+        if (error) setPrivacyNotice(await getFunctionErrorMessage(error))
+        else if (data?.error) setPrivacyNotice(data.error)
+        else setPrivacyNotice('Private verification images have been permanently deleted.')
+        setPrivacyBusy(false)
+    }
+
     return (
         <section className="section-card form-card">
             <div className="section-header">
@@ -102,6 +119,18 @@ export function StoreSetupPage({ userId, businessProfile, onSave, onCancel }: St
                 </div>
                 <button className="ghost-btn" onClick={onCancel}>Cancel</button>
             </div>
+            {businessProfile && (
+                <div style={{ margin: '16px 0', padding: 14, border: '1px solid var(--border)', borderRadius: 10 }}>
+                    <strong>Private verification images</strong>
+                    <p style={{ margin: '6px 0 10px', color: 'var(--text-secondary)', fontSize: '.86rem' }}>
+                        ID and selfie images are automatically scheduled for deletion 30 days after review. You may delete them sooner.
+                    </p>
+                    <button type="button" className="secondary-btn" disabled={privacyBusy} onClick={() => void handleDeleteVerificationImages()}>
+                        {privacyBusy ? 'Deleting…' : 'Delete verification images now'}
+                    </button>
+                    {privacyNotice && <p role="status">{privacyNotice}</p>}
+                </div>
+            )}
 
             <form onSubmit={handleSubmit} className="form-stack" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 {/* 1. Basic Store Information */}
