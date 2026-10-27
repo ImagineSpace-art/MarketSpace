@@ -4,6 +4,7 @@ import {
   isDisposableEmailDomain,
   validateStoreSubdomain,
 } from '../_shared/storeRegistrationValidation.ts'
+import { hashSensitiveIdentifier } from '../_shared/storeRegistrationHash.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': Deno.env.get('ALLOWED_ORIGIN') || '*',
@@ -246,7 +247,7 @@ async function saveDraft(context: HandlerContext, body: Json) {
     await verifyPrivateImage(context.admin, selfiePath, context.userId, 'selfiePath')
     const idNumber = getString(body.identityNumber)
     if (!idNumber) return fail('Enter your government ID number.')
-    const idHash = await keyedHash(idNumber, 'STORE_ID_HASH_SECRET')
+    const idHash = await hashSensitiveIdentifier(idNumber, 'id', Deno.env.get('STORE_ID_HASH_SECRET') || '')
     const { data: duplicateIdentity, error: duplicateError } = await context.admin
       .from('store_owner_identity')
       .select('user_id')
@@ -368,7 +369,6 @@ async function submitApplication(context: HandlerContext, body: Json) {
   const identity = getStepData(data, 'identity')
   const storeData = getStepData(data, 'store')
   const location = getStepData(data, 'location')
-  const payout = getStepData(data, 'payout')
   const { data: ownerIdentity, error: identityError } = await context.admin
     .from('store_owner_identity')
     .select('id_number_hash, id_image_path, selfie_path, legal_name')
@@ -397,7 +397,9 @@ async function submitApplication(context: HandlerContext, body: Json) {
 
   const idHash = ownerIdentity.id_number_hash
   const verifiedPhone = authData.user.phone || ''
-  const phoneHash = verifiedPhone ? await keyedHash(verifiedPhone, 'STORE_ID_HASH_SECRET') : ''
+  const phoneHash = verifiedPhone
+    ? await hashSensitiveIdentifier(verifiedPhone, 'phone', Deno.env.get('STORE_ID_HASH_SECRET') || '')
+    : ''
   const storeAddress = storeData.type === 'physical'
     ? getString(location.streetAddress)
     : storeData.type === 'online_delivery' ? 'Online delivery' : 'Meetup only'

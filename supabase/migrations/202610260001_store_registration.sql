@@ -197,7 +197,6 @@ CREATE POLICY "Store admins read audit log"
   USING (EXISTS (SELECT 1 FROM public.store_admins WHERE user_id = auth.uid()));
 
 DROP POLICY IF EXISTS "Public Read Profiles" ON public.profiles;
-UPDATE public.profiles SET pending_otp = NULL WHERE pending_otp IS NOT NULL;
 ALTER TABLE public.profiles DROP COLUMN IF EXISTS pending_otp;
 
 DROP POLICY IF EXISTS "Public Read Stores" ON public.stores;
@@ -485,17 +484,3 @@ GRANT ALL ON public.store_registration_drafts, public.store_owner_identity,
   public.store_policy_acceptances, public.store_admins, public.store_banned_matches,
   public.store_review_checks, public.store_review_audit_log,
   public.store_registration_rate_limits TO service_role;
-
-CREATE OR REPLACE FUNCTION public.delete_my_account()
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, storage, auth
-AS $$
-BEGIN
-  DELETE FROM storage.objects
-  WHERE bucket_id = 'store-private'
-    AND (storage.foldername(name))[1] = auth.uid()::text;
-  DELETE FROM auth.users WHERE id = auth.uid();
-END;
-$$;

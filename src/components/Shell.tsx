@@ -130,33 +130,7 @@ export function Shell({
 
   return (
     <div className="app-shell">
-      {/* 1. Top Announcement Ticker */}
-      <div
-        className="shell-top-ticker"
-        style={{
-          backgroundColor: '#0f172a',
-          color: '#f8fafc',
-          padding: '8px 16px',
-          textAlign: 'center',
-          fontSize: '0.78rem',
-          fontWeight: 600,
-          letterSpacing: '0.02em',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          gap: '14px',
-          flexWrap: 'wrap',
-          borderBottom: '1px solid rgba(255,255,255,0.08)',
-        }}
-      >
-        <span>Free Nationwide Delivery On Orders Over K500</span>
-        <span style={{ opacity: 0.3 }}>|</span>
-        <span>Summer Flash Sale Up To 70% Off</span>
-        <span style={{ opacity: 0.3 }}>|</span>
-        <Link to="/stores" style={{ color: '#fab829', textDecoration: 'none', fontWeight: 700 }}>
-          Explore Verified Storefronts →
-        </Link>
-      </div>
+      
 
       {/* 2. Top Header Navigation Bar */}
       <header className="site-header-bar" onMouseLeave={() => setHoveredCategory(null)}>

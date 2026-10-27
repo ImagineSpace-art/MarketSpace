@@ -12,7 +12,6 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     email TEXT,
     phone_number TEXT,
     avatar_url TEXT,
-    pending_otp TEXT,
     onboarding_choice TEXT,
     phone_verified BOOLEAN DEFAULT false,
     created_at TIMESTAMPTZ DEFAULT NOW()
@@ -179,17 +178,6 @@ CREATE POLICY "User Read Notifications" ON public.notifications FOR SELECT USING
 CREATE POLICY "User Update Notifications" ON public.notifications FOR UPDATE USING (user_id IS NULL OR auth.uid() = user_id);
 CREATE POLICY "User Write Reviews" ON public.reviews FOR INSERT WITH CHECK (auth.uid() = reviewer_id);
 
--- Secure RPC Function to let users delete their own auth account & cascading data
-CREATE OR REPLACE FUNCTION delete_my_account()
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-BEGIN
-    DELETE FROM auth.users WHERE id = auth.uid();
-END;
-$$;
-
 -- Migration: Add listings columns
 ALTER TABLE public.listings ADD COLUMN IF NOT EXISTS renewal_frequency VARCHAR(20) DEFAULT 'weekly';
 ALTER TABLE public.listings ADD COLUMN IF NOT EXISTS use_global_renewal BOOLEAN DEFAULT false;
@@ -250,6 +238,5 @@ DROP POLICY IF EXISTS "User follow store" ON public.store_followers;
 CREATE POLICY "User follow store" ON public.store_followers FOR INSERT WITH CHECK (auth.uid() = user_id);
 DROP POLICY IF EXISTS "User unfollow store" ON public.store_followers;
 CREATE POLICY "User unfollow store" ON public.store_followers FOR DELETE USING (auth.uid() = user_id);
-
 
 

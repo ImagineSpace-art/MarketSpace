@@ -21,7 +21,7 @@ secrets in a `VITE_*` variable.
 
 For a new Supabase project, first apply the existing baseline schema in
 `src/supabase_schema.sql` using the Supabase SQL editor. For an existing project,
-preserve its current schema and apply only the new migration. Link the CLI to the
+preserve its current schema and apply the pending migrations. Link the CLI to the
 intended project before pushing migrations.
 
 2. Install dependencies:
@@ -35,12 +35,18 @@ npm install
 ```bash
 supabase db push
 supabase functions deploy store-registration
+supabase functions deploy account-deletion
 supabase functions deploy purge-store-identity-images
 ```
 
 The application also needs these Supabase Edge Function secrets:
 
-- `STORE_ID_HASH_SECRET`: long random secret used to HMAC government ID numbers and rate-limit identifiers.
+- `STORE_ID_HASH_SECRET`: long random secret used to HMAC normalized government
+  ID numbers, verified E.164 phone numbers, and rate-limit identifiers. Changing
+  identifier normalization means existing ID/phone hashes created from
+  non-canonical values will not match their newly normalized hashes; clear
+  applicable test rows and re-register test accounts. Location-code hashing is
+  unchanged.
 - `STORE_PAYOUT_ENCRYPTION_KEY`: base64-encoded 32-byte AES-GCM key.
 - `PHONE_OTP_REQUIRED`: `true` for production; `false` only for local development.
 - `TURNSTILE_SECRET_KEY`: required to validate CAPTCHA tokens. `APP_ENV` defaults to
@@ -79,6 +85,38 @@ Generate secrets outside the repository (for example, use a password manager or
    the platform's real domain; the app resolves a registered subdomain to its
    approved storefront. The project cannot provision DNS or hosting settings.
 
+To schedule trusted-store promotion with `pg_cron`, first enable the extension
+in the Supabase dashboard, then run:
+
+```sql
+-- Requires the pg_cron extension to be enabled in the Supabase dashboard.
+-- Runs trusted-store promotion every day at 02:00 UTC.
+SELECT cron.schedule(
+  'promote-trusted-stores-daily',
+  '0 2 * * *',
+  $$SELECT public.promote_trusted_stores();$$
+);
+```
+
+The profile's Delete Account action invokes the `account-deletion` Edge Function.
+It prepares the caller's data through the service-role-only
+`prepare_account_deletion(p_user_id)` RPC, recursively removes that user's
+`store-private` files through the Storage API, and then deletes the Auth user.
+The `202610260002_store_registration_fixes.sql` migration adds the
+`prepare_account_deletion` RPC and is safe to rerun if the patch was previously
+applied manually. Account deletion does not yet check open orders, unresolved
+disputes, or pending payouts because those tables are not present in this schema.
+
+The two client-side store upserts in `useMarketplaceApp.ts` write these columns:
+
+- Store editor: `user_id`, `shop_name`, `description`, `category`, `address`,
+  `whatsapp`, `logo`, `cover`, `accent_color`, `announcement_bar`, `collections`,
+  `customer_care`, `catalog`, `ads`, and `theme_config`.
+- Theme editor: `user_id`, `shop_name`, `theme_config`, and `accent_color`.
+
+Neither upsert explicitly writes the protected status, verification, trust,
+subdomain, store-type, or storefront-coordinate fields.
+
 ### Manual store-registration test
 
 1. Create a test account, confirm its email, and choose **Open a store**.
@@ -98,14 +136,14 @@ Generate secrets outside the repository (for example, use a password manager or
 
 ### Current platform limits
 
-The existing app has no orders/checkout or payout execution subsystem. The
-migration installs a database helper for order-value eligibility and records the
-probation cap/hold settings, but the cap cannot be enforced at order creation nor
-can payout releases be delayed until those server-side subsystems call/enforce
-them. Likewise, trusted-store promotion reads `completed_order_count`, which must
-be incremented by the eventual order-completion workflow. These remain integration
-work when those flows exist; this change does not modify checkout or listings
-other than the database-level active-listing limit.
+The existing app has no persisted orders/checkout, disputes, or payout execution
+subsystem. Probation order limits are not checked at order creation, completed
+order counts are not incremented, and payout holds are not applied when scheduling
+payouts. The migration's `store_can_accept_order` helper and configured probation
+fields are not wired into those flows. Trusted-store promotion reads
+`completed_order_count`, which must be incremented by the eventual order-completion
+workflow. These remain integration work when those flows exist; listing statuses
+and the existing database-level active-listing limit are unchanged.
 
 Run the development server:
 
@@ -127,3 +165,10 @@ providing the local project URL, anon key, and service-role key as
 `STORE_REGISTRATION_TEST_SERVICE_ROLE_KEY`. Then set
 `STORE_REGISTRATION_INTEGRATION=1` and run `npm test`. Do not use production
 credentials or production data for this test.
+
+The account-deletion route integration test is also opt-in. Run it only against a
+local/test project after applying the store-registration fixes patch and deploying
+`account-deletion`; set `ACCOUNT_DELETION_INTEGRATION=1` and the same
+`STORE_REGISTRATION_TEST_*` variables before running `npm test`. It creates two
+temporary users, verifies the request cannot delete the other user, and confirms
+the caller's private test image is removed.

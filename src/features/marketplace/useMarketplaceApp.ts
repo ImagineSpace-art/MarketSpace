@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabaseClient'
 import { CATEGORY_OPTIONS, CONDITION_OPTIONS, DELIVERY_OPTIONS } from './constants'
 import type { Listing, Profile, View, BusinessProfile, StoreReview, PaymentMethodItem, NotificationConfig, StoreThemeConfig } from '../../types'
 import { logAnalyticsEvent, toggleStoreFollowInDb } from '../../services/analytics'
+import { getFunctionErrorMessage } from '../../utils/functionError'
 
 export type NotificationItem = {
   id: number
@@ -867,35 +868,25 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   }
 
   const handleDeleteAccount = async () => {
-    if (!session?.user?.id) return
-
     try {
-      // 1. Trigger secure RPC database function to wipe auth.users & CASCADE all profile/listings/store data
-      const { error: rpcError } = await supabase.rpc('delete_my_account')
+      if (!session?.user?.id) throw new Error('Sign in again before deleting your account.')
+      const { error } = await supabase.functions.invoke('account-deletion', { body: {} })
+      if (error) throw new Error(await getFunctionErrorMessage(error))
 
-      if (rpcError) {
-        console.warn('RPC delete_my_account fallback:', rpcError.message)
-        await supabase.from('profiles').delete().eq('user_id', session.user.id)
-      }
+      const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' })
+      if (signOutError) throw signOutError
+
+      setSession(null)
+      setProfile(null)
+      setSavedIds([])
+      setBusinessProfile(null)
+      window.localStorage.removeItem('marketspace-saved')
+      window.localStorage.removeItem('marketspace-notify-store-ids')
+      setMessage('Your account and associated data have been permanently deleted.')
+      navigate('/')
     } catch (err) {
-      console.error('Error deleting account:', err)
-      await supabase.from('profiles').delete().eq('user_id', session.user.id)
+      setMessage(err instanceof Error ? `Account deletion failed: ${err.message}` : 'Account deletion could not be completed.')
     }
-
-    // 2. Sign out of Supabase Auth
-    await supabase.auth.signOut()
-
-    // 3. Clear local session & profile state
-    setSession(null)
-    setProfile(null)
-    setSavedIds([])
-    setBusinessProfile(null)
-    window.localStorage.removeItem('marketspace-saved')
-    window.localStorage.removeItem('marketspace-notify-store-ids')
-
-    // 4. Notify user and redirect to homepage
-    setMessage('Your account and associated data have been permanently deleted.')
-    navigate('/')
   }
 
   const resetForm = () => {
