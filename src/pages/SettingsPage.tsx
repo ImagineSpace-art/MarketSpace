@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import type { PaymentMethodItem, NotificationConfig } from '../types'
+import { SettingsNavigation } from '../components/SettingsNavigation'
 
 type SettingsPageProps = {
     theme: 'light' | 'dark'
@@ -54,7 +55,8 @@ export function SettingsPage({
     setEnableGlobalRenewal,
 }: SettingsPageProps) {
     const { category = 'account' } = useParams<{ category?: string }>()
-    const navigate = useNavigate()
+    const [isMobileNavigationOpen, setIsMobileNavigationOpen] = useState(false)
+    const [isDesktopNavigationCollapsed, setIsDesktopNavigationCollapsed] = useState(false)
 
     // Account View local states
     const [passwordCurrent, setPasswordCurrent] = useState('')
@@ -116,50 +118,60 @@ export function SettingsPage({
     ]
 
     return (
-        <div className="section-card settings-page" style={{ margin: 0, padding: '24px', width: '100%', boxSizing: 'border-box' }}>
+        <div className="section-card settings-page">
             {/* Header Banner */}
-            <div style={{ marginBottom: '20px', borderBottom: '1px solid var(--border)', paddingBottom: '16px' }}>
-                <h2 style={{ margin: '0 0 6px 0', fontSize: '1.6rem', fontWeight: 800, color: 'var(--text)' }}>
-                    Settings & Account Preferences
-                </h2>
-                <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
-                    Manage your account security, notification alerts, payment methods, and legal policies.
-                </p>
+            <div className="settings-page-header">
+                <button
+                    type="button"
+                    className="settings-mobile-menu-button"
+                    onClick={() => setIsMobileNavigationOpen(true)}
+                    aria-label="Open settings sections"
+                    aria-expanded={isMobileNavigationOpen}
+                >
+                    <span className="material-icons" aria-hidden="true">menu</span>
+                    <span>Settings sections</span>
+                </button>
+                <button
+                    type="button"
+                    className="settings-desktop-menu-button"
+                    onClick={() => setIsDesktopNavigationCollapsed((collapsed) => !collapsed)}
+                    aria-label={isDesktopNavigationCollapsed ? 'Show settings sections' : 'Hide settings sections'}
+                    aria-expanded={!isDesktopNavigationCollapsed}
+                >
+                    <span className="material-icons" aria-hidden="true">{isDesktopNavigationCollapsed ? 'menu' : 'menu_open'}</span>
+                </button>
+                <div>
+                    <h2>Settings & Account Preferences</h2>
+                    <p>Manage your account security, notification alerts, payment methods, and legal policies.</p>
+                </div>
             </div>
 
-            {/* Horizontal Settings Tabs at Top */}
-            <div className="settings-nav-tabs" style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '24px', borderBottom: '1px solid var(--border)' }}>
-                {[
-                    { id: 'account', label: 'Your Account', icon: 'manage_accounts' },
-                    { id: 'preferences', label: 'Preferences', icon: 'tune' },
-                    { id: 'audience', label: 'Audience & Visibility', icon: 'visibility' },
-                    { id: 'payments', label: 'Payments', icon: 'payment' },
-                    { id: 'activity', label: 'Your Activity', icon: 'history' },
-                    { id: 'legal', label: 'Legal & Policies', icon: 'gavel' },
-                ].map((item) => {
-                    const isCurrent = activeTab === item.id || (!activeTab && item.id === 'account')
-                    return (
+            <div className={`settings-layout${isDesktopNavigationCollapsed ? ' nav-collapsed' : ''}${isMobileNavigationOpen ? ' mobile-nav-open' : ''}`}>
+                <button
+                    type="button"
+                    className="settings-mobile-backdrop"
+                    onClick={() => setIsMobileNavigationOpen(false)}
+                    aria-label="Close settings sections"
+                    tabIndex={isMobileNavigationOpen ? 0 : -1}
+                />
+                <aside className="settings-sidebar" aria-label="Settings sections">
+                    <div className="settings-sidebar-header">
+                        <strong>Settings sections</strong>
                         <button
-                            key={item.id}
-                            className={isCurrent ? "primary-btn" : "ghost-btn"}
-                            onClick={() => navigate(`/settings/${item.id}`)}
-                            style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                padding: '10px 16px',
-                                borderRadius: '20px',
-                                whiteSpace: 'nowrap',
-                                fontSize: '0.88rem',
-                                fontWeight: isCurrent ? 700 : 500
-                            }}
+                            type="button"
+                            className="settings-navigation-close settings-mobile-close"
+                            onClick={() => setIsMobileNavigationOpen(false)}
+                            aria-label="Close settings sections"
                         >
-                            <span className="material-icons" style={{ fontSize: '18px' }}>{item.icon}</span>
-                            {item.label}
+                            <span className="material-icons" aria-hidden="true">close</span>
                         </button>
-                    )
-                })}
-            </div>
+                    </div>
+                    <SettingsNavigation
+                        activeCategory={activeTab}
+                        onNavigate={() => setIsMobileNavigationOpen(false)}
+                    />
+                </aside>
+                <main className="settings-content">
 
             {/* 1. ACCOUNT SUB-PAGE */}
             {(!activeTab || activeTab === 'account') && (
@@ -582,6 +594,8 @@ export function SettingsPage({
                     </div>
                 </div>
             )}
+                </main>
+            </div>
         </div>
     )
 }

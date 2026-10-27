@@ -236,8 +236,13 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
   const receiveCaptchaToken = useCallback((token: string) => setCaptchaToken(token), [])
 
   const invoke = async <T,>(action: string, body: Record<string, unknown> = {}) => {
+    const { data: authData, error: authError } = await supabase.auth.getSession()
+    if (authError) throw new Error('Your sign-in session could not be checked. Please sign in again.')
+    if (!authData.session?.access_token) throw new Error('Your session expired, please sign in again')
+
     const { data: response, error: functionError } = await supabase.functions.invoke<T>('store-registration', {
       body: { action, ...body },
+      headers: { Authorization: `Bearer ${authData.session.access_token}` },
     })
     if (functionError) throw new Error(await getFunctionErrorMessage(functionError))
     if (!response) throw new Error('The registration service returned no response.')

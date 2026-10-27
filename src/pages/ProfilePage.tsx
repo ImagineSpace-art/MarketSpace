@@ -1,5 +1,6 @@
 import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
+import { PROFILE_NAVIGATION_ITEMS } from '../components/profileNavigationItems'
 import type { Listing, Profile, BusinessProfile, PaymentMethodItem, NotificationConfig, StoreThemeConfig } from '../types'
 import { SavedItemsPage, NotificationsPage } from './SavedNotificationsPage'
 import { ListingFormPage } from './ListingPage'
@@ -235,17 +236,6 @@ export function ProfilePage({
         return () => window.removeEventListener('keydown', handleKeyDown)
     }, [isNavigationOpen])
 
-    const navItems = [
-        { path: '/settings', label: 'Settings', icon: 'settings' },
-        { path: '/profile/create', label: 'Create new listing', icon: 'add_circle', isPrimary: true },
-        { path: '/profile/create-ad', label: 'Create ad', icon: 'campaign', isPrimary: false },
-        { path: '/profile', label: 'Seller dashboard', icon: 'dashboard', exact: true },
-        { path: '/profile/store-dashboard', label: 'Store dashboard', icon: 'storefront' },
-        { path: '/profile/store-insights', label: 'Store insights', icon: 'insights' },
-        { path: '/profile/saved-listings', label: 'Saved listings', icon: 'bookmark' },
-        { path: '/profile/notifications', label: 'Notifications', icon: 'notifications' },
-    ]
-
     return (
         <div className="dashboard-layout">
             <button
@@ -286,12 +276,12 @@ export function ProfilePage({
                     </button>
                 </div>
                 <nav className="sidebar-nav">
-                    {navItems.map((item) => (
+                    {PROFILE_NAVIGATION_ITEMS.map((item) => (
                         <NavLink
                             key={item.path}
-                            className={({ isActive }) => `nav-btn ${item.isPrimary ? 'primary-action' : ''} ${isActive ? 'active' : ''}`}
+                            className={({ isActive }) => `nav-btn ${'isPrimary' in item && item.isPrimary ? 'primary-action' : ''} ${isActive ? 'active' : ''}`}
                             to={item.path}
-                            end={item.exact}
+                            end={'exact' in item ? item.exact : false}
                             onClick={() => setIsNavigationOpen(false)}
                             style={{ textDecoration: 'none' }}
                         >

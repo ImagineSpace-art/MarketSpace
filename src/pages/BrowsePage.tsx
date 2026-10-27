@@ -158,8 +158,8 @@ export function BrowsePage({
     <div
       className="browse-page-wrapper"
       style={{
-        backgroundColor: '#ffffff',
-        color: '#0f172a',
+        backgroundColor: 'var(--bg)',
+        color: 'var(--text)',
         minHeight: '100vh',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
       }}
@@ -365,7 +365,7 @@ export function BrowsePage({
       </section>
 
       {/* ---------------- 3. SHOP BY CATEGORIES ---------------- */}
-      <section style={{ maxWidth: '1280px', margin: '54px auto 40px', padding: '0 24px' }}>
+      <section className="shop-category-section" style={{ maxWidth: '1280px', margin: '54px auto 40px', padding: '0 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 900, margin: 0, color: '#0f172a', letterSpacing: '-0.02em' }}>
             Shop by Categories
@@ -393,46 +393,36 @@ export function BrowsePage({
           </button>
         </div>
 
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
-            gap: '18px',
-          }}
-        >
+        <div className="shop-category-rail">
           {categories.map((cat) => (
             <div
               key={cat.id}
+              className="shop-category-card"
               onClick={() => {
                 setSelectedCategory(cat.name)
                 scrollToCatalog()
               }}
               style={{
-                borderRadius: '20px',
-                overflow: 'hidden',
-                border: '1px solid #e2e8f0',
-                backgroundColor: '#ffffff',
-                boxShadow: '0 4px 14px rgba(0,0,0,0.03)',
                 cursor: 'pointer',
                 transition: 'transform 0.2s ease, box-shadow 0.2s ease',
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-4px)'
-                e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.08)'
+                e.currentTarget.style.boxShadow = '0 12px 24px rgba(15,23,42,0.16)'
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.03)'
+                e.currentTarget.style.boxShadow = '0 4px 14px rgba(15,23,42,0.1)'
               }}
             >
-              <div style={{ height: '170px', overflow: 'hidden', backgroundColor: '#f1f5f9' }}>
+              <div className="shop-category-image">
                 <img
                   src={cat.image}
                   alt={cat.title}
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
               </div>
-              <div style={{ padding: '14px', textAlign: 'center' }}>
+              <div className="shop-category-caption">
                 <strong style={{ display: 'block', fontSize: '0.92rem', color: '#0f172a', marginBottom: '2px' }}>
                   {cat.name}
                 </strong>

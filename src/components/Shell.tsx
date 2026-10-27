@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import type { Profile } from '../types'
 import { CartDrawer, type CartItem } from './CartDrawer'
+import { SettingsNavigationDrawer } from './SettingsNavigation'
 
 type ShellProps = {
   children: ReactNode
@@ -103,6 +104,7 @@ export function Shell({
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null)
   const [mobileCatExpanded, setMobileCatExpanded] = useState<string | null>(null)
   const [isMobileCategoryDrawerOpen, setIsMobileCategoryDrawerOpen] = useState(false)
+  const [isSettingsNavigationOpen, setIsSettingsNavigationOpen] = useState(false)
   const [selectedDrawerCategory, setSelectedDrawerCategory] = useState<string | null>(null)
   const navigate = useNavigate()
   const location = useLocation()
@@ -385,15 +387,22 @@ export function Shell({
               )}
             </button>
 
-            {/* Direct Profile Link */}
+            {/* Account settings navigation */}
             {session ? (
-              <Link to="/profile" className="header-avatar-bubble" title="My Account & Dashboard">
+              <button
+                type="button"
+                className="header-avatar-bubble"
+                title="Open settings navigation"
+                aria-label="Open settings navigation"
+                aria-expanded={isSettingsNavigationOpen}
+                onClick={() => setIsSettingsNavigationOpen(true)}
+              >
                 {profile?.avatar_url ? (
                   <img src={profile.avatar_url} alt="Profile" className="header-avatar-img" />
                 ) : (
                   <span>{(profile?.username || session.user.email || 'MS').slice(0, 2).toUpperCase()}</span>
                 )}
-              </Link>
+              </button>
             ) : (
               <Link to="/login" className="header-icon-link" title="Sign In">
                 <span className="material-icons">account_circle</span>
@@ -661,6 +670,10 @@ export function Shell({
         )}
       </>
     )}
+    <SettingsNavigationDrawer
+      isOpen={isSettingsNavigationOpen}
+      onClose={() => setIsSettingsNavigationOpen(false)}
+    />
       </header>
 
       {/* Main Content Pane with Push Sidebar */}

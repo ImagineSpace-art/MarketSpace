@@ -107,11 +107,12 @@ export function StoresPage({
 
   return (
     <div
+      className="stores-page-wrapper"
       style={{
         width: '100%',
         boxSizing: 'border-box',
-        backgroundColor: '#ffffff',
-        color: '#0f172a',
+        backgroundColor: 'var(--bg)',
+        color: 'var(--text)',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
       }}
     >
@@ -196,7 +197,7 @@ export function StoresPage({
         </div>
       </section>
 
-      <section style={{ maxWidth: '1280px', margin: '48px auto 40px', padding: '0 24px' }}>
+      <section className="shop-category-section" style={{ maxWidth: '1280px', margin: '48px auto 40px', padding: '0 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '22px', gap: '12px', flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 900, margin: 0, color: '#0f172a', letterSpacing: '-0.02em' }}>Shop by Category</h2>
@@ -206,19 +207,20 @@ export function StoresPage({
             View all stores <span className="material-icons" style={{ fontSize: '16px' }}>arrow_forward</span>
           </button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '18px' }}>
+        <div className="shop-category-rail">
           {storeCategories.map((category) => (
             <button
               key={category.name}
               type="button"
+              className="shop-category-card"
               onClick={() => { onSearchQueryChange(''); setSelectedCategory(category.name); setViewMode('listings'); scrollToCatalog() }}
-              style={{ padding: 0, borderRadius: '20px', overflow: 'hidden', border: '1px solid #e2e8f0', backgroundColor: '#ffffff', boxShadow: '0 4px 14px rgba(0,0,0,0.03)', cursor: 'pointer', textAlign: 'center' }}
+              style={{ padding: 0, cursor: 'pointer', textAlign: 'center' }}
             >
-              <div style={{ height: '150px', overflow: 'hidden', backgroundColor: '#f1f5f9' }}>
+              <div className="shop-category-image">
                 <img src={category.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               </div>
-              <span style={{ display: 'block', padding: '12px 10px 2px', fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>{category.name}</span>
-              <span style={{ display: 'block', padding: '0 10px 14px', fontSize: '0.76rem', color: '#ea580c', fontWeight: 700 }}>{category.description}</span>
+              <span className="shop-category-title">{category.name}</span>
+              <span className="shop-category-description">{category.description}</span>
             </button>
           ))}
         </div>
