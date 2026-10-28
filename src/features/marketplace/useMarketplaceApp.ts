@@ -1,0 +1,1655 @@
+import { useEffect, useMemo, useState, type Dispatch, type FormEvent, type SetStateAction } from 'react'
+import type { Session } from '@supabase/supabase-js'
+import { useNavigate } from 'react-router-dom'
+import { supabase } from '../../lib/supabaseClient'
+import { CATEGORY_OPTIONS, CONDITION_OPTIONS, DELIVERY_OPTIONS } from './constants'
+import type { Listing, Profile, View, BusinessProfile, StoreReview, PaymentMethodItem, NotificationConfig, StoreThemeConfig } from '../../types'
+import { logAnalyticsEvent, toggleStoreFollowInDb } from '../../services/analytics'
+import { getFunctionErrorMessage } from '../../utils/functionError'
+
+export type NotificationItem = {
+  id: number
+  title: string
+  body: string
+  time: string
+  unread: boolean
+}
+
+export type ChatMessage = {
+  id: number
+  sender: 'me' | 'them'
+  content: string
+  time: string
+}
+
+export type ChatThread = {
+  id: number
+  title: string
+  participant: string
+  listingTitle: string
+  unread: boolean
+  messages: ChatMessage[]
+  isPinned?: boolean
+  isFavorite?: boolean
+  isArchived?: boolean
+}
+
+export interface MarketplaceAppModel {
+  view: View
+  setView: Dispatch<SetStateAction<View>>
+  theme: 'light' | 'dark'
+  setTheme: Dispatch<SetStateAction<'light' | 'dark'>>
+  session: Session | null
+  setSession: Dispatch<SetStateAction<Session | null>>
+  profile: Profile | null
+  setProfile: Dispatch<SetStateAction<Profile | null>>
+  listings: Listing[]
+  setListings: Dispatch<SetStateAction<Listing[]>>
+  stores: Profile[]
+  setStores: Dispatch<SetStateAction<Profile[]>>
+  selectedListing: Listing | null
+  setSelectedListing: Dispatch<SetStateAction<Listing | null>>
+  editingListing: Listing | null
+  setEditingListing: Dispatch<SetStateAction<Listing | null>>
+  loading: boolean
+  setLoading: Dispatch<SetStateAction<boolean>>
+  message: string
+  setMessage: Dispatch<SetStateAction<string>>
+  authEmail: string
+  setAuthEmail: Dispatch<SetStateAction<string>>
+  authPassword: string
+  setAuthPassword: Dispatch<SetStateAction<string>>
+  authUsername: string
+  setAuthUsername: Dispatch<SetStateAction<string>>
+  searchQuery: string
+  setSearchQuery: Dispatch<SetStateAction<string>>
+  activeCategories: string[]
+  setActiveCategories: Dispatch<SetStateAction<string[]>>
+  toggleCategory: (category: string) => void
+  priceRange: number
+  setPriceRange: Dispatch<SetStateAction<number>>
+  distanceFilter: number
+  setDistanceFilter: Dispatch<SetStateAction<number>>
+  sortBy: string
+  setSortBy: Dispatch<SetStateAction<string>>
+  showOnlyAvailable: boolean
+  setShowOnlyAvailable: Dispatch<SetStateAction<boolean>>
+  savedIds: string[]
+  setSavedIds: Dispatch<SetStateAction<string[]>>
+  followingIds: string[]
+  notifyStoreIds: string[]
+  toggleFollowStore: (storeId: string) => void
+  toggleNotifyStore: (storeId: string) => void
+  notifications: NotificationItem[]
+  setNotifications: Dispatch<SetStateAction<NotificationItem[]>>
+  chatThreads: ChatThread[]
+  setChatThreads: Dispatch<SetStateAction<ChatThread[]>>
+  activeChatId: number | null
+  setActiveChatId: Dispatch<SetStateAction<number | null>>
+  chatDraft: string
+  setChatDraft: Dispatch<SetStateAction<string>>
+  title: string
+  setTitle: Dispatch<SetStateAction<string>>
+  description: string
+  setDescription: Dispatch<SetStateAction<string>>
+  price: string
+  setPrice: Dispatch<SetStateAction<string>>
+  category: string
+  setCategory: Dispatch<SetStateAction<string>>
+  status: string
+  setStatus: Dispatch<SetStateAction<string>>
+  listingType: string
+  setListingType: Dispatch<SetStateAction<string>>
+  condition: string
+  setCondition: Dispatch<SetStateAction<string>>
+  deliveryOption: string
+  setDeliveryOption: Dispatch<SetStateAction<string>>
+  renewalFrequency: 'daily' | 'weekly' | 'biweekly' | 'monthly'
+  setRenewalFrequency: Dispatch<SetStateAction<'daily' | 'weekly' | 'biweekly' | 'monthly'>>
+  publishAs: 'private' | 'store'
+  setPublishAs: Dispatch<SetStateAction<'private' | 'store'>>
+  collectionId: string
+  setCollectionId: Dispatch<SetStateAction<string>>
+  howItWorks: string
+  setHowItWorks: Dispatch<SetStateAction<string>>
+  useGlobalRenewal: boolean
+  setUseGlobalRenewal: Dispatch<SetStateAction<boolean>>
+  globalRenewalFrequency: 'daily' | 'weekly' | 'biweekly' | 'monthly'
+  setGlobalRenewalFrequency: Dispatch<SetStateAction<'daily' | 'weekly' | 'biweekly' | 'monthly'>>
+  globalRenewalDay: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday'
+  setGlobalRenewalDay: Dispatch<SetStateAction<'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday'>>
+  enableGlobalRenewal: boolean
+  setEnableGlobalRenewal: Dispatch<SetStateAction<boolean>>
+  canMessage: boolean
+  setCanMessage: Dispatch<SetStateAction<boolean>>
+  userEmail: string
+  fetchListings: () => Promise<void>
+  fetchStores: () => Promise<void>
+  loadProfile: (userId: string, userObj?: any) => Promise<Profile>
+  handleLogin: () => Promise<void>
+  handleSignup: (captchaToken?: string) => Promise<void>
+  handleLogout: () => Promise<void>
+  resetForm: () => void
+  handleCreateListing: (event: FormEvent<HTMLFormElement>) => Promise<void>
+  handleUpdateListing: (event: FormEvent<HTMLFormElement>) => Promise<void>
+  openListing: (listing: Listing) => void
+  openEditListing: (listing: Listing) => void
+  toggleSave: (listingId: number) => void
+  clearAllFilters: () => void
+  handleUpdateListingCollection: (listingId: number, targetColId: string | null) => Promise<void>
+  markAllRead: () => void
+  sendInboxMessage: () => void
+  filteredListings: Listing[]
+  savedListings: Listing[]
+  myListings: Listing[]
+  heroStats: Array<{ label: string; value: string }>
+  businessProfile: BusinessProfile | null
+  setBusinessProfile: Dispatch<SetStateAction<BusinessProfile | null>>
+  allBusinesses: Record<string, BusinessProfile>
+  setAllBusinesses: Dispatch<SetStateAction<Record<string, BusinessProfile>>>
+  selectedStore: BusinessProfile | null
+  setSelectedStore: Dispatch<SetStateAction<BusinessProfile | null>>
+  uploadedImages: string[]
+  setUploadedImages: Dispatch<SetStateAction<string[]>>
+  handleCreateOrUpdateBusiness: (profile: BusinessProfile) => void
+  handleSaveStoreTheme: (config: StoreThemeConfig, storeUserId?: string) => Promise<void>
+  handleDeleteListing: (listingId: number) => Promise<void>
+  handleRenewListing: (listingId: number) => Promise<void>
+  handleUpdateListingStatus: (listingId: number, status: string) => Promise<void>
+  handleUploadAvatar: (base64: string) => Promise<void>
+  handleStartChat: (listing: Listing, customMessage?: string) => Promise<void>
+  availableColors: string[]
+  setAvailableColors: Dispatch<SetStateAction<string[]>>
+  listingKindFilter: 'all' | 'item' | 'service'
+  setListingKindFilter: Dispatch<SetStateAction<'all' | 'item' | 'service'>>
+  storeReviews: StoreReview[]
+  addStoreReview: (storeId: string | null, rating: number, comment: string, targetUserId?: string | null) => void
+  replyToStoreReview: (reviewId: string, replyText: string) => void
+  currency: 'ZMW' | 'USD' | 'EUR'
+  setCurrency: Dispatch<SetStateAction<'ZMW' | 'USD' | 'EUR'>>
+  notificationsConfig: NotificationConfig
+  setNotificationsConfig: Dispatch<SetStateAction<NotificationConfig>>
+  blockedUserIds: string[]
+  toggleBlockUser: (userId: string) => void
+  paymentMethods: PaymentMethodItem[]
+  addPaymentMethod: (item: Omit<PaymentMethodItem, 'id'>) => void
+  removePaymentMethod: (id: string) => void
+  browsingHistory: Array<{ id: number; title: string; price: number; image?: string; timestamp: string }>
+  clearBrowsingHistory: () => void
+  searchHistory: string[]
+  clearSearchHistory: () => void
+  togglePinChat: (chatId: number) => void
+  toggleFavoriteChat: (chatId: number) => void
+  toggleArchiveChat: (chatId: number) => void
+  deleteChat: (chatId: number) => void
+  handleDeleteAccount: () => Promise<void>
+}
+
+type ListingRow = Listing & {
+  user_id?: string
+}
+
+type ProfileSummary = Pick<Profile, 'user_id' | 'username'>
+
+function getStoredTheme(): 'light' | 'dark' {
+  if (typeof window === 'undefined') {
+    return 'light'
+  }
+
+  return window.localStorage.getItem('marketspace-theme') === 'dark' ? 'dark' : 'light'
+}
+
+function getStoredSavedIds(): string[] {
+  if (typeof window === 'undefined') {
+    return []
+  }
+
+  const storedSaves = window.localStorage.getItem('marketspace-saved')
+  if (!storedSaves) {
+    return []
+  }
+
+  try {
+    const parsedSaves: unknown = JSON.parse(storedSaves)
+    return Array.isArray(parsedSaves) ? parsedSaves.filter((value): value is string => typeof value === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+export function useMarketplaceApp(): MarketplaceAppModel {
+  const navigate = useNavigate()
+  const [view, setView] = useState<View>('home')
+  const [theme, setTheme] = useState<'light' | 'dark'>(getStoredTheme)
+  const [session, setSession] = useState<Session | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [listings, setListings] = useState<Listing[]>([])
+  const [stores, setStores] = useState<Profile[]>([])
+  const [selectedListing, setSelectedListing] = useState<Listing | null>(null)
+  const [editingListing, setEditingListing] = useState<Listing | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [message, setMessage] = useState('')
+  const [authEmail, setAuthEmail] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authUsername, setAuthUsername] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [activeCategories, setActiveCategories] = useState<string[]>(['All'])
+  const [priceRange, setPriceRange] = useState<number>(3000)
+  const [distanceFilter, setDistanceFilter] = useState<number>(65)
+  const [sortBy, setSortBy] = useState('Newest')
+  const [showOnlyAvailable, setShowOnlyAvailable] = useState(true)
+  const [savedIds, setSavedIds] = useState<string[]>(getStoredSavedIds)
+  const [globalRenewalFrequency, setGlobalRenewalFrequency] = useState<'daily' | 'weekly' | 'biweekly' | 'monthly'>(() => {
+    if (typeof window === 'undefined') return 'weekly'
+    const stored = window.localStorage.getItem('marketspace-global-renewal')
+    return (stored as any) || 'weekly'
+  })
+
+  const [globalRenewalDay, setGlobalRenewalDay] = useState<'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday'>(() => {
+    if (typeof window === 'undefined') return 'Monday'
+    const stored = window.localStorage.getItem('marketspace-global-renewal-day')
+    return (stored as any) || 'Monday'
+  })
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('marketspace-global-renewal', globalRenewalFrequency)
+    }
+  }, [globalRenewalFrequency])
+
+  const [enableGlobalRenewal, setEnableGlobalRenewal] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true
+    const stored = window.localStorage.getItem('marketspace-enable-global-renewal')
+    return stored !== null ? JSON.parse(stored) : true
+  })
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('marketspace-enable-global-renewal', JSON.stringify(enableGlobalRenewal))
+    }
+  }, [enableGlobalRenewal])
+  const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
+    if (typeof window === 'undefined') return []
+    const stored = window.localStorage.getItem('marketspace-notifications')
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      } catch { }
+    }
+    return [
+      {
+        id: 'notif-1',
+        user_id: 'all',
+        title: 'Welcome to MarketSpace!',
+        body: 'Explore thousands of verified local listings, stores, and services in Zambia.',
+        time: 'Just now',
+        unread: true
+      },
+      {
+        id: 'notif-2',
+        user_id: 'all',
+        title: 'System Currency Update',
+        body: 'All item and service prices automatically display in ZMW (Zambian Kwacha).',
+        time: 'Today',
+        unread: true
+      },
+      {
+        id: 'notif-3',
+        user_id: 'all',
+        title: 'Verified Store Feature',
+        body: 'Create your digital storefront on MarketSpace and publish your product catalogs.',
+        time: 'Yesterday',
+        unread: false
+      }
+    ]
+  })
+
+  useEffect(() => {
+    window.localStorage.setItem('marketspace-notifications', JSON.stringify(notifications))
+  }, [notifications])
+  const [chatThreads, setChatThreads] = useState<ChatThread[]>([])
+  const [activeChatId, setActiveChatId] = useState<number | null>(1)
+  const [chatDraft, setChatDraft] = useState('')
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [price, setPrice] = useState<string>('3000')
+  const [category, setCategory] = useState('Electronics')
+  const [status, setStatus] = useState('Available')
+  const [listingType, setListingType] = useState('single')
+  const [condition, setCondition] = useState('Used - Good')
+  const [deliveryOption, setDeliveryOption] = useState('In-Person Meetup')
+  const [uploadedImages, setUploadedImages] = useState<string[]>([])
+  const [availableColors, setAvailableColors] = useState<string[]>([])
+  const [renewalFrequency, setRenewalFrequency] = useState<'daily' | 'weekly' | 'biweekly' | 'monthly'>('weekly')
+  const [publishAs, setPublishAs] = useState<'private' | 'store'>('private')
+  const [collectionId, setCollectionId] = useState<string>('')
+  const [howItWorks, setHowItWorks] = useState<string>('')
+  const [useGlobalRenewal, setUseGlobalRenewal] = useState<boolean>(true)
+  const [listingKindFilter, setListingKindFilter] = useState<'all' | 'item' | 'service'>('all')
+  const [canMessage, setCanMessage] = useState(true)
+
+  useEffect(() => {
+    if (message) {
+      const timer = setTimeout(() => {
+        setMessage('')
+      }, 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [message])
+
+  const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null)
+  const [allBusinesses, setAllBusinesses] = useState<Record<string, BusinessProfile>>({})
+  const [selectedStore, setSelectedStore] = useState<BusinessProfile | null>(null)
+
+  const [followingIds, setFollowingIds] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return []
+    const stored = window.localStorage.getItem('marketspace-following-ids')
+    return stored ? JSON.parse(stored) : []
+  })
+
+  const [notifyStoreIds, setNotifyStoreIds] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return []
+    const stored = window.localStorage.getItem('marketspace-notify-store-ids')
+    return stored ? JSON.parse(stored) : []
+  })
+
+  const [storeReviews, setStoreReviews] = useState<StoreReview[]>(() => {
+    if (typeof window === 'undefined') return []
+    const stored = window.localStorage.getItem('marketspace-store-reviews')
+    return stored ? JSON.parse(stored) : []
+  })
+
+  const [currency, setCurrency] = useState<'ZMW' | 'USD' | 'EUR'>(() => {
+    if (typeof window === 'undefined') return 'ZMW'
+    return (window.localStorage.getItem('marketspace-currency') as any) || 'ZMW'
+  })
+
+  useEffect(() => {
+    window.localStorage.setItem('marketspace-currency', currency)
+  }, [currency])
+
+  const [notificationsConfig, setNotificationsConfig] = useState<NotificationConfig>(() => {
+    if (typeof window === 'undefined') return { email: true, push: true, sms: false, orders: true, promos: false }
+    const stored = window.localStorage.getItem('marketspace-notifications-config')
+    return stored ? JSON.parse(stored) : { email: true, push: true, sms: false, orders: true, promos: false }
+  })
+
+  useEffect(() => {
+    window.localStorage.setItem('marketspace-notifications-config', JSON.stringify(notificationsConfig))
+  }, [notificationsConfig])
+
+  const [blockedUserIds, setBlockedUserIds] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return []
+    const stored = window.localStorage.getItem('marketspace-blocked-user-ids')
+    return stored ? JSON.parse(stored) : []
+  })
+
+  useEffect(() => {
+    window.localStorage.setItem('marketspace-blocked-user-ids', JSON.stringify(blockedUserIds))
+  }, [blockedUserIds])
+
+  const toggleBlockUser = (targetUserId: string) => {
+    setBlockedUserIds((prev) =>
+      prev.includes(targetUserId) ? prev.filter((id) => id !== targetUserId) : [...prev, targetUserId]
+    )
+    setMessage(blockedUserIds.includes(targetUserId) ? 'User unblocked' : 'User blocked')
+  }
+
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodItem[]>(() => {
+    if (typeof window === 'undefined') return []
+    const stored = window.localStorage.getItem('marketspace-payment-methods')
+    return stored ? JSON.parse(stored) : []
+  })
+
+  useEffect(() => {
+    window.localStorage.setItem('marketspace-payment-methods', JSON.stringify(paymentMethods))
+  }, [paymentMethods])
+
+  const addPaymentMethod = (item: Omit<PaymentMethodItem, 'id'>) => {
+    const newItem: PaymentMethodItem = {
+      ...item,
+      id: 'p-' + Date.now(),
+    }
+    setPaymentMethods((prev) => [...prev, newItem])
+    setMessage('Payment method added')
+  }
+
+  const removePaymentMethod = (id: string) => {
+    setPaymentMethods((prev) => prev.filter((p) => p.id !== id))
+    setMessage('Payment method removed')
+  }
+
+  const [browsingHistory, setBrowsingHistory] = useState<Array<{ id: number; title: string; price: number; image?: string; timestamp: string }>>(() => {
+    if (typeof window === 'undefined') return []
+    const stored = window.localStorage.getItem('marketspace-browsing-history')
+    return stored ? JSON.parse(stored) : []
+  })
+
+  const clearBrowsingHistory = () => {
+    setBrowsingHistory([])
+    window.localStorage.removeItem('marketspace-browsing-history')
+    setMessage('Browsing history cleared')
+  }
+
+  const [searchHistory, setSearchHistory] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return []
+    const stored = window.localStorage.getItem('marketspace-search-history')
+    return stored ? JSON.parse(stored) : []
+  })
+
+  const clearSearchHistory = () => {
+    setSearchHistory([])
+    window.localStorage.removeItem('marketspace-search-history')
+    setMessage('Search history cleared')
+  }
+
+  const [chatFlags, setChatFlags] = useState<Record<number, { isPinned?: boolean; isFavorite?: boolean; isArchived?: boolean }>>(() => {
+    if (typeof window === 'undefined') return {}
+    const stored = window.localStorage.getItem('marketspace-chat-flags')
+    return stored ? JSON.parse(stored) : {}
+  })
+
+  useEffect(() => {
+    window.localStorage.setItem('marketspace-chat-flags', JSON.stringify(chatFlags))
+  }, [chatFlags])
+
+  const [deletedChatIds, setDeletedChatIds] = useState<number[]>(() => {
+    if (typeof window === 'undefined') return []
+    const stored = window.localStorage.getItem('marketspace-deleted-chats')
+    return stored ? JSON.parse(stored) : []
+  })
+
+  useEffect(() => {
+    window.localStorage.setItem('marketspace-deleted-chats', JSON.stringify(deletedChatIds))
+  }, [deletedChatIds])
+
+  const togglePinChat = (chatId: number) => {
+    setChatFlags((prev) => ({
+      ...prev,
+      [chatId]: { ...prev[chatId], isPinned: !prev[chatId]?.isPinned }
+    }))
+  }
+
+  const toggleFavoriteChat = (chatId: number) => {
+    setChatFlags((prev) => ({
+      ...prev,
+      [chatId]: { ...prev[chatId], isFavorite: !prev[chatId]?.isFavorite }
+    }))
+  }
+
+  const toggleArchiveChat = (chatId: number) => {
+    setChatFlags((prev) => ({
+      ...prev,
+      [chatId]: { ...prev[chatId], isArchived: !prev[chatId]?.isArchived }
+    }))
+  }
+
+  const deleteChat = (chatId: number) => {
+    setDeletedChatIds((prev) => [...prev, chatId])
+    if (activeChatId === chatId) {
+      setActiveChatId(null)
+    }
+    setMessage('Chat thread deleted')
+  }
+
+  useEffect(() => {
+    window.localStorage.setItem('marketspace-following-ids', JSON.stringify(followingIds))
+  }, [followingIds])
+
+  useEffect(() => {
+    window.localStorage.setItem('marketspace-notify-store-ids', JSON.stringify(notifyStoreIds))
+  }, [notifyStoreIds])
+
+  useEffect(() => {
+    window.localStorage.setItem('marketspace-store-reviews', JSON.stringify(storeReviews))
+  }, [storeReviews])
+
+  const addStoreReview = async (storeId: string | null, rating: number, comment: string, targetUserId?: string | null) => {
+    if (!session) {
+      setMessage('Please sign in to write a review')
+      return
+    }
+    const newReview: StoreReview = {
+      id: Math.random().toString(36).substring(2, 9),
+      storeId: storeId ?? null,
+      targetUserId: targetUserId ?? null,
+      reviewerId: session.user.id,
+      reviewerName: profile?.username || session.user.email || 'Anonymous',
+      rating,
+      comment,
+      createdAt: new Date().toISOString(),
+    }
+    setStoreReviews((prev) => [newReview, ...prev])
+    setMessage('Review submitted successfully')
+
+    await supabase.from('reviews').insert({
+      reviewer_id: session.user.id,
+      store_id: storeId || null,
+      target_user_id: targetUserId || null,
+      rating,
+      comment,
+    })
+  }
+
+  const replyToStoreReview = (reviewId: string, replyText: string) => {
+    setStoreReviews((prev) =>
+      prev.map((r) => (r.id === reviewId ? { ...r, reply: replyText } : r))
+    )
+    setMessage('Response posted successfully')
+  }
+
+  const toggleFollowStore = (storeId: string) => {
+    if (!session) {
+      setMessage('Please sign in to follow stores')
+      return
+    }
+    const isFollowing = followingIds.includes(storeId)
+    setFollowingIds(prev =>
+      isFollowing ? prev.filter(id => id !== storeId) : [...prev, storeId]
+    )
+    void toggleStoreFollowInDb(session.user.id, storeId)
+  }
+
+  const toggleNotifyStore = (storeId: string) => {
+    setNotifyStoreIds(prev =>
+      prev.includes(storeId) ? prev.filter(id => id !== storeId) : [...prev, storeId]
+    )
+  }
+
+  const userEmail = session?.user?.email ?? profile?.email ?? 'Guest'
+
+  async function fetchStoreReviews() {
+    const { data, error } = await supabase.from('reviews').select('*').order('created_at', { ascending: false })
+    if (error || !data) return
+
+    const reviewerIds = Array.from(new Set(data.map((review) => review.reviewer_id).filter(Boolean)))
+    const { data: reviewers } = reviewerIds.length
+      ? await supabase.from('public_profiles').select('user_id, username').in('user_id', reviewerIds)
+      : { data: [] }
+    const storeIds = Array.from(new Set(data.map((review) => review.store_id).filter(Boolean)))
+    const { data: reviewedStores } = storeIds.length
+      ? await supabase.from('stores').select('id, user_id').in('id', storeIds)
+      : { data: [] }
+    const reviewerNames = new Map((reviewers ?? []).map((reviewer) => [reviewer.user_id, reviewer.username || 'User']))
+    const storeOwners = new Map((reviewedStores ?? []).map((store) => [store.id, store.user_id]))
+
+    setStoreReviews(data.map((review) => ({
+      id: review.id,
+      storeId: review.store_id,
+      targetUserId: review.target_user_id || storeOwners.get(review.store_id),
+      reviewerId: review.reviewer_id,
+      reviewerName: reviewerNames.get(review.reviewer_id) || 'User',
+      rating: review.rating,
+      comment: review.comment,
+      createdAt: review.created_at,
+      reply: review.reply || undefined,
+    })))
+  }
+
+  async function fetchListings() {
+    const { data, error } = await supabase.from('listings').select('*').order('created_at', { ascending: false })
+    if (error) return
+
+    const { data: profilesData } = await supabase.from('public_profiles').select('user_id, username')
+    const sellerMap = new Map<string, string>()
+      ; ((profilesData ?? []) as ProfileSummary[]).forEach((profileRow) => {
+        if (profileRow.user_id) {
+          sellerMap.set(profileRow.user_id, profileRow.username ?? 'Seller')
+        }
+      })
+
+    const enriched = ((data ?? []) as ListingRow[]).map((item) => ({
+      ...item,
+      seller_name: sellerMap.get(item.user_id ?? '') ?? 'Seller',
+    }))
+
+    setListings(enriched)
+  }
+
+  async function fetchStores() {
+    const { data, error } = await supabase.from('public_profiles').select('*').limit(8)
+    if (!error) {
+      setStores((data ?? []) as Profile[])
+    }
+  }
+
+  async function loadProfile(userId: string, userObj?: any) {
+    let { data } = await supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle()
+
+    const fallbackUsername = userObj?.user_metadata?.username || (userObj?.email ? userObj.email.split('@')[0] : '') || 'User'
+    const fallbackEmail = userObj?.email || ''
+
+    if (!data) {
+      const newProfile: Profile = {
+        user_id: userId,
+        username: fallbackUsername,
+        email: fallbackEmail,
+        phone_verified: false,
+      }
+      await supabase.from('profiles').upsert(newProfile)
+      setProfile(newProfile)
+      return newProfile
+    }
+
+    if (!data.username && fallbackUsername) {
+      data.username = fallbackUsername
+      await supabase.from('profiles').update({ username: fallbackUsername }).eq('user_id', userId)
+    }
+
+    setProfile(data as Profile)
+    return data as Profile
+  }
+
+  async function fetchChatThreads() {
+    if (!session) return
+
+    const { data: chatsData, error: chatsError } = await supabase
+      .from('chats')
+      .select('*')
+      .or(`buyer_id.eq.${session.user.id},seller_id.eq.${session.user.id}`)
+
+    if (chatsError) return
+
+    if (!chatsData || chatsData.length === 0) {
+      setChatThreads([])
+      return
+    }
+
+    const chatIds = chatsData.map(c => c.id)
+
+    const { data: messagesData, error: messagesError } = await supabase
+      .from('messages')
+      .select('*')
+      .in('chat_id', chatIds)
+      .order('created_at', { ascending: true })
+
+    if (messagesError) return
+
+    const threadMap = new Map<number, ChatMessage[]>()
+    messagesData?.forEach((m: any) => {
+      const list = threadMap.get(m.chat_id) || []
+      list.push({
+        id: m.id,
+        sender: m.sender_id === session.user.id ? 'me' : 'them',
+        content: m.content,
+        time: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      })
+      threadMap.set(m.chat_id, list)
+    })
+
+    const userIds = new Set<string>()
+    chatsData.forEach((c) => {
+      userIds.add(c.buyer_id)
+      userIds.add(c.seller_id)
+    })
+
+    const { data: profilesData } = await supabase
+      .from('public_profiles')
+      .select('user_id, username')
+      .in('user_id', Array.from(userIds))
+
+    const nameMap = new Map<string, string>()
+    profilesData?.forEach((p: any) => {
+      nameMap.set(p.user_id, p.username || 'User')
+    })
+
+    const threads: ChatThread[] = chatsData.map((c) => {
+      const otherId = c.buyer_id === session.user.id ? c.seller_id : c.buyer_id
+      const participantName = nameMap.get(otherId) || 'User'
+      const msgs = threadMap.get(c.id) || []
+
+      return {
+        id: c.id,
+        title: c.title || 'Inquiry',
+        participant: participantName,
+        listingTitle: c.title || 'Marketplace Item',
+        unread: false,
+        messages: msgs,
+      }
+    })
+
+    setChatThreads(threads)
+  }
+
+  useEffect(() => {
+    if (!session) return
+
+    const channel = supabase
+      .channel('chat-messages-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
+        void fetchChatThreads()
+      })
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [session])
+
+  useEffect(() => {
+    const loadInitialData = async () => {
+      const {
+        data: { session: currentSession },
+      } = await supabase.auth.getSession()
+      setSession(currentSession)
+
+      let loadedProfile: Profile | null = null
+      if (currentSession) {
+        loadedProfile = await loadProfile(currentSession.user.id, currentSession.user)
+        const { data: followRows } = await supabase.from('store_followers').select('store_id').eq('user_id', currentSession.user.id)
+        if (followRows) {
+          setFollowingIds(followRows.map((r: any) => r.store_id))
+        }
+      }
+
+      await Promise.all([fetchListings(), fetchStores(), fetchStoreReviews()])
+      setLoading(false)
+
+      const needsOnboarding = currentSession && (
+        !loadedProfile?.onboarding_choice
+      )
+
+      if (needsOnboarding && (window.location.pathname === '/' || window.location.pathname === '/profile')) {
+        navigate('/onboarding')
+      }
+    }
+
+    void loadInitialData()
+  }, [])
+
+  useEffect(() => {
+    if (session) {
+      void fetchChatThreads()
+    }
+  }, [session])
+
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, currentSession) => {
+      setSession(currentSession)
+      if (currentSession) {
+        const loadedProfile = await loadProfile(currentSession.user.id, currentSession.user)
+        void fetchListings()
+
+        const needsOnboarding = !loadedProfile?.onboarding_choice
+
+        if (needsOnboarding && (window.location.pathname === '/' || window.location.pathname === '/profile')) {
+          navigate('/onboarding')
+        }
+      } else {
+        setProfile(null)
+        setChatThreads([])
+      }
+    })
+
+    return () => {
+      authListener.subscription.unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    window.localStorage.setItem('marketspace-theme', theme)
+  }, [theme])
+
+  useEffect(() => {
+    window.localStorage.setItem('marketspace-saved', JSON.stringify(savedIds))
+  }, [savedIds])
+
+  const handleLogin = async () => {
+    setMessage('')
+    const { data, error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword })
+    if (error) {
+      setMessage(error.message)
+      return
+    }
+    setSession(data.session)
+    setMessage('Welcome back to MarketSpace')
+    setAuthEmail('')
+    setAuthPassword('')
+
+    // Fetch user profile choice
+    const { data: profileRow } = await supabase.from('profiles').select('onboarding_choice').eq('user_id', data.user.id).maybeSingle()
+    if (!profileRow?.onboarding_choice) {
+      navigate('/onboarding')
+    } else {
+      navigate('/')
+    }
+  }
+
+  const handleSignup = async (captchaToken?: string) => {
+    setMessage('')
+    if (!authEmail.trim() || !authPassword.trim()) {
+      setMessage('Please enter a valid email and password.')
+      return
+    }
+
+    const { data, error } = await supabase.auth.signUp({
+      email: authEmail.trim(),
+      password: authPassword,
+      options: { data: { username: authUsername }, captchaToken },
+    })
+
+    if (error) {
+      setMessage(error.message)
+      return
+    }
+
+    if (data.user) {
+      await supabase.from('profiles').upsert({
+        user_id: data.user.id,
+        username: authUsername || authEmail.split('@')[0],
+        email: authEmail.trim(),
+      })
+    }
+
+    if (!data.session) {
+      setMessage('Registration successful! A confirmation email has been sent. Please confirm your email before logging in.')
+      setAuthEmail('')
+      setAuthPassword('')
+      setAuthUsername('')
+      navigate('/login')
+      return
+    }
+
+    setSession(data.session)
+    setMessage('Account created successfully')
+    setAuthEmail('')
+    setAuthPassword('')
+    setAuthUsername('')
+    navigate('/onboarding')
+  }
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    setSession(null)
+    setProfile(null)
+    navigate('/login')
+  }
+
+  const handleDeleteAccount = async () => {
+    try {
+      if (!session?.user?.id) throw new Error('Sign in again before deleting your account.')
+      const { error } = await supabase.functions.invoke('account-deletion', { body: {} })
+      if (error) throw new Error(await getFunctionErrorMessage(error))
+
+      const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' })
+      if (signOutError) throw signOutError
+
+      setSession(null)
+      setProfile(null)
+      setSavedIds([])
+      setBusinessProfile(null)
+      window.localStorage.removeItem('marketspace-saved')
+      window.localStorage.removeItem('marketspace-notify-store-ids')
+      setMessage('Your account and associated data have been permanently deleted.')
+      navigate('/')
+    } catch (err) {
+      setMessage(err instanceof Error ? `Account deletion failed: ${err.message}` : 'Account deletion could not be completed.')
+    }
+  }
+
+  const resetForm = () => {
+    setTitle('')
+    setDescription('')
+    setPrice('0')
+    setCategory('Electronics')
+    setStatus('Available')
+    setListingType('single')
+    setCondition('Used - Good')
+    setDeliveryOption('Meetup')
+    setUploadedImages([])
+    setAvailableColors([])
+    setPublishAs('private')
+    setCollectionId('')
+    setHowItWorks('')
+    setUseGlobalRenewal(true)
+  }
+
+  const handleCreateListing = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!session) {
+      setMessage('Please sign in to create a listing')
+      return
+    }
+
+    const effectiveRenewal = useGlobalRenewal ? globalRenewalFrequency : renewalFrequency
+
+    const { error } = await supabase.from('listings').insert({
+      user_id: session.user.id,
+      title,
+      description,
+      price: Number(price) || 0,
+      category,
+      status,
+      listing_type: listingType,
+      condition,
+      delivery_option: deliveryOption,
+      images: uploadedImages,
+      available_colors: availableColors,
+      renewal_frequency: effectiveRenewal,
+      use_global_renewal: useGlobalRenewal,
+      publish_as: publishAs,
+      collection_id: publishAs === 'store' ? collectionId : null,
+      how_it_works: howItWorks,
+      last_renewed_at: new Date().toISOString(),
+    })
+
+    if (error) {
+      setMessage(error.message)
+      return
+    }
+
+    setMessage('Listing posted successfully')
+    resetForm()
+    await fetchListings()
+    navigate('/')
+  }
+
+  const handleUpdateListing = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!editingListing) return
+
+    const effectiveRenewal = useGlobalRenewal ? globalRenewalFrequency : renewalFrequency
+
+    const { error } = await supabase.from('listings').update({
+      title,
+      description,
+      price: Number(price) || 0,
+      category,
+      status,
+      listing_type: listingType,
+      condition,
+      delivery_option: deliveryOption,
+      images: uploadedImages,
+      available_colors: availableColors,
+      renewal_frequency: effectiveRenewal,
+      use_global_renewal: useGlobalRenewal,
+      publish_as: publishAs,
+      collection_id: publishAs === 'store' ? collectionId : null,
+      how_it_works: howItWorks,
+    }).eq('id', editingListing.id)
+
+    if (error) {
+      setMessage(error.message)
+      return
+    }
+
+    setMessage('Listing updated successfully')
+    resetForm()
+    setEditingListing(null)
+    await fetchListings()
+    navigate('/')
+  }
+
+  const openListing = (listing: Listing) => {
+    setSelectedListing(listing)
+    void logAnalyticsEvent({
+      event_type: 'listing_click',
+      seller_id: listing.user_id,
+      listing_id: listing.id,
+      actor_id: session?.user?.id
+    })
+    if (listing.sponsored) {
+      void logAnalyticsEvent({
+        event_type: 'ad_click',
+        seller_id: listing.user_id,
+        listing_id: listing.id,
+        actor_id: session?.user?.id
+      })
+    }
+    navigate(`/listings/${listing.id}`)
+  }
+
+  const openEditListing = (listing: Listing) => {
+    setEditingListing(listing)
+    setTitle(listing.title)
+    setDescription(listing.description)
+    setPrice(String(listing.price))
+    setCategory(listing.category)
+    setStatus(listing.status ?? 'Available')
+    setListingType(listing.listing_type ?? 'single')
+    setCondition(listing.condition ?? 'Used - Good')
+    setDeliveryOption(listing.delivery_option ?? 'Meetup')
+    setUploadedImages(listing.images ?? [])
+    setAvailableColors(listing.available_colors ?? [])
+    setRenewalFrequency(listing.renewal_frequency ?? 'weekly')
+    setPublishAs((listing.publish_as as any) ?? 'private')
+    setCollectionId(listing.collection_id ?? '')
+    setHowItWorks(listing.how_it_works ?? '')
+    setUseGlobalRenewal(listing.use_global_renewal ?? true)
+    navigate(`/edit/${listing.id}`)
+  }
+
+  async function fetchSavedListings(userId: string) {
+    const { data } = await supabase.from('saved_listings').select('listing_id').eq('user_id', userId)
+    if (data) {
+      setSavedIds(data.map((item: any) => String(item.listing_id)))
+    }
+  }
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      void fetchSavedListings(session.user.id)
+    } else {
+      setSavedIds([])
+    }
+  }, [session?.user?.id])
+
+  const toggleSave = async (listingId: number) => {
+    if (!session) {
+      setMessage('Please sign in to save items')
+      return
+    }
+    const strId = String(listingId)
+    const exists = savedIds.includes(strId)
+    const nextSaved = exists ? savedIds.filter((id) => id !== strId) : [...savedIds, strId]
+    setSavedIds(nextSaved)
+    setMessage(exists ? 'Item removed from saved' : 'Item saved')
+
+    if (exists) {
+      await supabase.from('saved_listings').delete().eq('user_id', session.user.id).eq('listing_id', strId)
+    } else {
+      await supabase.from('saved_listings').upsert({ user_id: session.user.id, listing_id: strId }, { onConflict: 'user_id,listing_id' })
+      const targetListing = listings.find((l) => l.id === listingId)
+      void logAnalyticsEvent({
+        event_type: 'listing_save',
+        seller_id: targetListing?.user_id,
+        listing_id: listingId,
+        actor_id: session.user.id
+      })
+    }
+  }
+
+  const toggleCategory = (nextCategory: string) => {
+    setActiveCategories((current) => {
+      if (nextCategory === 'All') {
+        return ['All']
+      }
+
+      const withoutAll = current.filter((categoryItem) => categoryItem !== 'All')
+      if (withoutAll.includes(nextCategory)) {
+        const nextCategories = withoutAll.filter((categoryItem) => categoryItem !== nextCategory)
+        return nextCategories.length === 0 ? ['All'] : nextCategories
+      }
+
+      return [...withoutAll, nextCategory]
+    })
+  }
+
+  const clearAllFilters = () => {
+    setActiveCategories(['All'])
+    setSearchQuery('')
+    setPriceRange(3000)
+    setDistanceFilter(65)
+    setShowOnlyAvailable(false)
+    setListingKindFilter('all')
+  }
+
+  const handleUpdateListingCollection = async (listingId: number, targetColId: string | null) => {
+    const { error } = await supabase
+      .from('listings')
+      .update({ collection_id: targetColId })
+      .eq('id', listingId)
+
+    if (error) {
+      setMessage('Failed to update listing department: ' + error.message)
+      return
+    }
+
+    setMessage('Listing department updated successfully!')
+    await fetchListings()
+  }
+
+  const markAllRead = () => {
+    setNotifications((current) => current.map((item) => ({ ...item, unread: false })))
+  }
+
+  const sendInboxMessage = async () => {
+    if (!chatDraft.trim() || !activeChatId || !session) return
+
+    const messageText = chatDraft.trim()
+    setChatDraft('')
+
+    const { error } = await supabase.from('messages').insert({
+      chat_id: activeChatId,
+      sender_id: session.user.id,
+      content: messageText
+    })
+
+    if (error) {
+      setMessage('Failed to send message: ' + error.message)
+    } else {
+      await fetchChatThreads()
+    }
+  }
+
+  const handleStartChat = async (listing: Listing, customMessage?: string) => {
+    if (!session) {
+      setMessage('Please sign in to message the seller')
+      navigate('/login')
+      return
+    }
+    if (listing.user_id === session.user.id) {
+      setMessage("You cannot message yourself about your own listing")
+      return
+    }
+
+    setLoading(true)
+    try {
+      const validListingId = listing.id && Number(listing.id) > 0 ? Number(listing.id) : null
+      let query = supabase
+        .from('chats')
+        .select('*')
+        .eq('buyer_id', session.user.id)
+        .eq('seller_id', listing.user_id || '')
+
+      if (validListingId) {
+        query = query.eq('listing_id', validListingId)
+      }
+
+      const { data: existingChats, error: selectError } = await query
+
+      if (selectError) throw selectError
+
+      let chatId: number
+      if (existingChats && existingChats.length > 0) {
+        chatId = existingChats[0].id
+      } else {
+        const { data: newChat, error: insertError } = await supabase
+          .from('chats')
+          .insert({
+            listing_id: validListingId,
+            buyer_id: session.user.id,
+            seller_id: listing.user_id || '',
+            title: listing.title || 'Store Inquiry'
+          })
+          .select()
+          .single()
+
+        if (insertError) throw insertError
+        chatId = newChat.id
+      }
+
+      if (customMessage) {
+        await supabase.from('messages').insert({
+          chat_id: chatId,
+          sender_id: session.user.id,
+          content: customMessage
+        })
+      }
+
+      await fetchChatThreads()
+      setActiveChatId(chatId)
+      void logAnalyticsEvent({
+        event_type: 'chat_inquiry',
+        seller_id: listing.user_id || undefined,
+        listing_id: listing.id,
+        actor_id: session.user.id
+      })
+      navigate('/inbox')
+    } catch (err: any) {
+      setMessage(err.message || 'Failed to start chat')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredListings = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase()
+
+    return [...listings]
+      .map((listing) => {
+        const listingSellerId = listing.user_id || ''
+        const sellerBusiness = allBusinesses[listingSellerId]
+        const isAdActive = sellerBusiness?.ads?.some(
+          (ad) => ad.listingId === listing.id && ad.status === 'Active'
+        )
+        return {
+          ...listing,
+          sponsored: isAdActive || false,
+        }
+      })
+      .filter((listing) => {
+        const listingPrice = Number(String(listing.price).replace(/[^\d.]/g, ''))
+
+        // Dynamic Renewal Frequency Rule: listings older than their renewal interval or cycle day are paused from homepage
+        const DAY_MS = 24 * 60 * 60 * 1000
+        const now = Date.now()
+        const lastRenewedTime = new Date(listing.last_renewed_at || listing.created_at || Date.now()).getTime()
+        const daysSinceRenewed = (now - lastRenewedTime) / DAY_MS
+
+        let isExpired = false
+
+        if (listing.use_global_renewal === false) {
+          const freq = listing.renewal_frequency ?? 'weekly'
+          const expiryIntervalMs = freq === 'daily' ? DAY_MS : freq === 'biweekly' ? 14 * DAY_MS : freq === 'monthly' ? 30 * DAY_MS : 7 * DAY_MS
+          isExpired = now - lastRenewedTime > expiryIntervalMs
+        } else {
+          // Global Renewal Mode: Frequency + Preferred Day of Week
+          const freq = globalRenewalFrequency || 'weekly'
+          const cycleDays = freq === 'daily' ? 1 : freq === 'biweekly' ? 14 : freq === 'monthly' ? 30 : 7
+          const dayIndexMap: Record<string, number> = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 }
+          const targetDay = dayIndexMap[globalRenewalDay] ?? 1
+          const currentDay = new Date(now).getDay()
+
+          if (daysSinceRenewed >= cycleDays) {
+            isExpired = true
+          } else if (freq === 'weekly' || freq === 'biweekly') {
+            const lastRenewedDay = new Date(lastRenewedTime).getDay()
+            if (daysSinceRenewed >= 1 && currentDay === targetDay && lastRenewedDay !== targetDay) {
+              isExpired = true
+            }
+          }
+        }
+
+        if (isExpired) {
+          return false
+        }
+
+        const listingSellerId = listing.user_id || ''
+        const sellerBusiness = allBusinesses[listingSellerId]
+        const sellerShopName = sellerBusiness?.shopName || ''
+        const sellerShopCat = sellerBusiness?.category || ''
+        const searchText = `${listing.title} ${listing.description} ${listing.category} ${listing.seller_name || ''} ${sellerShopName} ${sellerShopCat}`.toLowerCase()
+        const matchesQuery = !normalizedQuery || searchText.includes(normalizedQuery)
+        const matchesCategory = activeCategories.includes('All') || activeCategories.includes(listing.category)
+        const matchesPrice = priceRange === 3000 || listingPrice <= priceRange
+        const matchesAvailability = !showOnlyAvailable || (listing.status ?? 'Available') === 'Available'
+        const matchesKind =
+          listingKindFilter === 'all' ||
+          (listingKindFilter === 'service' && listing.listing_type === 'service') ||
+          (listingKindFilter === 'item' && listing.listing_type !== 'service')
+
+        return matchesQuery && matchesCategory && matchesPrice && matchesAvailability && matchesKind
+      })
+      .sort((a, b) => {
+        const aSponsored = a.sponsored ? 1 : 0
+        const bSponsored = b.sponsored ? 1 : 0
+        if (aSponsored !== bSponsored) {
+          return bSponsored - aSponsored
+        }
+
+        if (sortBy === 'Price: Low to High') {
+          return Number(String(a.price).replace(/[^\d.]/g, '')) - Number(String(a.price).replace(/[^\d.]/g, ''))
+        }
+        if (sortBy === 'Price: High to Low') {
+          return Number(String(b.price).replace(/[^\d.]/g, '')) - Number(String(a.price).replace(/[^\d.]/g, ''))
+        }
+        return Number(b.id) - Number(a.id)
+      })
+  }, [listings, searchQuery, activeCategories, priceRange, showOnlyAvailable, sortBy, allBusinesses, listingKindFilter, session])
+
+  // --- ADD THESE MISSING VARIABLES ---
+  const savedListings = useMemo(() => {
+    return listings.filter((listing) => savedIds.includes(String(listing.id)))
+  }, [listings, savedIds])
+
+  const myListings = useMemo(() => {
+    if (!session?.user?.id) return []
+    // Using type assertion because user_id comes from ListingRow
+    return listings.filter((listing) => (listing as ListingRow).user_id === session.user.id)
+  }, [listings, session])
+
+  const heroStats = useMemo(() => [
+    { label: 'Total Listings', value: String(listings.length) },
+    { label: 'Saved Items', value: String(savedIds.length) },
+    { label: 'Unread Messages', value: String(chatThreads.filter(t => t.unread).length) }
+  ], [listings.length, savedIds.length, chatThreads])
+
+  const handleDeleteListing = async (listingId: number) => {
+    const { error } = await supabase.from('listings').delete().eq('id', listingId)
+    if (error) {
+      setMessage(error.message)
+      return
+    }
+    setMessage('Listing deleted successfully')
+    await fetchListings()
+  }
+
+  const handleRenewListing = async (listingId: number) => {
+    const nowIso = new Date().toISOString()
+    const { error } = await supabase.from('listings').update({
+      last_renewed_at: nowIso,
+      created_at: nowIso,
+      status: 'Available'
+    }).eq('id', listingId)
+    if (error) {
+      setMessage(error.message)
+      return
+    }
+    setMessage('Listing renewed successfully! Active for another 7 days.')
+    await fetchListings()
+  }
+
+  const handleUpdateListingStatus = async (listingId: number, nextStatus: string) => {
+    const { error } = await supabase.from('listings').update({ status: nextStatus }).eq('id', listingId)
+    if (error) {
+      setMessage(error.message)
+      return
+    }
+    setMessage(`Listing marked as ${nextStatus.toLowerCase()}`)
+    await fetchListings()
+  }
+
+  const handleUploadAvatar = async (base64: string) => {
+    if (!session?.user?.id) return
+    const { error } = await supabase.from('profiles').update({ avatar_url: base64 }).eq('user_id', session.user.id)
+    if (!error) {
+      setProfile((current) => current ? { ...current, avatar_url: base64 } : null)
+      setMessage('Avatar updated successfully')
+    } else {
+      setMessage(error.message)
+    }
+  }
+
+  const handleCreateOrUpdateBusiness = (updated: BusinessProfile) => {
+    const nextAll = { ...allBusinesses, [updated.userId]: updated }
+    setAllBusinesses(nextAll)
+    setBusinessProfile(updated)
+    window.localStorage.setItem('marketspace-all-businesses', JSON.stringify(nextAll))
+    setMessage('Business profile updated successfully')
+
+    if (session?.user?.id) {
+      void supabase.from('stores').upsert({
+        user_id: updated.userId,
+        shop_name: updated.shopName,
+        description: updated.description,
+        category: updated.category,
+        address: updated.address,
+        whatsapp: updated.whatsapp,
+        logo: updated.logo,
+        cover: updated.cover,
+        accent_color: updated.accentColor,
+        announcement_bar: updated.announcementBar,
+        collections: updated.collections || [],
+        customer_care: updated.customerCare || {},
+        catalog: updated.catalog,
+        ads: updated.ads,
+        theme_config: updated.themeConfig || {},
+      }, { onConflict: 'user_id' })
+    }
+    navigate('/profile/store-dashboard')
+  }
+
+  const handleSaveStoreTheme = async (themeConfig: StoreThemeConfig, storeUserId?: string) => {
+    const targetUserId = storeUserId || businessProfile?.userId || session?.user?.id
+    if (!targetUserId) return
+
+    const existing: BusinessProfile = allBusinesses[targetUserId] || businessProfile || {
+      userId: targetUserId,
+      shopName: profile?.username ? `${profile.username}'s Store` : 'Official Store',
+      description: 'Official Merchant Storefront',
+      category: 'General Merchant',
+      address: 'Lusaka, Zambia',
+      whatsapp: '',
+      logo: profile?.avatar_url || '',
+      cover: '/banners/store_banner_apparel.png',
+      accentColor: themeConfig.primaryColor || '#2563eb',
+      announcementBar: '',
+      collections: [],
+      customerCare: {},
+      catalog: [],
+      ads: [],
+      themeConfig
+    }
+
+    const updated: BusinessProfile = {
+      ...existing,
+      themeConfig,
+      accentColor: themeConfig.primaryColor || existing.accentColor || '#2563eb'
+    }
+
+    const nextAll = { ...allBusinesses, [targetUserId]: updated }
+    setAllBusinesses(nextAll)
+    if (session?.user?.id === targetUserId || !businessProfile) {
+      setBusinessProfile(updated)
+    }
+
+    try {
+      window.localStorage.setItem('marketspace-all-businesses', JSON.stringify(nextAll))
+      window.localStorage.setItem(`marketspace-store-theme-${targetUserId}`, JSON.stringify(themeConfig))
+    } catch (e) {
+      console.error('Failed to save store theme to localStorage:', e)
+    }
+
+    if (session?.user?.id) {
+      try {
+        await supabase.from('stores').upsert({
+          user_id: targetUserId,
+          shop_name: updated.shopName,
+          theme_config: themeConfig,
+          accent_color: updated.accentColor,
+        }, { onConflict: 'user_id' })
+      } catch (err) {
+        console.error('Error saving store theme to Supabase:', err)
+      }
+    }
+  }
+
+  const loadBusinesses = async () => {
+    const stored = window.localStorage.getItem('marketspace-all-businesses')
+    let baseStores: Record<string, BusinessProfile> = {}
+    if (stored) {
+      try {
+        baseStores = JSON.parse(stored) as Record<string, BusinessProfile>
+      } catch {
+        // ignore
+      }
+    }
+    setAllBusinesses(baseStores)
+
+    const { data } = await supabase.from('stores').select('*')
+    if (data && data.length > 0) {
+      const dbStores: Record<string, BusinessProfile> = {}
+      const nonPublicStoreOwners = new Set<string>()
+      data.forEach((s: any) => {
+        if (s.status && s.status !== 'approved') {
+          nonPublicStoreOwners.add(s.user_id)
+          return
+        }
+        let localTheme: StoreThemeConfig | undefined = undefined
+        try {
+          const localStr = window.localStorage.getItem(`marketspace-store-theme-${s.user_id}`)
+          if (localStr) localTheme = JSON.parse(localStr)
+        } catch { }
+
+        dbStores[s.user_id] = {
+          userId: s.user_id,
+          subdomain: s.subdomain || undefined,
+          shopName: s.shop_name,
+          description: s.description,
+          category: s.category,
+          address: s.address,
+          whatsapp: s.whatsapp,
+          logo: s.logo,
+          cover: s.cover,
+          operationType: s.operation_type,
+          accentColor: s.accent_color || s.accentColor || '#2563eb',
+          announcementBar: s.announcement_bar || s.announcementBar || '',
+          collections: s.collections || [],
+          customerCare: s.customer_care || s.customerCare || {},
+          catalog: s.catalog || [],
+          ads: s.ads || [],
+          verifiedId: s.verified_id === true,
+          verifiedLocation: s.verified_location === true,
+          registeredBusiness: s.registered_business === true,
+          probationState: s.probation_state === 'probation' ? 'probation' : 'trusted',
+          themeConfig: (s.theme_config && s.theme_config.sections && s.theme_config.sections.length > 0)
+            ? s.theme_config
+            : (localTheme || s.themeConfig || undefined),
+        }
+      })
+      setAllBusinesses(prev => {
+        const next = { ...prev, ...dbStores }
+        nonPublicStoreOwners.forEach((ownerId) => delete next[ownerId])
+        return next
+      })
+    }
+  }
+
+  useEffect(() => {
+    void loadBusinesses()
+  }, [])
+
+  useEffect(() => {
+    if (session?.user?.id && allBusinesses[session.user.id]) {
+      setBusinessProfile(allBusinesses[session.user.id])
+    } else {
+      setBusinessProfile(null)
+    }
+  }, [session, allBusinesses])
+
+  return {
+    view,
+    setView,
+    theme,
+    setTheme,
+    session,
+    setSession,
+    profile,
+    setProfile,
+    listings,
+    setListings,
+    stores,
+    setStores,
+    selectedListing,
+    setSelectedListing,
+    editingListing,
+    setEditingListing,
+    loading,
+    setLoading,
+    message,
+    setMessage,
+    authEmail,
+    setAuthEmail,
+    authPassword,
+    setAuthPassword,
+    authUsername,
+    setAuthUsername,
+    searchQuery,
+    setSearchQuery,
+    activeCategories,
+    setActiveCategories,
+    toggleCategory,
+    priceRange,
+    setPriceRange,
+    distanceFilter,
+    setDistanceFilter,
+    sortBy,
+    setSortBy,
+    showOnlyAvailable,
+    setShowOnlyAvailable,
+    savedIds,
+    setSavedIds,
+    notifications,
+    setNotifications,
+    chatThreads,
+    setChatThreads,
+    activeChatId,
+    setActiveChatId,
+    chatDraft,
+    setChatDraft,
+    title,
+    setTitle,
+    description,
+    setDescription,
+    price,
+    setPrice,
+    category,
+    setCategory,
+    status,
+    setStatus,
+    listingType,
+    setListingType,
+    condition,
+    setCondition,
+    deliveryOption,
+    setDeliveryOption,
+    canMessage,
+    setCanMessage,
+    userEmail,
+    fetchListings,
+    fetchStores,
+    loadProfile,
+    handleLogin,
+    handleSignup,
+    handleLogout,
+    resetForm,
+    handleCreateListing,
+    handleUpdateListing,
+    openListing,
+    openEditListing,
+    toggleSave,
+    markAllRead,
+    sendInboxMessage,
+    filteredListings,
+    savedListings,
+    myListings,
+    heroStats,
+    businessProfile,
+    setBusinessProfile,
+    allBusinesses,
+    setAllBusinesses,
+    selectedStore,
+    setSelectedStore,
+    uploadedImages,
+    setUploadedImages,
+    handleCreateOrUpdateBusiness,
+    handleSaveStoreTheme,
+    handleDeleteListing,
+    handleRenewListing,
+    handleUpdateListingStatus,
+    handleUploadAvatar,
+    handleStartChat,
+    availableColors,
+    setAvailableColors,
+    renewalFrequency,
+    setRenewalFrequency,
+    publishAs,
+    setPublishAs,
+    collectionId,
+    setCollectionId,
+    howItWorks,
+    setHowItWorks,
+    useGlobalRenewal,
+    setUseGlobalRenewal,
+    globalRenewalFrequency,
+    setGlobalRenewalFrequency,
+    globalRenewalDay,
+    setGlobalRenewalDay,
+    enableGlobalRenewal,
+    setEnableGlobalRenewal,
+    listingKindFilter,
+    setListingKindFilter,
+    followingIds,
+    notifyStoreIds,
+    toggleFollowStore,
+    toggleNotifyStore,
+    storeReviews,
+    addStoreReview,
+    replyToStoreReview,
+    currency,
+    setCurrency,
+    notificationsConfig,
+    setNotificationsConfig,
+    blockedUserIds,
+    toggleBlockUser,
+    paymentMethods,
+    addPaymentMethod,
+    removePaymentMethod,
+    browsingHistory,
+    clearBrowsingHistory,
+    searchHistory,
+    clearSearchHistory,
+    togglePinChat,
+    toggleFavoriteChat,
+    toggleArchiveChat,
+    deleteChat,
+    handleDeleteAccount,
+    clearAllFilters,
+    handleUpdateListingCollection,
+  }
+}
+
+export { CATEGORY_OPTIONS, CONDITION_OPTIONS, DELIVERY_OPTIONS }
