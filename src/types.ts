@@ -35,6 +35,7 @@ export type Profile = {
   email?: string
   phone_number?: string
   avatar_url?: string
+  created_at?: string
   onboarding_choice?: string
   phone_verified?: boolean
   global_renewal_frequency?: 'daily' | 'weekly' | 'biweekly' | 'monthly'

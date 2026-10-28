@@ -8,6 +8,7 @@ import { SettingsNavigationDrawer } from './SettingsNavigation'
 type ShellProps = {
   children: ReactNode
   session: Session | null
+  onLogout: () => void
   activeCategories: string[]
   priceRange: number
   distanceFilter: number
@@ -84,6 +85,7 @@ const MEGA_CATEGORIES: Record<string, { label: string; subcats: string[]; featur
 export function Shell({
   children,
   session,
+  onLogout,
   activeCategories,
   onCategoryToggle,
   profile,
@@ -673,6 +675,7 @@ export function Shell({
     <SettingsNavigationDrawer
       isOpen={isSettingsNavigationOpen}
       onClose={() => setIsSettingsNavigationOpen(false)}
+      onLogout={onLogout}
     />
       </header>
 

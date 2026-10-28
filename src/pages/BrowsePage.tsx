@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import type { Listing, BusinessProfile } from '../types'
-import { ListingCard } from '../components/ListingCard'
+import { Listing as ListingView } from '../components/Listing'
 import { isBestSeller, isNewArrival } from '../utils/listingSections'
 
 type BrowsePageProps = {
@@ -111,6 +111,19 @@ export function BrowsePage({
       .sort((a, b) => Number(b.rating ?? 0) - Number(a.rating ?? 0)),
     [listings]
   )
+
+  const storeListingCategories = ['All', 'Electronics', 'Fashion', 'Home & Garden', 'Vehicles', 'Sports', 'Services']
+  const storeListings = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+    return listings.filter((listing) => {
+      if (!listing.user_id || !allBusinesses[listing.user_id]?.shopName) return false
+      if (selectedCategory !== 'All' && listing.category !== selectedCategory) return false
+      if (!query) return true
+      return listing.title.toLowerCase().includes(query) ||
+        (listing.category || '').toLowerCase().includes(query) ||
+        allBusinesses[listing.user_id].shopName.toLowerCase().includes(query)
+    })
+  }, [allBusinesses, listings, searchQuery, selectedCategory])
 
   const newArrivalCards = newArrivals.map((listing) => ({
     ...listing,
@@ -364,6 +377,49 @@ export function BrowsePage({
         </div>
       </section>
 
+      <section id="browse-store-listings" style={{ maxWidth: '1280px', margin: '48px auto 40px', padding: '0 24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '18px' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: '#0f172a' }}>Store Listings</h2>
+            <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: '0.88rem' }}>Products from MarketSpace storefronts.</p>
+          </div>
+          <button type="button" onClick={scrollToCatalog} className="secondary-btn">Browse all listings</button>
+        </div>
+        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '12px', WebkitOverflowScrolling: 'touch' }}>
+          {storeListingCategories.map((category) => (
+            <button
+              key={category}
+              type="button"
+              onClick={() => setSelectedCategory(category)}
+              className={selectedCategory === category ? 'primary-btn compact-btn' : 'secondary-btn compact-btn'}
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              {category}
+            </button>
+          ))}
+        </div>
+        {storeListings.length === 0 ? (
+          <div className="section-card" style={{ textAlign: 'center' }}>
+            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+              {searchQuery ? `No store listings match "${searchQuery}" in this category.` : 'No store listings are available in this category yet.'}
+            </p>
+          </div>
+        ) : (
+          <div className="marketplace-listing-grid">
+            {storeListings.map((listing) => (
+              <ListingView
+                key={listing.id}
+                listing={listing}
+                saved={savedIds.includes(String(listing.id))}
+                onOpen={onOpenListing}
+                onToggleSave={onToggleSave}
+                allBusinesses={allBusinesses}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
       {/* ---------------- 3. SHOP BY CATEGORIES ---------------- */}
       <section className="shop-category-section" style={{ maxWidth: '1280px', margin: '54px auto 40px', padding: '0 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -613,9 +669,9 @@ export function BrowsePage({
               Explore all listings <span className="material-icons" style={{ fontSize: '16px' }}>arrow_forward</span>
             </button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '20px' }}>
-            {bestSellers.slice(0, 4).map((listing) => (
-              <ListingCard
+          <div className="marketplace-listing-grid">
+            {bestSellers.slice(0, 5).map((listing) => (
+              <ListingView
                 key={listing.id}
                 listing={listing}
                 saved={savedIds.includes(String(listing.id))}
@@ -878,16 +934,10 @@ export function BrowsePage({
             </button>
           </div>
         ) : (
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))',
-              gap: '20px',
-            }}
-          >
+          <div className="marketplace-listing-grid">
             {filteredCatalog.map((item) => {
               return (
-                <ListingCard
+                <ListingView
                   key={item.id}
                   listing={item}
                   saved={savedIds.includes(String(item.id))}

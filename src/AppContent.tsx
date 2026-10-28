@@ -1,8 +1,7 @@
-import { type FormEvent, useState, useEffect } from 'react'
+import { type ComponentProps, type FormEvent, useState, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import './App.css'
 import { Shell } from './components/Shell'
-import { ProfilePanel } from './components/ProfilePanel'
 import { useMarketplaceApp } from './features/marketplace/useMarketplaceApp'
 import { ListingDetailPage, ListingFormPage } from './pages/ListingPage'
 import { SavedItemsPage } from './pages/SavedNotificationsPage'
@@ -15,10 +14,12 @@ import { DiscoveryPage } from './pages/DiscoveryPage'
 import { BrowsePage } from './pages/BrowsePage'
 import { useCart } from './features/marketplace/useCart'
 import { ProfilePage } from './pages/ProfilePage'
+import { UserProfilePage } from './pages/UserProfilePage'
 import { SettingsPage } from './pages/SettingsPage'
 import { AdminStoreReviewPage } from './pages/AdminStoreReviewPage'
 import type { Listing, Profile, BusinessProfile } from './types'
 import { isBestSeller, isNewArrival } from './utils/listingSections'
+import { supabase } from './lib/supabaseClient'
 
 function SlowlyFlashingMarketSpaceTemplate({ message = 'Loading MarketSpace...' }: { message?: string }) {
   return (
@@ -163,7 +164,6 @@ export function AppContent() {
     }
   }, [location.pathname, location.search])
 
-  const [isProfilePanelOpen, setIsProfilePanelOpen] = useState(false)
   const [showScrollTop, setShowScrollTop] = useState(false)
 
   useEffect(() => {
@@ -329,6 +329,7 @@ export function AppContent() {
                 toggleFollowStore={toggleFollowStore}
                 toggleNotifyStore={toggleNotifyStore}
                 session={session}
+                onLogout={handleLogout}
                 storeReviews={app.storeReviews}
                 addStoreReview={app.addStoreReview}
                 replyToStoreReview={app.replyToStoreReview}
@@ -398,6 +399,7 @@ export function AppContent() {
         onUpdateCartQty={cart.updateQuantity}
         onRemoveCartItem={cart.removeFromCart}
         onClearCart={cart.clearCart}
+        onLogout={handleLogout}
       >
         {message ? <div className="status-banner">{message}</div> : null}
         <Routes>
@@ -526,9 +528,6 @@ export function AppContent() {
                 listings={listings}
                 searchQuery={app.searchQuery}
                 onSearchQueryChange={app.setSearchQuery}
-                openListing={openListing}
-                toggleSave={toggleSave}
-                savedIds={savedIds}
               />
             }
           />
@@ -565,7 +564,51 @@ export function AppContent() {
           />
           <Route
             path="/seller/:userId"
-            element={<SellerProfileRoute />}
+            element={
+              <SellerProfileRoute
+                profile={profile}
+                sessionUserId={session?.user.id}
+                userEmail={userEmail}
+                listings={listings}
+                allBusinesses={allBusinesses}
+                followingIds={followingIds}
+                savedIds={savedIds}
+                onToggleFollow={toggleFollowStore}
+                onToggleSave={toggleSave}
+                onOpenListing={openListing}
+                onUploadAvatar={handleUploadAvatar}
+                onUpdateUsername={async (username: string) => {
+                  if (!session) throw new Error('Sign in to edit your profile.')
+                  const { error: updateError } = await supabase.from('profiles').update({ username }).eq('user_id', session.user.id)
+                  if (updateError) throw new Error(updateError.message)
+                  app.setProfile((current) => current ? { ...current, username } : current)
+                }}
+              />
+            }
+          />
+          <Route
+            path="/profile/my-profile"
+            element={session ? (
+              <UserProfilePage
+                profileUserId={session.user.id}
+                profile={profile}
+                sessionUserId={session.user.id}
+                userEmail={userEmail}
+                listings={myListings}
+                businessProfile={businessProfile}
+                followingIds={followingIds}
+                savedIds={savedIds}
+                onToggleFollow={toggleFollowStore}
+                onToggleSave={toggleSave}
+                onOpenListing={openListing}
+                onUploadAvatar={handleUploadAvatar}
+                onUpdateUsername={async (username) => {
+                  const { error: updateError } = await supabase.from('profiles').update({ username }).eq('user_id', session.user.id)
+                  if (updateError) throw new Error(updateError.message)
+                  app.setProfile((current) => current ? { ...current, username } : current)
+                }}
+              />
+            ) : <Navigate to="/login" replace />}
           />
           <Route
             path="/profile/:tab?"
@@ -573,7 +616,6 @@ export function AppContent() {
               <ProfileTabRoute
                 session={session}
                 profile={profile}
-                userEmail={userEmail}
                 myListings={myListings}
                 listings={listings}
                 savedListings={savedListings}
@@ -588,13 +630,10 @@ export function AppContent() {
                 onRenewListing={handleRenewListing}
                 onDeleteListing={handleDeleteListing}
                 onUpdateStatus={handleUpdateListingStatus}
-                onUploadAvatar={handleUploadAvatar}
                 onOpenListing={openListing}
                 onToggleSave={toggleSave}
-                onLogout={handleLogout}
                 onUpdateListingCollection={app.handleUpdateListingCollection}
                 onSaveStoreTheme={app.handleSaveStoreTheme}
-                onOpenDashboardPanel={() => setIsProfilePanelOpen(true)}
                 theme={theme}
                 locationString="Lusaka"
                 onToggleTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')}
@@ -778,14 +817,6 @@ export function AppContent() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Shell>
-      <ProfilePanel
-        isOpen={isProfilePanelOpen}
-        onClose={() => setIsProfilePanelOpen(false)}
-        profile={profile}
-        userEmail={userEmail}
-        myListings={myListings}
-        businessProfile={businessProfile}
-      />
       {showScrollTop && (
         <button
           onClick={scrollToTop}
@@ -1098,7 +1129,10 @@ function StoreViewRoute({ stores, businessProfile, allBusinesses, listings, navi
   )
 }
 
-function SellerProfileRoute() {
+function SellerProfileRoute({ allBusinesses, ...props }: Omit<ComponentProps<typeof UserProfilePage>, 'profileUserId' | 'businessProfile'> & {
+  allBusinesses?: Record<string, BusinessProfile>
+}) {
   const { userId } = useParams()
-  return <Navigate to={`/store/${userId}`} replace />
+  const businessProfile = allBusinesses?.[userId || ''] || null
+  return <UserProfilePage {...props} profileUserId={userId} businessProfile={businessProfile} />
 }

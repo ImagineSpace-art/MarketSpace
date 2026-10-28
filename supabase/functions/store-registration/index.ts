@@ -504,7 +504,15 @@ async function submitApplication(context: HandlerContext, body: Json) {
     .upsert(storePayload, { onConflict: 'user_id' })
     .select('id')
     .single()
-  if (storeError || !savedStore) throw new Error('Store application could not be submitted.')
+  if (storeError) {
+    const databaseErrorCode = storeError.code || 'unknown'
+    console.error('store_registration_store_upsert_failed', { code: databaseErrorCode })
+    if (['PGRST204', 'PGRST205', '42703'].includes(databaseErrorCode)) {
+      return fail('The store database schema is missing required fields. Apply the store-registration migrations and retry.', 500)
+    }
+    throw new Error(`Store application could not be submitted (database error ${databaseErrorCode}).`)
+  }
+  if (!savedStore) throw new Error('Store application could not be submitted because no store record was returned.')
 
   const { error: locationError } = await context.admin.from('store_location_verifications').upsert({
     store_id: savedStore.id,

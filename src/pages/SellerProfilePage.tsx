@@ -1,5 +1,5 @@
 import type { Profile, Listing, BusinessProfile } from '../types'
-import { ListingCard } from '../components/ListingCard'
+import { Listing as ListingView } from '../components/Listing'
 
 type SellerProfilePageProps = {
     seller: Profile
@@ -71,9 +71,9 @@ export function SellerProfilePage({
                 {sellerListings.length === 0 ? (
                     <p style={{ color: 'var(--text-muted)' }}>This seller has no active listings on the marketplace.</p>
                 ) : (
-                    <div className="marketplace-listing-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px' }}>
+                    <div className="marketplace-listing-grid">
                         {sellerListings.map((listing) => (
-                            <ListingCard
+                            <ListingView
                                 key={listing.id}
                                 listing={listing}
                                 saved={savedIds.includes(String(listing.id))}

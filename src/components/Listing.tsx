@@ -1,4 +1,5 @@
 import type { Listing, BusinessProfile } from '../types'
+import { Link } from 'react-router-dom'
 import { formatZMWPrice } from '../utils/formatPrice'
 import { isNewArrival } from '../utils/listingSections'
 
@@ -25,7 +26,7 @@ const categoryIcons: Record<string, string> = {
   Toys: 'smart_toy',
 }
 
-export function ListingCard({ listing, saved = false, onOpen, onToggleSave, onAddToCart, onQuickPeek, allBusinesses, onVisitStore }: ListingCardProps) {
+export function Listing({ listing, saved = false, onOpen, onToggleSave, onAddToCart, onQuickPeek, allBusinesses, onVisitStore }: ListingCardProps) {
   const hasImage = Boolean(listing.images && listing.images.length > 0)
   const mainImage = hasImage ? listing.images![0] : null
 
@@ -192,6 +193,16 @@ export function ListingCard({ listing, saved = false, onOpen, onToggleSave, onAd
           </div>
         )}
 
+        {listing.user_id && (
+          <Link
+            to={`/seller/${listing.user_id}`}
+            className="listing-seller-profile-link"
+            onClick={(event) => event.stopPropagation()}
+          >
+            View seller profile
+          </Link>
+        )}
+
         {/* Product Title (Refined lightweight font) */}
         <h3 className="modern-card-title" title={listing.title}>
           {listing.title}
@@ -311,3 +322,5 @@ export function ListingCard({ listing, saved = false, onOpen, onToggleSave, onAd
     </article>
   )
 }
+
+export const ListingCard = Listing

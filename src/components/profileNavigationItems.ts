@@ -7,4 +7,5 @@ export const PROFILE_NAVIGATION_ITEMS = [
   { path: '/profile/store-insights', label: 'Store insights', icon: 'insights' },
   { path: '/profile/saved-listings', label: 'Saved listings', icon: 'bookmark' },
   { path: '/profile/notifications', label: 'Notifications', icon: 'notifications' },
+  { path: '/profile/my-profile', label: 'My profile', icon: 'person' },
 ] as const

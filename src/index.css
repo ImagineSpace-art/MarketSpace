@@ -1,5 +1,13 @@
+@font-face {
+    font-family: 'Cormorant';
+    src: url('.../fonts/Cormorant,GFS_Didot/Cormorant-VariableFont_wght.ttf') format('truetype');
+    font-weight: 100 900;
+    font-style: normal;
+}
+
 :root {
     font-family:
+        Didot,
         Inter,
         Outfit,
         system-ui,

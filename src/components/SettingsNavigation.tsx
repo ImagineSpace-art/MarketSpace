@@ -37,9 +37,10 @@ export function SettingsNavigation({ activeCategory, onNavigate }: SettingsNavig
 type SettingsNavigationDrawerProps = {
   isOpen: boolean
   onClose: () => void
+  onLogout: () => void
 }
 
-export function SettingsNavigationDrawer({ isOpen, onClose }: SettingsNavigationDrawerProps) {
+export function SettingsNavigationDrawer({ isOpen, onClose, onLogout }: SettingsNavigationDrawerProps) {
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -92,6 +93,17 @@ export function SettingsNavigationDrawer({ isOpen, onClose }: SettingsNavigation
             </button>
           ))}
         </nav>
+        <button
+          type="button"
+          className="settings-navigation-item profile-menu-logout"
+          onClick={() => {
+            onClose()
+            onLogout()
+          }}
+        >
+          <span className="material-icons" aria-hidden="true">logout</span>
+          <span>Log out</span>
+        </button>
       </aside>
     </div>
   )

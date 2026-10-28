@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { BusinessProfile, Listing, StoreReview, StoreCartItem, StoreThemeConfig } from '../types'
-import { ListingCard } from '../components/ListingCard'
+import { Listing as ListingView } from '../components/Listing'
 import { logAnalyticsEvent } from '../services/analytics'
 import { StoreSectionRenderer } from '../components/store-theme/StoreSectionRenderer'
 import { StoreThemedListingView } from '../components/store-theme/StoreThemedListingView'
@@ -675,7 +675,7 @@ export function StoreViewPage({
                     ) : (
                         <div className="marketplace-listing-grid">
                             {displayedListings.map(listing => (
-                                <ListingCard
+                                <ListingView
                                     key={listing.id}
                                     listing={listing}
                                     saved={savedIds.includes(String(listing.id))}
@@ -894,7 +894,7 @@ export function StoreViewPage({
                                                     } : {})
                                                 }}
                                             >
-                                                <ListingCard
+                                                <ListingView
                                                     listing={listing}
                                                     saved={savedIds.includes(String(listing.id))}
                                                     onOpen={handleOpenThemedListing}
@@ -944,7 +944,7 @@ export function StoreViewPage({
                                     ) : (
                                         <div className="marketplace-listing-grid">
                                             {filteredColListings.map(listing => (
-                                                <ListingCard
+                                                <ListingView
                                                     key={listing.id}
                                                     listing={listing}
                                                     saved={savedIds.includes(String(listing.id))}

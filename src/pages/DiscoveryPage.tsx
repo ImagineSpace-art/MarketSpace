@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import './DiscoveryPage.css'
 import type { BusinessProfile, Listing, StoreReview } from '../types'
+import { Listing as ListingView } from '../components/Listing'
 
 type DiscoveryPageProps = {
   allBusinesses?: Record<string, BusinessProfile>
@@ -307,21 +308,14 @@ export function DiscoveryPage({
           <h2>Products to Discover</h2>
           <Link to="/browse">Browse all products <span className="material-icons">arrow_forward</span></Link>
         </div>
-        <div className="discovery-product-rail">
+        <div className="marketplace-listing-grid">
           {availableListings.map((listing) => {
-            const store = listing.user_id ? allBusinesses[listing.user_id] : undefined
-            return (
-              <Link key={listing.id} to={`/listings/${listing.id}`} className="discovery-product-card">
-                <div className="discovery-product-image">
-                  {listing.images?.[0] ? <img src={listing.images[0]} alt={listing.title} /> : <span>No image</span>}
-                </div>
-                <div className="discovery-product-details">
-                  <strong>{listing.title}</strong>
-                  <span>{store?.shopName || listing.seller_name || 'Marketplace seller'}</span>
-                  <b>K{listing.price.toLocaleString()}</b>
-                </div>
-              </Link>
-            )
+            return <ListingView
+              key={listing.id}
+              listing={listing}
+              onOpen={() => navigate(`/listings/${listing.id}`)}
+              allBusinesses={allBusinesses}
+            />
           })}
         </div>
       </section>}

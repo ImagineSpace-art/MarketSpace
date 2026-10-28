@@ -1,6 +1,5 @@
 import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react'
-import { Link, NavLink, useNavigate } from 'react-router-dom'
-import { PROFILE_NAVIGATION_ITEMS } from '../components/profileNavigationItems'
+import { Link, useNavigate } from 'react-router-dom'
 import type { Listing, Profile, BusinessProfile, PaymentMethodItem, NotificationConfig, StoreThemeConfig } from '../types'
 import { SavedItemsPage, NotificationsPage } from './SavedNotificationsPage'
 import { ListingFormPage } from './ListingPage'
@@ -16,7 +15,6 @@ import { fetchStoreAnalytics, type StoreAnalyticsData } from '../services/analyt
 // ---------------- PROFILE PAGE ----------------
 type ProfilePageProps = {
     profile: Profile | null
-    userEmail: string
     myListings: Listing[]
     listings: Listing[]
     savedListings: Listing[]
@@ -27,11 +25,8 @@ type ProfilePageProps = {
     onRenewListing: (listingId: number) => void
     onDeleteListing: (listingId: number) => void
     onUpdateStatus: (listingId: number, status: string) => void
-    onUploadAvatar: (base64: string) => void
     onOpenListing: (listing: Listing) => void
     onToggleSave: (listingId: number) => void
-    onLogout: () => void
-    onOpenDashboardPanel?: () => void
     onUpdateListingCollection?: (listingId: number, targetColId: string | null) => void | Promise<void>
 
     // Settings panel specific props
@@ -99,7 +94,6 @@ type ProfilePageProps = {
 
 export function ProfilePage({
     profile,
-    userEmail,
     myListings,
     savedListings,
     businessProfile,
@@ -107,11 +101,8 @@ export function ProfilePage({
     onRenewListing,
     onDeleteListing,
     onUpdateStatus,
-    onUploadAvatar,
     onOpenListing,
     onToggleSave,
-    onLogout,
-    onOpenDashboardPanel,
     activeSection,
     notifications,
     onMarkAllRead,
@@ -122,7 +113,6 @@ export function ProfilePage({
     onToggleFollowStore = () => { },
     onSaveStoreTheme,
 }: ProfilePageProps) {
-    const displayName = profile?.username || (userEmail && userEmail !== 'Guest' ? userEmail.split('@')[0] : 'User Profile')
     const navigate = useNavigate()
 
     const [storeTab, setStoreTab] = useState<'analytics' | 'catalog' | 'ads' | 'social' | 'customizer'>('analytics')
@@ -214,109 +204,8 @@ export function ProfilePage({
         })
     }
 
-    const handleAvatarChange = async (e: ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            try {
-                const url = await uploadImageToSupabase(e.target.files[0], 'marketspace-media', 'avatars')
-                onUploadAvatar(url)
-            } catch (err) {
-                console.error('Error uploading avatar:', err)
-            }
-        }
-    }
-
-    const [isNavigationOpen, setIsNavigationOpen] = useState(false)
-
-    useEffect(() => {
-        if (!isNavigationOpen) return
-        const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') setIsNavigationOpen(false)
-        }
-        window.addEventListener('keydown', handleKeyDown)
-        return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [isNavigationOpen])
-
     return (
         <div className="dashboard-layout">
-            <button
-                type="button"
-                className="floating-sidebar-toggle-btn"
-                onClick={() => setIsNavigationOpen(true)}
-                title="Open navigation"
-                aria-label="Open navigation"
-                aria-expanded={isNavigationOpen}
-                aria-controls="profile-navigation-drawer"
-            >
-                <span className="material-icons" style={{ fontSize: '22px' }}>menu</span>
-            </button>
-
-            <div
-                className={`profile-navigation-backdrop ${isNavigationOpen ? 'open' : ''}`}
-                aria-hidden="true"
-                onClick={() => setIsNavigationOpen(false)}
-            />
-
-            <aside
-                id="profile-navigation-drawer"
-                className={`dashboard-sidebar desktop-profile-sidebar ${isNavigationOpen ? 'open' : ''}`}
-                style={{padding: '15px'}}
-                aria-label="Profile navigation"
-                aria-hidden={!isNavigationOpen}
-            >
-                <div className="profile-navigation-header">
-                    <span>Navigation</span>
-                    <button
-                        type="button"
-                        onClick={() => setIsNavigationOpen(false)}
-                        className="ghost-btn compact-btn"
-                        title="Close navigation"
-                        aria-label="Close navigation"
-                    >
-                        <span className="material-icons" style={{ fontSize: '20px' }}>close</span>
-                    </button>
-                </div>
-                <nav className="sidebar-nav">
-                    {PROFILE_NAVIGATION_ITEMS.map((item) => (
-                        <NavLink
-                            key={item.path}
-                            className={({ isActive }) => `nav-btn ${'isPrimary' in item && item.isPrimary ? 'primary-action' : ''} ${isActive ? 'active' : ''}`}
-                            to={item.path}
-                            end={'exact' in item ? item.exact : false}
-                            onClick={() => setIsNavigationOpen(false)}
-                            style={{ textDecoration: 'none' }}
-                        >
-                            <span className="material-icons">{item.icon}</span> {item.label}
-                        </NavLink>
-                    ))}
-                </nav>
-                <div className="sidebar-footer">
-                    <div className="profile-mini">
-                        <label className="avatar-upload-label">
-                            <input type="file" accept="image/*" onChange={handleAvatarChange} style={{ display: 'none' }} />
-                            {profile?.avatar_url ? (
-                                <img src={profile.avatar_url} alt={displayName} className="mini-avatar-img" />
-                            ) : (
-                                <div className="mini-avatar-placeholder">{displayName.slice(0, 1).toUpperCase()}</div>
-                            )}
-                            <div className="avatar-badge">
-                                <span className="material-icons">photo_camera</span>
-                            </div>
-                        </label>
-                        <div
-                            className="profile-mini-info"
-                            onClick={onOpenDashboardPanel}
-                            style={{ cursor: 'pointer' }}
-                            title="Open Professional Dashboard"
-                        >
-                            <strong>{displayName}</strong>
-                            <span>{userEmail}</span>
-                        </div>
-                    </div>
-                    <button className="ghost-btn logout-btn" onClick={onLogout}>Log out</button>
-                </div>
-            </aside>
-
-            {/* --- MAIN CONTENT AREA --- */}
             <main className="dashboard-main">
                 {activeSection === 'notifications' ? (
                     <NotificationsPage

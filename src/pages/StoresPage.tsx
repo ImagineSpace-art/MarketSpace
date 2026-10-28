@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import type { BusinessProfile, Listing } from '../types'
-import { ListingCard } from '../components/ListingCard'
 
 // ---------------- STORES & STORE LISTINGS PAGE ----------------
 type StoresPageProps = {
@@ -10,9 +10,6 @@ type StoresPageProps = {
   listings: Listing[]
   searchQuery: string
   onSearchQueryChange: (query: string) => void
-  openListing?: (listing: Listing) => void
-  toggleSave?: (id: number) => void
-  savedIds?: string[]
 }
 
 export function StoresPage({
@@ -22,15 +19,10 @@ export function StoresPage({
   listings,
   searchQuery,
   onSearchQueryChange,
-  openListing = () => {},
-  toggleSave = () => {},
-  savedIds = []
 }: StoresPageProps) {
   const activeShops = Object.values(allBusinesses || {}).filter(b => Boolean(b && b.shopName))
   const [currentSlide, setCurrentSlide] = useState(0)
-  const [viewMode, setViewMode] = useState<'listings' | 'shops'>('listings')
-  const activeViewMode = searchQuery.trim() ? 'shops' : viewMode
-  const [selectedCategory, setSelectedCategory] = useState<string>('All')
+  const [selectedStoreCategory, setSelectedStoreCategory] = useState('All')
   const normalizedSearchQuery = searchQuery.trim().toLowerCase()
 
   const slides = [
@@ -46,30 +38,6 @@ export function StoresPage({
     return () => clearInterval(timer)
   }, [slides.length])
 
-  // Filter listings to only items that belong to verified registered stores
-  const storeOnlyListings = listings.filter((l) => {
-    const isStoreOwner = Boolean(l.user_id && allBusinesses[l.user_id]?.shopName)
-    if (!isStoreOwner) return false
-
-    if (selectedCategory !== 'All' && l.category !== selectedCategory) return false
-
-    if (normalizedSearchQuery) {
-      const titleMatch = l.title.toLowerCase().includes(normalizedSearchQuery)
-      const catMatch = (l.category || '').toLowerCase().includes(normalizedSearchQuery)
-      const storeName = allBusinesses[l.user_id!]?.shopName.toLowerCase() || ''
-      const storeMatch = storeName.includes(normalizedSearchQuery)
-      if (!titleMatch && !catMatch && !storeMatch) return false
-    }
-
-    if (listingKindFilter === 'service') {
-      return l.listing_type === 'service'
-    } else if (listingKindFilter === 'item') {
-      return l.listing_type !== 'service'
-    }
-
-    return true
-  })
-
   // Filter storefronts based on search query
   const filteredShops = activeShops.filter((shop) => {
     const matchesSearch = shop.shopName.toLowerCase().includes(normalizedSearchQuery) ||
@@ -78,6 +46,7 @@ export function StoresPage({
       (shop.address || '').toLowerCase().includes(normalizedSearchQuery)
 
     if (!matchesSearch) return false
+    if (selectedStoreCategory !== 'All' && shop.category !== selectedStoreCategory) return false
 
     if (listingKindFilter === 'service') {
       const hasServiceListings = listings.some((l) => l.user_id === shop.userId && l.listing_type === 'service')
@@ -91,8 +60,6 @@ export function StoresPage({
 
     return true
   })
-
-  const categories = ['All', 'Electronics', 'Fashion', 'Home & Garden', 'Vehicles', 'Sports', 'Services']
 
   const storeCategories = [
     { name: 'Electronics', image: slides[2], description: 'Tech and accessories' },
@@ -140,19 +107,18 @@ export function StoresPage({
           <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginBottom: '32px' }}>
             <button
               type="button"
-              onClick={() => { setViewMode('shops'); scrollToCatalog() }}
+              onClick={() => { setSelectedStoreCategory('All'); scrollToCatalog() }}
               style={{ backgroundColor: '#0f172a', color: '#ffffff', border: 'none', borderRadius: '999px', padding: '13px 26px', fontSize: '0.94rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
             >
               Explore Stores
               <span className="material-icons" style={{ fontSize: '18px' }}>arrow_forward</span>
             </button>
-            <button
-              type="button"
-              onClick={() => { onSearchQueryChange(''); setViewMode('listings'); scrollToCatalog() }}
+            <Link
+              to="/browse#browse-store-listings"
               style={{ backgroundColor: '#ffffff', color: '#0f172a', border: '1px solid #e2e8f0', borderRadius: '999px', padding: '12px 24px', fontSize: '0.94rem', fontWeight: 700, cursor: 'pointer' }}
             >
               Shop Store Products
-            </button>
+            </Link>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#64748b', fontSize: '0.84rem', fontWeight: 600 }}>
             <span className="material-icons" style={{ color: '#2563eb', fontSize: '20px' }}>verified</span>
@@ -203,7 +169,7 @@ export function StoresPage({
             <h2 style={{ fontSize: '1.5rem', fontWeight: 900, margin: 0, color: '#0f172a', letterSpacing: '-0.02em' }}>Shop by Category</h2>
             <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: '0.88rem' }}>Find a local store for whatever you need.</p>
           </div>
-          <button type="button" onClick={() => { onSearchQueryChange(''); setSelectedCategory('All'); setViewMode('listings'); scrollToCatalog() }} style={{ background: 'none', border: 'none', color: '#0f172a', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <button type="button" onClick={() => { onSearchQueryChange(''); setSelectedStoreCategory('All'); scrollToCatalog() }} style={{ background: 'none', border: 'none', color: '#0f172a', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
             View all stores <span className="material-icons" style={{ fontSize: '16px' }}>arrow_forward</span>
           </button>
         </div>
@@ -213,7 +179,7 @@ export function StoresPage({
               key={category.name}
               type="button"
               className="shop-category-card"
-              onClick={() => { onSearchQueryChange(''); setSelectedCategory(category.name); setViewMode('listings'); scrollToCatalog() }}
+              onClick={() => { onSearchQueryChange(''); setSelectedStoreCategory(category.name); scrollToCatalog() }}
               style={{ padding: 0, cursor: 'pointer', textAlign: 'center' }}
             >
               <div className="shop-category-image">
@@ -229,127 +195,15 @@ export function StoresPage({
       <section id="stores-catalog" style={{ maxWidth: '1280px', margin: '48px auto 64px', padding: '0 24px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
           
-          {/* Header Controls: Switcher + Search */}
+          {/* Directory search */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', paddingBottom: '18px', borderBottom: '1px solid #f1f5f9' }}>
-            
-            {/* View Switcher: Store Listings vs Storefronts Directory */}
-            <div style={{ display: 'flex', gap: '4px', background: '#f8fafc', padding: '4px', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setViewMode('listings');
-                  onSearchQueryChange('');
-                }}
-                style={{
-                  padding: '8px 18px',
-                  border: '1px solid black',
-                  'borderRadius': '100px !important',
-                  fontSize: '0.86rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  background: activeViewMode === 'listings' ? '#0f172a' : 'transparent',
-                  color: activeViewMode === 'listings' ? '#ffffff' : '#64748b',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <span className="material-icons" style={{ fontSize: '16px' }}>inventory_2</span>
-                <span>Store Listings ({storeOnlyListings.length})</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setViewMode('shops')}
-                style={{
-                  padding: '8px 18px',
-                  borderRadius: '100px',
-                  border: 'none',
-                  fontSize: '0.86rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  background: activeViewMode === 'shops' ? '#0f172a' : 'transparent',
-                  color: activeViewMode === 'shops' ? '#ffffff' : '#64748b',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <span className="material-icons" style={{ fontSize: '16px' }}>storefront</span>
-                <span>Merchant Directory ({filteredShops.length})</span>
-              </button>
-            </div>
-
+            <h2 style={{ margin: 0, fontSize: '1.2rem' }}>Merchant Directory ({filteredShops.length})</h2>
           </div>
 
           {/* ========================================================================= */}
-          {/* VIEW MODE 1: DEDICATED STORE LISTINGS FEED                                */}
+          {/* REGISTERED STOREFRONTS DIRECTORY                                         */}
           {/* ========================================================================= */}
-          {activeViewMode === 'listings' && (
-            <div>
-              {/* Category Pills Bar */}
-              <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '20px', WebkitOverflowScrolling: 'touch' }}>
-                {categories.map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setSelectedCategory(cat)}
-                    style={{
-                      padding: '6px 14px',
-                      borderRadius: '16px',
-                      border: selectedCategory === cat ? '1px solid #0f172a' : '1px solid #e2e8f0',
-                      background: selectedCategory === cat ? '#0f172a' : '#ffffff',
-                      color: selectedCategory === cat ? '#ffffff' : '#334155',
-                      fontWeight: selectedCategory === cat ? 700 : 500,
-                      fontSize: '0.82rem',
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-
-              {storeOnlyListings.length === 0 ? (
-                <div style={{ padding: '60px 20px', textAlign: 'center', background: '#ffffff', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
-                  <span className="material-icons" style={{ fontSize: '48px', color: '#2563eb', opacity: 0.8 }}>storefront</span>
-                  <h3 style={{ margin: '12px 0 6px', fontSize: '1.2rem', fontWeight: 800 }}>No Store Listings Found</h3>
-                  <p style={{ margin: '0 0 16px', color: '#64748b', fontSize: '0.88rem' }}>
-                    {searchQuery ? `No products match "${searchQuery}" in our verified stores.` : 'No store products in this category yet.'}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => { setSelectedCategory('All'); onSearchQueryChange('') }}
-                    className="primary-btn compact-btn"
-                  >
-                    Reset Filter
-                  </button>
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '16px' }}>
-                  {storeOnlyListings.map((listing) => (
-                    <ListingCard
-                      key={listing.id}
-                      listing={listing}
-                      saved={savedIds.includes(String(listing.id))}
-                      onOpen={openListing}
-                      onToggleSave={toggleSave}
-                      allBusinesses={allBusinesses}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ========================================================================= */}
-          {/* VIEW MODE 2: REGISTERED STOREFRONTS DIRECTORY                             */}
-          {/* ========================================================================= */}
-          {activeViewMode === 'shops' && (
-            <div>
+          <div>
               {filteredShops.length === 0 ? (
                 <div style={{ padding: '60px 20px', textAlign: 'center', background: '#ffffff', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
                   <span className="material-icons" style={{ fontSize: '48px', color: '#94a3b8' }}>search_off</span>
@@ -455,7 +309,6 @@ export function StoresPage({
                 </div>
               )}
             </div>
-          )}
 
         </div>
       </section>

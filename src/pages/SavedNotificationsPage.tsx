@@ -1,4 +1,4 @@
-import { ListingCard } from '../components/ListingCard'
+import { Listing as ListingView } from '../components/Listing'
 import type { Listing } from '../types'
 import type { NotificationItem } from '../features/marketplace/useMarketplaceApp'
 
@@ -20,7 +20,7 @@ export function SavedItemsPage({ savedListings, onOpenListing, onToggleSave }: S
       {savedListings.length === 0 ? <p>No saved items yet. Tap save on a listing to keep it here.</p> : (
         <div className="listing-grid">
           {savedListings.map((listing) => (
-            <ListingCard key={listing.id} listing={listing} saved onOpen={onOpenListing} onToggleSave={onToggleSave} />
+            <ListingView key={listing.id} listing={listing} saved onOpen={onOpenListing} onToggleSave={onToggleSave} />
           ))}
         </div>
       )}

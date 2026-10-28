@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { StoreSection, BusinessProfile, Listing } from '../../types'
-import { ListingCard } from '../ListingCard'
+import { Listing as ListingView } from '../Listing'
 import { LiveEditableText, LiveEditableImage, LiveSectionToolbar } from './LiveCustomizerControls'
 import { DEFAULT_HYPER_SLIDES, type CarouselSlide } from './defaultSections'
 
@@ -1704,7 +1704,7 @@ function FeaturedProductsSection({
             )
           ) : (
             displayItems.map(item => (
-              <ListingCard
+              <ListingView
                 key={item.id}
                 listing={item}
                 saved={savedIds.includes(String(item.id))}

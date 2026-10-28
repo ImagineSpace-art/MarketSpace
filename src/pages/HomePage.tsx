@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ListingCard } from '../components/ListingCard'
+import { Listing } from '../components/Listing'
 import type { MarketplaceAppModel } from '../features/marketplace/useMarketplaceApp'
 
 type HomePageProps = Pick<MarketplaceAppModel,
@@ -530,9 +530,9 @@ export function HomePage({
                   <button type="button" onClick={clearAllFilters} className="primary-btn compact-btn">Reset Filters</button>
                 </div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '16px' }}>
+                <div className="marketplace-listing-grid">
                   {displayListings.map((listing) => (
-                    <ListingCard
+                    <Listing
                       key={listing.id}
                       listing={listing}
                       saved={savedIds.includes(String(listing.id))}
@@ -1082,9 +1082,9 @@ export function HomePage({
                   </div>
                 </div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '16px' }}>
+                <div className="marketplace-listing-grid">
                   {displayListings.map((listing) => (
-                    <ListingCard
+                    <Listing
                       key={listing.id}
                       listing={listing}
                       saved={savedIds.includes(String(listing.id))}

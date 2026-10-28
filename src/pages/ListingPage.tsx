@@ -642,7 +642,17 @@ export function ListingDetailPage({
 
             {/* Visit Store / Seller Profile Button */}
             {selectedListing.user_id && (
-              allBusinesses[selectedListing.user_id] ? (
+              <>
+              <button
+                type="button"
+                onClick={() => navigate(`/seller/${selectedListing.user_id}`)}
+                className="secondary-btn"
+                style={{ width: '100%', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+              >
+                <span className="material-icons" style={{ fontSize: '18px' }}>person</span>
+                View seller profile
+              </button>
+              {allBusinesses[selectedListing.user_id] ? (
                 <button
                   type="button"
                   onClick={() => onVisitStore(selectedListing.user_id || '')}
@@ -662,7 +672,8 @@ export function ListingDetailPage({
                   <span className="material-icons" style={{ fontSize: '18px' }}>storefront</span>
                   Visit Seller Store
                 </button>
-              )
+              )}
+              </>
             )}
 
             {/* Owner Management Panel: Renew, Edit, Delete */}
