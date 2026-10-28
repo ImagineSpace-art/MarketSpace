@@ -281,6 +281,7 @@ export function AuthPage({
           max-width: 410px;
           background: #fab829;
           border-radius: 28px;
+          border: 1px solid black;
           padding: 36px 30px;
           box-sizing: border-box;
           box-shadow: 0 14px 32px rgba(250, 184, 41, 0.3), 0 4px 12px rgba(0, 0, 0, 0.05);

@@ -322,7 +322,7 @@ export function BrowsePage({
             }}
           >
             <img
-              src="/illustrations/browse_hero_lifestyle.jpg"
+              src="/illustrations/cat_sneaker.jpg"
               alt="Lifestyle Shopper"
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />

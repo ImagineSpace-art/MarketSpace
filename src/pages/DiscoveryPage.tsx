@@ -146,7 +146,7 @@ export function DiscoveryPage({
                 color: '#111827',
               }}
             >
-              Discover Handcrafted Goods & Modern Stores
+              Discover Quality Goods & Modern Stores
             </h1>
             <p style={{ fontSize: '0.96rem', lineHeight: 1.6, color: '#4b5563', margin: '0 0 28px 0' }}>
               Explore verified digital storefronts, boutique creators, and high-quality products across Zambia. From

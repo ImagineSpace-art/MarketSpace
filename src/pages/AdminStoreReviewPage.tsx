@@ -99,7 +99,7 @@ export function AdminStoreReviewPage() {
         </div>
         <button type="button" className="secondary-btn" onClick={refreshQueue}>Refresh queue</button>
       </header>
-      {error && <p role="alert" className="store-wizard-alert error">{error}</p>}
+      {/*error && <p role="alert" className="store-wizard-alert error">{error}</p>*/}
       {notice && <p role="status" className="store-wizard-alert notice">{notice}</p>}
       {!applications.length && <section className="section-card"><p>No store applications are waiting for review.</p></section>}
 

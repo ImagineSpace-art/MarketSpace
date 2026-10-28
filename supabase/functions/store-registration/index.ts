@@ -506,7 +506,15 @@ async function submitApplication(context: HandlerContext, body: Json) {
     .single()
   if (storeError) {
     const databaseErrorCode = storeError.code || 'unknown'
-    console.error('store_registration_store_upsert_failed', { code: databaseErrorCode })
+    console.error('store_registration_store_upsert_failed', {
+      code: storeError.code,
+      message: storeError.message,
+      details: storeError.details,
+      hint: storeError.hint,
+    })
+    if (Deno.env.get('APP_ENV') === 'development') {
+      return respond({ error: storeError.message, code: storeError.code, message: storeError.message }, 500)
+    }
     if (['PGRST204', 'PGRST205', '42703'].includes(databaseErrorCode)) {
       return fail('The store database schema is missing required fields. Apply the store-registration migrations and retry.', 500)
     }

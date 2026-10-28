@@ -694,7 +694,7 @@ export function Shell({
           display: isDiscoveryPage ? 'none' : undefined,
         }}
       >
-        <button
+        {/*<button
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           style={{
             width: '100%',
@@ -711,7 +711,7 @@ export function Shell({
           className="back-to-top-btn"
         >
           Back to top
-        </button>
+        </button>*/}
 
         <div
           style={{
