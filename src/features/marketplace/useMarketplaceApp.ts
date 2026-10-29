@@ -3,7 +3,7 @@ import type { Session } from '@supabase/supabase-js'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { CATEGORY_OPTIONS, CONDITION_OPTIONS, DELIVERY_OPTIONS } from './constants'
-import type { Listing, Profile, View, BusinessProfile, StoreReview, PaymentMethodItem, NotificationConfig, StoreThemeConfig } from '../../types'
+import type { Listing, Profile, View, BusinessProfile, StoreReview, PaymentMethodItem, NotificationConfig, StoreThemeConfig, StoreTemplateContent, StoreTemplateId } from '../../types'
 import { logAnalyticsEvent, toggleStoreFollowInDb } from '../../services/analytics'
 import { getFunctionErrorMessage } from '../../utils/functionError'
 
@@ -153,6 +153,7 @@ export interface MarketplaceAppModel {
   setUploadedImages: Dispatch<SetStateAction<string[]>>
   handleCreateOrUpdateBusiness: (profile: BusinessProfile) => void
   handleSaveStoreTheme: (config: StoreThemeConfig, storeUserId?: string) => Promise<void>
+  handleSaveStoreTemplate: (templateId: StoreTemplateId, content: Record<string, unknown>, storeUserId?: string) => Promise<void>
   handleDeleteListing: (listingId: number) => Promise<void>
   handleRenewListing: (listingId: number) => Promise<void>
   handleUpdateListingStatus: (listingId: number, status: string) => Promise<void>
@@ -1427,6 +1428,49 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     }
   }
 
+  const handleSaveStoreTemplate = async (
+    templateId: StoreTemplateId,
+    content: Record<string, unknown>,
+    storeUserId?: string,
+  ) => {
+    if (!session?.user.id) throw new Error('Your session expired, please sign in again.')
+    const targetUserId = storeUserId || businessProfile?.userId || session.user.id
+    if (targetUserId !== session.user.id) throw new Error('You can only customize your own store.')
+
+    const { data, error } = await supabase.functions.invoke<{
+      success?: boolean
+      templateId?: StoreTemplateId
+      content?: Record<string, string>
+      error?: string
+    }>('store-template-save', {
+      body: { templateId, content },
+    })
+    if (error) throw new Error(await getFunctionErrorMessage(error))
+    if (!data?.success || !data.templateId || !data.content) {
+      throw new Error(data?.error || 'Store template could not be saved.')
+    }
+
+    const existing = allBusinesses[targetUserId] || businessProfile
+    if (!existing) throw new Error('Your store profile could not be loaded.')
+    const templateContent: StoreTemplateContent = {
+      ...(existing.templateContent || {}),
+      [templateId]: data.content,
+    }
+    const updated: BusinessProfile = {
+      ...existing,
+      templateId: data.templateId,
+      templateContent,
+    }
+    const nextAll = { ...allBusinesses, [targetUserId]: updated }
+    setAllBusinesses(nextAll)
+    if (businessProfile?.userId === targetUserId) setBusinessProfile(updated)
+    try {
+      window.localStorage.setItem('marketspace-all-businesses', JSON.stringify(nextAll))
+    } catch (storageError) {
+      console.error('Failed to cache the saved store template:', storageError)
+    }
+  }
+
   const loadBusinesses = async () => {
     const stored = window.localStorage.getItem('marketspace-all-businesses')
     let baseStores: Record<string, BusinessProfile> = {}
@@ -1456,6 +1500,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
 
         dbStores[s.user_id] = {
           userId: s.user_id,
+          storeId: s.id,
           subdomain: s.subdomain || undefined,
           shopName: s.shop_name,
           description: s.description,
@@ -1478,6 +1523,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
           themeConfig: (s.theme_config && s.theme_config.sections && s.theme_config.sections.length > 0)
             ? s.theme_config
             : (localTheme || s.themeConfig || undefined),
+          templateId: s.template_id || undefined,
+          templateContent: s.template_content || {},
         }
       })
       setAllBusinesses(prev => {
@@ -1597,6 +1644,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setUploadedImages,
     handleCreateOrUpdateBusiness,
     handleSaveStoreTheme,
+    handleSaveStoreTemplate,
     handleDeleteListing,
     handleRenewListing,
     handleUpdateListingStatus,

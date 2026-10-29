@@ -24,9 +24,33 @@ type ReviewApplication = {
   checks: { flagged: boolean; results: Record<string, unknown> } | null
 }
 
+type StoreReport = {
+  id: string
+  reason: 'scam_or_fake_store' | 'prohibited_items' | 'misleading_information' | 'impersonation' | 'other'
+  details: string
+  created_at: string
+}
+
+type StoreReportGroup = {
+  store: { id: string; shop_name: string; subdomain: string | null } | undefined
+  count: number
+  reports: StoreReport[]
+}
+
+const REPORT_REASON_LABELS: Record<StoreReport['reason'], string> = {
+  scam_or_fake_store: 'Scam or fake store',
+  prohibited_items: 'Prohibited items',
+  misleading_information: 'Misleading information',
+  impersonation: 'Impersonation',
+  other: 'Other',
+}
+
 export function AdminStoreReviewPage() {
   const [applications, setApplications] = useState<ReviewApplication[]>([])
+  const [reportGroups, setReportGroups] = useState<StoreReportGroup[]>([])
+  const [activeQueue, setActiveQueue] = useState<'applications' | 'reports'>('applications')
   const [loading, setLoading] = useState(true)
+  const [reportsLoading, setReportsLoading] = useState(false)
   const [workingId, setWorkingId] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -44,6 +68,22 @@ export function AdminStoreReviewPage() {
       setError(loadError instanceof Error ? loadError.message : 'The review queue could not be loaded.')
     } finally {
       setLoading(false)
+    }
+  }, [])
+
+  const loadReports = useCallback(async () => {
+    setError('')
+    setReportsLoading(true)
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke<{ reports: StoreReportGroup[] }>('store-report', {
+        body: { action: 'open_reports' },
+      })
+      if (invokeError) setError(await getFunctionErrorMessage(invokeError))
+      else setReportGroups(data?.reports || [])
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Open store reports could not be loaded.')
+    } finally {
+      setReportsLoading(false)
     }
   }, [])
 
@@ -87,7 +127,105 @@ export function AdminStoreReviewPage() {
     }
   }
 
+  const reviewStoreReport = async (report: StoreReport, decision: 'dismiss' | 'uphold') => {
+    setError('')
+    setNotice('')
+    setWorkingId(report.id)
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke<{ success?: boolean }>('store-report', {
+        body: { action: 'review_report', reportId: report.id, decision },
+      })
+      if (invokeError) setError(await getFunctionErrorMessage(invokeError))
+      else if (!data?.success) setError('The report decision could not be saved.')
+      else {
+        setNotice(`Report ${decision === 'dismiss' ? 'dismissed' : 'upheld'}.`)
+        await loadReports()
+      }
+    } catch (reviewError) {
+      setError(reviewError instanceof Error ? reviewError.message : 'The report decision could not be saved.')
+    } finally {
+      setWorkingId('')
+    }
+  }
+
   if (loading) return <section className="section-card"><p>Loading store applications…</p></section>
+
+  if (activeQueue === 'reports') {
+    return (
+      <section style={{ width: 'min(100%, 1100px)', margin: '0 auto', padding: 20 }}>
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+          <div>
+            <p style={{ margin: 0, color: '#2563eb', fontSize: '.75rem', fontWeight: 800, letterSpacing: '.1em' }}>MARKETSPACE MODERATION</p>
+            <h2 style={{ margin: '4px 0' }}>Store reports</h2>
+            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+              {reportGroups.reduce((count, group) => count + group.count, 0)} open reports across {reportGroups.length} stores
+            </p>
+          </div>
+          <button type="button" className="secondary-btn" disabled={reportsLoading} onClick={() => void loadReports()}>
+            {reportsLoading ? 'Refreshing…' : 'Refresh reports'}
+          </button>
+        </header>
+        <nav aria-label="Moderation queues" style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+          <button type="button" className="secondary-btn" onClick={() => setActiveQueue('applications')}>Store applications</button>
+          <button type="button" className="primary-btn" aria-current="page">Reports</button>
+        </nav>
+        {error && <p role="alert" className="store-wizard-alert error">{error}</p>}
+        {notice && <p role="status" className="store-wizard-alert notice">{notice}</p>}
+        {reportsLoading ? (
+          <section className="section-card"><p>Loading reports…</p></section>
+        ) : reportGroups.length === 0 ? (
+          <section className="section-card"><p>No open store reports.</p></section>
+        ) : (
+          <div style={{ display: 'grid', gap: 18 }}>
+            {reportGroups.map(group => (
+              <section key={group.store?.id || group.reports[0]?.id} className="section-card" style={{ padding: 18 }}>
+                <header style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+                  <div>
+                    <h3 style={{ margin: 0 }}>{group.store?.shop_name || 'Unknown store'}</h3>
+                    {group.store?.subdomain && <p style={{ margin: '4px 0 0', color: 'var(--text-secondary)' }}>{group.store.subdomain}</p>}
+                  </div>
+                  <strong>{group.count} open {group.count === 1 ? 'report' : 'reports'}</strong>
+                </header>
+                <div style={{ display: 'grid', gap: 12 }}>
+                  {group.reports.map(report => (
+                    <article key={report.id} style={{ padding: 14, border: '1px solid var(--border)', borderRadius: 10 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                        <strong>{REPORT_REASON_LABELS[report.reason]}</strong>
+                        <time dateTime={report.created_at} style={{ color: 'var(--text-secondary)', fontSize: '.82rem' }}>
+                          {new Date(report.created_at).toLocaleString()}
+                        </time>
+                      </div>
+                      <p style={{ margin: '10px 0 14px', whiteSpace: 'pre-wrap' }}>
+                        {report.details || 'No additional details provided.'}
+                      </p>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                        <button
+                          type="button"
+                          className="secondary-btn"
+                          disabled={workingId === report.id}
+                          onClick={() => void reviewStoreReport(report, 'dismiss')}
+                        >
+                          Dismiss
+                        </button>
+                        <button
+                          type="button"
+                          className="primary-btn"
+                          disabled={workingId === report.id}
+                          onClick={() => void reviewStoreReport(report, 'uphold')}
+                        >
+                          {workingId === report.id ? 'Saving…' : 'Uphold'}
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
+      </section>
+    )
+  }
 
   return (
     <section style={{ width: 'min(100%, 1100px)', margin: '0 auto', padding: 20 }}>
@@ -99,7 +237,20 @@ export function AdminStoreReviewPage() {
         </div>
         <button type="button" className="secondary-btn" onClick={refreshQueue}>Refresh queue</button>
       </header>
-      {/*error && <p role="alert" className="store-wizard-alert error">{error}</p>*/}
+      <nav aria-label="Moderation queues" style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+        <button type="button" className="primary-btn" aria-current="page">Store applications</button>
+        <button
+          type="button"
+          className="secondary-btn"
+          onClick={() => {
+            setActiveQueue('reports')
+            void loadReports()
+          }}
+        >
+          Reports
+        </button>
+      </nav>
+      {error && <p role="alert" className="store-wizard-alert error">{error}</p>}
       {notice && <p role="status" className="store-wizard-alert notice">{notice}</p>}
       {!applications.length && <section className="section-card"><p>No store applications are waiting for review.</p></section>}
 

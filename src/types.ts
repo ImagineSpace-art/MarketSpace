@@ -200,8 +200,12 @@ export type StoreThemeConfig = {
   sections: StoreSection[]
 }
 
+export type StoreTemplateId = 'boutique-grid' | 'storefront-landing'
+export type StoreTemplateContent = Record<string, Record<string, string>>
+
 export type BusinessProfile = {
   userId: string
+  storeId?: string
   subdomain?: string
   shopName: string
   description: string
@@ -223,6 +227,8 @@ export type BusinessProfile = {
   registeredBusiness?: boolean
   probationState?: 'probation' | 'trusted'
   themeConfig?: StoreThemeConfig
+  templateId?: StoreTemplateId
+  templateContent?: StoreTemplateContent
 }
 
 export type MessageRecord = {

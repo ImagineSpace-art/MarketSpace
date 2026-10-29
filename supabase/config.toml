@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.store-template-save]
 verify_jwt = true
+
+[functions.store-report]
+verify_jwt = true

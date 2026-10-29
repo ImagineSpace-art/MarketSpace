@@ -633,7 +633,7 @@ export function AppContent() {
                 onOpenListing={openListing}
                 onToggleSave={toggleSave}
                 onUpdateListingCollection={app.handleUpdateListingCollection}
-                onSaveStoreTheme={app.handleSaveStoreTheme}
+                onSaveStoreTemplate={(content: Record<string, unknown>) => app.handleSaveStoreTemplate('boutique-grid', content)}
                 theme={theme}
                 locationString="Lusaka"
                 onToggleTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')}

@@ -70,7 +70,7 @@ export const STORE_PROHIBITED_TERMS = [
   'child exploitation',
 ] as const
 
-export type StoreTemplateContent = Record<string, unknown>
+export type StoreTemplateContent = Record<string, string>
 
 export function getStoreTemplateId(value: unknown): StoreTemplateId | null {
   return typeof value === 'string' && STORE_TEMPLATE_IDS.includes(value as StoreTemplateId)

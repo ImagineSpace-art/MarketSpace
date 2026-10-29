@@ -1,13 +1,13 @@
 import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import type { Listing, Profile, BusinessProfile, PaymentMethodItem, NotificationConfig, StoreThemeConfig } from '../types'
+import type { Listing, Profile, BusinessProfile, PaymentMethodItem, NotificationConfig } from '../types'
 import { SavedItemsPage, NotificationsPage } from './SavedNotificationsPage'
 import { ListingFormPage } from './ListingPage'
 import { StoreSetupPage } from './StoreSetupPage'
 import { StoreRegistrationWizard } from './StoreRegistrationWizard'
 import { AdCreationPage } from './AdCreationPage'
 import { StoreInsightsView } from '../components/StoreInsightsView'
-import { StoreThemeCustomizer } from '../components/store-theme/StoreThemeCustomizer'
+import { StoreTemplateEditor } from './StoreTemplateEditor'
 import type { NotificationItem } from '../features/marketplace/useMarketplaceApp'
 import { uploadImageToSupabase } from '../features/marketplace/ImageUploader'
 import { fetchStoreAnalytics, type StoreAnalyticsData } from '../services/analytics'
@@ -20,7 +20,7 @@ type ProfilePageProps = {
     savedListings: Listing[]
     savedIds: string[]
     businessProfile: BusinessProfile | null
-    onSaveStoreTheme?: (config: StoreThemeConfig) => Promise<void> | void
+    onSaveStoreTemplate?: (content: Record<string, string>) => Promise<void>
     onEditListing: (listing: Listing) => void
     onRenewListing: (listingId: number) => void
     onDeleteListing: (listingId: number) => void
@@ -111,7 +111,7 @@ export function ProfilePage({
     allBusinesses = {},
     followingIds = [],
     onToggleFollowStore = () => { },
-    onSaveStoreTheme,
+    onSaveStoreTemplate,
 }: ProfilePageProps) {
     const navigate = useNavigate()
 
@@ -591,13 +591,12 @@ export function ProfilePage({
                             {/* CUSTOMIZER TAB */}
                             {storeTab === 'customizer' && (
                                 <div style={{ marginTop: '10px' }}>
-                                    <StoreThemeCustomizer
+                                    <StoreTemplateEditor
                                         businessProfile={businessProfile}
                                         myListings={myListings}
-                                        onSaveTheme={async (config) => {
-                                            if (onSaveStoreTheme) {
-                                                await onSaveStoreTheme(config)
-                                            }
+                                        onSave={async (content) => {
+                                            if (!onSaveStoreTemplate) throw new Error('Store template saving is not available.')
+                                            await onSaveStoreTemplate(content)
                                         }}
                                         onClose={() => setStoreTab('analytics')}
                                     />

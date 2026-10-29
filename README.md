@@ -38,6 +38,7 @@ supabase functions deploy store-registration
 supabase functions deploy account-deletion
 supabase functions deploy purge-store-identity-images
 supabase functions deploy store-template-save
+supabase functions deploy store-report
 ```
 
 The application also needs these Supabase Edge Function secrets:
@@ -67,6 +68,21 @@ inside the caller's `{user_id}/` folder. Template images are compressed to WebP
 and resized in the browser to a maximum 1600 px longest side. Store only the
 returned storage path in template content, not a base64 data URL. Apply the
 migration with `supabase db push` before deploying `store-template-save`.
+After deploying Phase 1, an approved seller can open **Store dashboard →
+Customize Theme** to edit the original **Boutique Grid** template. The live
+storefront is selected by its saved `template_id`; the legacy theme editor
+remains in place until the planned cleanup phase.
+
+Store reports use `202610290002_store_reports.sql` and the `store-report` Edge
+Function. Apply the migration and deploy the function before enabling the
+storefront report action or moderator queue. Reports require a confirmed email,
+allow one open report per user/store, and are limited to five submissions per
+user per day. Add moderator user IDs to `public.store_admins`; report decisions
+are recorded in `store_review_audit_log`.
+
+The report workflow currently supports reports about stores only. It does not
+apply strikes, suspend stores automatically, report individual listings, or send
+report emails.
 
 ### Supabase project configuration
 
@@ -180,3 +196,10 @@ local/test project after applying the store-registration fixes patch and deployi
 `STORE_REGISTRATION_TEST_*` variables before running `npm test`. It creates two
 temporary users, verifies the request cannot delete the other user, and confirms
 the caller's private test image is removed.
+
+The store-report integration test is opt-in. Run it only against a local/test
+project after applying `202610290002_store_reports.sql` and deploying
+`store-report`; set `STORE_REPORT_INTEGRATION=1` and the same
+`STORE_REGISTRATION_TEST_*` variables before running `npm test`. It checks
+report-row privacy, reporter identity enforcement, duplicate prevention, and the
+five-per-day function rate limit. Do not use production credentials or data.

@@ -10,6 +10,8 @@ import { StoreFooter } from '../components/store-theme/StoreFooter'
 import { StoreInfoPanel } from '../components/store-theme/StoreInfoPanel'
 import { StoreCartDrawer } from '../components/store-theme/StoreCartDrawer'
 import { HYPER_THEME } from '../components/store-theme/defaultSections'
+import { BoutiqueGridTemplate, type BoutiqueGridContent } from './BoutiqueGridTemplate'
+import './StoreTemplates.css'
 
 // ---------------- PUBLIC STORE VIEW ----------------
 type StoreViewPageProps = {
@@ -387,6 +389,7 @@ export function StoreViewPage({
     const avgRating = reviewsList.length > 0
         ? (reviewsList.reduce((acc, r) => acc + r.rating, 0) / reviewsList.length).toFixed(1)
         : null
+    const boutiqueContent = (shop.templateContent?.['boutique-grid'] || {}) as BoutiqueGridContent
 
     const handleNavigateTarget = (target: string) => {
         if (listingQueryId) {
@@ -394,6 +397,7 @@ export function StoreViewPage({
             nextParams.delete('listing')
             setSearchParams(nextParams)
         }
+
         if (target === '#top') {
             window.scrollTo({ top: 0, behavior: 'smooth' })
         } else if (target === '#products' || target === '#catalog') {
@@ -424,6 +428,41 @@ export function StoreViewPage({
         } else if (target.startsWith('http')) {
             window.open(target, '_blank', 'noopener,noreferrer')
         }
+    }
+
+    if (shop.templateId === 'boutique-grid' && !activeThemedListing) {
+        return (
+            <BoutiqueGridTemplate
+                shop={shop}
+                listings={shopListings}
+                content={boutiqueContent}
+                currentUserId={currentUserId}
+                savedIds={savedIds}
+                storeReviews={storeReviews}
+                isFollowing={followingIds.includes(shop.userId)}
+                isNotified={notifyStoreIds.includes(shop.userId)}
+                followerCount={followingIds.filter(id => id === shop.userId).length}
+                cartCount={cartCount}
+                cartItems={cartItems}
+                onOpenListing={handleOpenStoreListing}
+                onToggleSave={onToggleSave}
+                onMessageSeller={onMessageSeller}
+                onToggleFollow={() => onToggleFollowStore(shop.userId)}
+                onToggleNotify={() => onToggleNotifyStore(shop.userId)}
+                onAddReview={onAddReview}
+                onReplyToReview={onReplyToReview}
+                onRequireSignIn={() => navigate('/login')}
+                onUpdateCartQuantity={handleUpdateCartQuantity}
+                onRemoveCartItem={handleRemoveCartItem}
+                onClearCart={handleClearCart}
+                onOpenCart={() => setIsCartDrawerOpen(true)}
+                onCloseCart={() => setIsCartDrawerOpen(false)}
+                onOpenInfo={() => setIsStorePanelOpen(true)}
+                onCloseInfo={() => setIsStorePanelOpen(false)}
+                isCartOpen={isCartDrawerOpen}
+                isInfoOpen={isStorePanelOpen}
+            />
+        )
     }
 
     return (
