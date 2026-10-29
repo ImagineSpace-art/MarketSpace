@@ -37,6 +37,7 @@ supabase db push
 supabase functions deploy store-registration
 supabase functions deploy account-deletion
 supabase functions deploy purge-store-identity-images
+supabase functions deploy store-template-save
 ```
 
 The application also needs these Supabase Edge Function secrets:
@@ -59,6 +60,13 @@ The application also needs these Supabase Edge Function secrets:
 
 Generate secrets outside the repository (for example, use a password manager or
 `openssl rand -base64 32` for the encryption key). Do not commit them.
+
+The store-template migration creates the public-read `store-assets` bucket.
+It accepts JPEG, PNG, and WebP files up to 5 MB; authenticated uploads must be
+inside the caller's `{user_id}/` folder. Template images are compressed to WebP
+and resized in the browser to a maximum 1600 px longest side. Store only the
+returned storage path in template content, not a base64 data URL. Apply the
+migration with `supabase db push` before deploying `store-template-save`.
 
 ### Supabase project configuration
 

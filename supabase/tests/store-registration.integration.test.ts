@@ -133,4 +133,22 @@ describe.skipIf(!enabled)('store registration Supabase integration', () => {
     expect(store?.status).toBe('pending_review')
     expect(store?.subdomain).toBe(subdomain)
   }, 60_000)
+
+  it('refuses direct client writes to protected template fields', async () => {
+    const { error: approveError } = await admin.from('stores')
+      .update({ status: 'approved' })
+      .eq('user_id', userId)
+    if (approveError) throw approveError
+
+    const { data, error } = await owner.from('stores')
+      .update({
+        template_id: 'boutique-grid',
+        template_content: { 'boutique-grid': { footerTagline: 'Direct write attempt' } },
+      })
+      .eq('user_id', userId)
+      .select('user_id')
+
+    expect(data).toBeNull()
+    expect(error?.message).toContain('template fields can only be changed by trusted services')
+  })
 })

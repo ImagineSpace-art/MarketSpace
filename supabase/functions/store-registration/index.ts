@@ -5,6 +5,7 @@ import {
   validateStoreSubdomain,
 } from '../_shared/storeRegistrationValidation.ts'
 import { hashSensitiveIdentifier } from '../_shared/storeRegistrationHash.ts'
+import { STORE_PROHIBITED_TERMS } from '../_shared/storeTemplateSchema.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': Deno.env.get('ALLOWED_ORIGIN') || '*',
@@ -12,10 +13,6 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-const PROHIBITED_TERMS = [
-  'counterfeit', 'fake id', 'stolen goods', 'illegal drugs', 'firearms', 'weapon sales',
-  'human trafficking', 'child exploitation',
-]
 const TERMS_VERSION = '2026-10-26'
 const RETURNS_VERSION = '2026-10-26'
 const PROHIBITED_ITEMS_VERSION = '2026-10-26'
@@ -407,7 +404,7 @@ async function submitApplication(context: HandlerContext, body: Json) {
   const normalizedAddress = residentialAddress.toLowerCase().replace(/[^a-z0-9]/g, '')
   const normalizedStoreAddress = getString(location.streetAddress).toLowerCase().replace(/[^a-z0-9]/g, '')
   const descriptionText = `${getString(storeData.name)} ${getString(storeData.description)}`.toLowerCase()
-  const prohibitedMatches = PROHIBITED_TERMS.filter((term) => descriptionText.includes(term))
+  const prohibitedMatches = STORE_PROHIBITED_TERMS.filter((term) => descriptionText.includes(term))
   const { data: banned, error: bannedError } = await context.admin
     .from('store_banned_matches')
     .select('id')
