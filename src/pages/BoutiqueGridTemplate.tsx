@@ -6,7 +6,11 @@ import { StoreInfoPanel } from '../components/store-theme/StoreInfoPanel'
 import { StoreCartDrawer } from '../components/store-theme/StoreCartDrawer'
 import { getStoreTemplateImageUrl } from '../features/store-templates/storeTemplateAssets'
 import { STORE_ACCENT_PALETTE } from '../features/store-templates/storeTemplateSchema'
-import { getBoutiqueGridDepartments, getBoutiqueGridListings, type BoutiqueGridSortOrder } from '../features/store-templates/boutiqueGridModel'
+import {
+  getBoutiqueGridDepartments,
+  getBoutiqueGridListings,
+  type BoutiqueGridSortOrder,
+} from '../features/store-templates/boutiqueGridModel'
 
 export type BoutiqueGridContent = Record<string, string | undefined>
 
@@ -111,12 +115,18 @@ export function BoutiqueGridTemplate({
 }: Props) {
   const [selectedDepartment, setSelectedDepartment] = useState('all')
   const [sortOrder, setSortOrder] = useState<BoutiqueGridSortOrder>('default')
+  const [catalogPage, setCatalogPage] = useState(1)
   const [rating, setRating] = useState(0)
   const reviews = storeReviews.filter(review => review.storeId === shop.userId)
   const isOwner = currentUserId === shop.userId && Boolean(currentUserId)
 
   const departments = getBoutiqueGridDepartments(shop.collections || [], listings)
-  const visibleListings = getBoutiqueGridListings(listings, selectedDepartment, sortOrder)
+  const visibleDepartments = departments.slice(0, 1)
+  const overflowDepartments = departments.slice(visibleDepartments.length)
+  const allCatalogListings = getBoutiqueGridListings(listings, selectedDepartment, sortOrder).slice(0, 40)
+  const catalogPageSize = 12
+  const catalogPageCount = Math.max(1, Math.ceil(allCatalogListings.length / catalogPageSize))
+  const catalogListings = allCatalogListings.slice((catalogPage - 1) * catalogPageSize, catalogPage * catalogPageSize)
 
   const bannerImage = safeImageUrl(content.bannerImage, DEFAULT_BANNER_IMAGE)
   const logoImage = content.logoImage
@@ -143,7 +153,19 @@ export function BoutiqueGridTemplate({
           <button type="button" onClick={() => scrollTo('boutique-top')}>Home</button>
           <button type="button" onClick={() => scrollTo('boutique-products')}>Shop</button>
           <button type="button" onClick={() => scrollTo('boutique-about')}>About</button>
-          <button type="button" onClick={() => scrollTo('boutique-contact')}>Contact</button>
+          {visibleDepartments.map(department => (
+            <button key={department.id} type="button" onClick={() => { setSelectedDepartment(department.id); setCatalogPage(1); scrollTo('boutique-products') }}>{department.name}</button>
+          ))}
+          {overflowDepartments.length > 0 && (
+            <details className="boutique-nav-dropdown">
+              <summary>More departments <span aria-hidden="true">⌄</span></summary>
+              <div>
+                {overflowDepartments.map(department => (
+                  <button key={department.id} type="button" onClick={() => { setSelectedDepartment(department.id); setCatalogPage(1); scrollTo('boutique-products') }}>{department.name}</button>
+                ))}
+              </div>
+            </details>
+          )}
         </nav>
         {!preview && currentUserId !== shop.userId && (
           <div className="boutique-actions">
@@ -168,12 +190,10 @@ export function BoutiqueGridTemplate({
 
       <main id="boutique-top">
         {content.announcementBar && <div className="boutique-announcement">{content.announcementBar}</div>}
-        <section className="boutique-hero" style={{ backgroundImage: `linear-gradient(90deg, rgba(20, 28, 38, .68), rgba(20, 28, 38, .05)), url("${bannerImage}")` }}>
-          <div className="boutique-hero-copy">
-            <p className="boutique-kicker">{shop.category || 'Independent MarketSpace store'}</p>
-            <h1>{content.bannerTitle || `A considered collection from ${shop.shopName}`}</h1>
-            <p>{content.bannerSubtitle || shop.description || 'Find useful, well-chosen pieces selected with care.'}</p>
-            <button type="button" onClick={() => scrollTo('boutique-products')}>Explore the collection</button>
+        <section className="boutique-hero boutique-catalog-banner" style={{ backgroundImage: `url("${bannerImage}")` }}>
+          <div className="boutique-catalog-title">
+            <h1>{content.shopHeading || 'Shop'}</h1>
+            <p><button type="button" onClick={() => scrollTo('boutique-top')}>Home</button><span>/</span> {content.shopHeading || 'Shop'}</p>
           </div>
           <div className="boutique-store-status">
             {shop.verifiedId && <span><span className="material-icons">verified</span> Identity verified</span>}
@@ -184,61 +204,77 @@ export function BoutiqueGridTemplate({
         </section>
 
         <section id="boutique-products" className="boutique-products-section">
-          <div className="boutique-section-heading">
-            <div>
-              <p className="boutique-kicker">The shop</p>
-              <h2>{content.shopHeading || 'Browse the collection'}</h2>
-            </div>
-            <span>{visibleListings.length} {visibleListings.length === 1 ? 'item' : 'items'}</span>
-          </div>
-
-          <div className="boutique-filter-bar">
-            <div className="boutique-departments" aria-label="Filter by department">
-              <button
-                type="button"
-                className={selectedDepartment === 'all' ? 'active' : ''}
-                onClick={() => setSelectedDepartment('all')}
-              >
-                All items
-              </button>
-              {departments.map(department => (
-                <button
-                  type="button"
-                  key={department.id}
-                  className={selectedDepartment === department.id ? 'active' : ''}
-                  onClick={() => setSelectedDepartment(department.id)}
-                >
-                  {department.name}
-                </button>
-              ))}
+          <div className="boutique-catalog-toolbar">
+            <div className="boutique-filter-dropdowns">
+              <label>
+                <span>Filter by</span>
+                <select value={selectedDepartment} onChange={event => { setSelectedDepartment(event.target.value); setCatalogPage(1) }}>
+                  <option value="all">Categories</option>
+                  {departments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
+                </select>
+              </label>
+              <span className="boutique-filter-static">Color</span>
+              <span className="boutique-filter-static">Size</span>
+              <span className="boutique-filter-static">Brand</span>
+              <label className="boutique-price-filter">
+                <span className="visually-hidden">Price order</span>
+                <select value={sortOrder} onChange={event => { setSortOrder(event.target.value as BoutiqueGridSortOrder); setCatalogPage(1) }}>
+                  <option value="default">Price</option>
+                  <option value="price-asc">Price: low to high</option>
+                  <option value="price-desc">Price: high to low</option>
+                </select>
+              </label>
             </div>
             <label className="boutique-sort">
-              <span>Sort</span>
-              <select value={sortOrder} onChange={event => setSortOrder(event.target.value as BoutiqueGridSortOrder)}>
-                <option value="default">Default</option>
+              <span className="visually-hidden">Sort products</span>
+              <select value={sortOrder} onChange={event => { setSortOrder(event.target.value as BoutiqueGridSortOrder); setCatalogPage(1) }}>
+                <option value="default">Default sorting</option>
                 <option value="price-asc">Price: low to high</option>
                 <option value="price-desc">Price: high to low</option>
               </select>
             </label>
+            <div className="boutique-view-controls" aria-hidden="true"><span className="active">▥</span><span>▦</span></div>
           </div>
 
-          {visibleListings.length ? (
-            <div className="boutique-product-grid">
-              {visibleListings.map(listing => (
-                <ListingCard
-                  key={listing.id}
-                  listing={listing}
-                  saved={savedIds.includes(String(listing.id))}
-                  onOpen={onOpenListing || (() => {})}
-                  onToggleSave={preview ? undefined : onToggleSave}
-                />
-              ))}
-            </div>
-          ) : (
+          <div className="boutique-catalog-grid">
+            {catalogListings.map(listing => (
+              <ListingCard
+                key={`catalog-${listing.id}`}
+                listing={listing}
+                saved={savedIds.includes(String(listing.id))}
+                onOpen={onOpenListing || (() => {})}
+                onToggleSave={preview ? undefined : onToggleSave}
+              />
+            ))}
+          </div>
+
+          {!catalogListings.length && (
             <div className="boutique-empty-state">
               <span className="material-icons">storefront</span>
-              <p>{selectedDepartment === 'all' ? 'New items will appear here soon.' : 'No items in this department yet.'}</p>
+              <p>New items will appear here soon.</p>
             </div>
+          )}
+
+          {allCatalogListings.length > catalogPageSize && (
+            <nav className="boutique-pagination" aria-label="Catalog pagination">
+              {Array.from({ length: catalogPageCount }, (_, index) => index + 1).map(page => (
+                <button
+                  key={page}
+                  type="button"
+                  className={page === catalogPage ? 'active' : ''}
+                  aria-current={page === catalogPage ? 'page' : undefined}
+                  onClick={() => { setCatalogPage(page); scrollTo('boutique-products') }}
+                >
+                  {page}
+                </button>
+              ))}
+              <button
+                type="button"
+                aria-label="Next page"
+                disabled={catalogPage >= catalogPageCount}
+                onClick={() => { setCatalogPage(page => Math.min(catalogPageCount, page + 1)); scrollTo('boutique-products') }}
+              >→</button>
+            </nav>
           )}
         </section>
 

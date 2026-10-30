@@ -11,6 +11,7 @@ import { StoreTemplateEditor } from './StoreTemplateEditor'
 import type { NotificationItem } from '../features/marketplace/useMarketplaceApp'
 import { uploadImageToSupabase } from '../features/marketplace/ImageUploader'
 import { fetchStoreAnalytics, type StoreAnalyticsData } from '../services/analytics'
+import { getListingTimeRemainingMs, isListingExpired } from '../features/marketplace/listingExpiry'
 
 // ---------------- PROFILE PAGE ----------------
 type ProfilePageProps = {
@@ -20,7 +21,7 @@ type ProfilePageProps = {
     savedListings: Listing[]
     savedIds: string[]
     businessProfile: BusinessProfile | null
-    onSaveStoreTemplate?: (content: Record<string, string>) => Promise<void>
+    onSaveStoreTemplate?: (content: Record<string, string>, departments?: Array<{ name: string; image?: string }>, templateId?: 'boutique-grid' | 'storefront-landing') => Promise<void>
     onEditListing: (listing: Listing) => void
     onRenewListing: (listingId: number) => void
     onDeleteListing: (listingId: number) => void
@@ -28,6 +29,8 @@ type ProfilePageProps = {
     onOpenListing: (listing: Listing) => void
     onToggleSave: (listingId: number) => void
     onUpdateListingCollection?: (listingId: number, targetColId: string | null) => void | Promise<void>
+    globalRenewalFrequency?: 'daily' | 'weekly' | 'biweekly' | 'monthly'
+    globalRenewalDay?: string
 
     // Settings panel specific props
     activeSection: 'dashboard' | 'settings' | 'notifications' | 'create' | 'create-ad' | 'business-setup' | 'store-dashboard' | 'store-insights' | 'saved-listings'
@@ -103,6 +106,8 @@ export function ProfilePage({
     onUpdateStatus,
     onOpenListing,
     onToggleSave,
+    globalRenewalFrequency = 'weekly',
+    globalRenewalDay = 'Monday',
     activeSection,
     notifications,
     onMarkAllRead,
@@ -225,7 +230,7 @@ export function ProfilePage({
                         profile={profile}
                         onSaveAd={async (newAd) => {
                             if (businessProfile) {
-                                void storeSetupProps.onSave({
+                                await storeSetupProps.onSave({
                                     ...businessProfile,
                                     ads: [...(businessProfile.ads || []), newAd]
                                 })
@@ -594,9 +599,9 @@ export function ProfilePage({
                                     <StoreTemplateEditor
                                         businessProfile={businessProfile}
                                         myListings={myListings}
-                                        onSave={async (content) => {
+                                        onSave={async (content, departments, templateId) => {
                                             if (!onSaveStoreTemplate) throw new Error('Store template saving is not available.')
-                                            await onSaveStoreTemplate(content)
+                                            await onSaveStoreTemplate(content, departments, templateId)
                                         }}
                                         onClose={() => setStoreTab('analytics')}
                                     />
@@ -751,13 +756,10 @@ export function ProfilePage({
                                                             <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                                                                 {(() => {
                                                                     const now = Date.now()
-                                                                    const DAY_MS = 24 * 60 * 60 * 1000
-                                                                    const freq = listing.renewal_frequency ?? 'weekly'
-                                                                    const interval = freq === 'daily' ? DAY_MS : freq === 'biweekly' ? 14 * DAY_MS : freq === 'monthly' ? 30 * DAY_MS : 7 * DAY_MS
-                                                                    const lastRenewed = new Date(listing.last_renewed_at || listing.created_at || now).getTime()
-                                                                    const remainingMs = interval - (now - lastRenewed)
+                                                                    const remainingMs = getListingTimeRemainingMs(listing, globalRenewalFrequency, now)
+                                                                    const expired = isListingExpired(listing, globalRenewalFrequency, globalRenewalDay, now)
 
-                                                                    if (remainingMs <= 0) {
+                                                                    if (expired || remainingMs <= 0) {
                                                                         return (
                                                                             <span style={{ fontSize: '0.75rem', padding: '3px 8px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.4)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                                                                                 <span className="material-icons" style={{ fontSize: '13px' }}>error_outline</span>

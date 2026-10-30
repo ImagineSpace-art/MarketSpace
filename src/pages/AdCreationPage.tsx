@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { BusinessProfile, Listing, BusinessAd, Profile } from '../types'
-import { uploadImageToSupabase } from '../features/marketplace/ImageUploader'
+import { uploadImageToSupabase, uploadVideoToSupabase } from '../features/marketplace/ImageUploader'
 
 type AdCreationPageProps = {
     businessProfile: BusinessProfile | null
@@ -21,13 +21,12 @@ export function AdCreationPage({
     const navigate = useNavigate()
 
     // 1. Target Entity (Store vs Specific Listing)
-    const hasStore = Boolean(businessProfile && businessProfile.shopName)
-    const [targetType, setTargetType] = useState<'store' | 'listing'>(hasStore ? 'store' : 'listing')
-    const [selectedListingId, setSelectedListingId] = useState<number>(myListings.length > 0 ? myListings[0].id : 0)
+    const [selectedListingId, setSelectedListingId] = useState<number>(0)
 
     const selectedListing = useMemo(() => {
-        return myListings.find(l => l.id === selectedListingId) || myListings[0] || null
+        return selectedListingId ? myListings.find(l => l.id === selectedListingId) || null : null
     }, [myListings, selectedListingId])
+    const targetType: 'store' | 'listing' = selectedListing ? 'listing' : 'store'
 
     // 2. Goal Selection
     const [goal, setGoal] = useState<string>('Get more website visitors')
@@ -49,6 +48,7 @@ export function AdCreationPage({
     }, [targetType, businessProfile, selectedListing])
 
     const [mediaList, setMediaList] = useState<string[]>([defaultInitialImage])
+    const [mediaTypes, setMediaTypes] = useState<Array<'image' | 'video'>>(['image'])
     const [activeMediaIndex, setActiveMediaIndex] = useState(0)
 
     // Headline & CTA
@@ -65,46 +65,36 @@ export function AdCreationPage({
             return businessProfile ? `/store/${businessProfile.userId}` : '/stores'
         }
         if (selectedListing) {
-            const storeOwnerId = businessProfile?.userId || selectedListing.user_id
-            return `/store/${storeOwnerId}?highlight=${selectedListing.id}`
+            return `/listings/${selectedListing.id}`
         }
         return '/'
     }, [targetType, businessProfile, selectedListing])
 
     const [destinationUrl, setDestinationUrl] = useState<string>(calculatedDestinationUrl)
 
-    // Synchronize when target entity changes
-    const handleTargetTypeChange = (newType: 'store' | 'listing') => {
-        setTargetType(newType)
-        if (newType === 'store' && businessProfile) {
-            setAdText(businessProfile.description || `Welcome to ${businessProfile.shopName}! Browse our curated catalog.`)
-            setHeadline(businessProfile.shopName.slice(0, 25))
-            setButtonLabel('Visit Store')
-            setMediaList([businessProfile.cover || businessProfile.logo || defaultInitialImage])
-            setDestinationUrl(`/store/${businessProfile.userId}`)
-        } else if (newType === 'listing' && selectedListing) {
-            setAdText(selectedListing.description.slice(0, 140))
-            setHeadline(selectedListing.title.slice(0, 25))
-            setButtonLabel('Shop Now')
-            if (selectedListing.images && selectedListing.images.length > 0) {
-                setMediaList(selectedListing.images.slice(0, 5))
-            }
-            const storeOwnerId = businessProfile?.userId || selectedListing.user_id
-            setDestinationUrl(`/store/${storeOwnerId}?highlight=${selectedListing.id}`)
-        }
-    }
-
     const handleSelectListing = (listingId: number) => {
         setSelectedListingId(listingId)
-        const item = myListings.find(l => l.id === listingId)
+        const item = listingId === 0 ? undefined : myListings.find(l => l.id === listingId)
+        if (!item) {
+            setAdText(businessProfile?.description || `Welcome to ${businessProfile?.shopName || 'our store'}! Browse our curated catalog.`)
+            setHeadline(businessProfile?.shopName || 'MarketSpace Store')
+            setButtonLabel('Visit Store')
+            setMediaList([businessProfile?.cover || businessProfile?.logo || defaultInitialImage])
+            setMediaTypes(['image'])
+            setDestinationUrl(businessProfile?.userId ? `/store/${businessProfile.userId}` : '/')
+            return
+        }
         if (item) {
             setAdText(item.description.slice(0, 140))
             setHeadline(item.title.slice(0, 25))
             if (item.images && item.images.length > 0) {
-                setMediaList(item.images.slice(0, 5))
+                const images = item.images.slice(0, 5)
+                setMediaList(images)
+                setMediaTypes(images.map(() => 'image'))
+            } else {
+                setMediaTypes(['image'])
             }
-            const storeOwnerId = businessProfile?.userId || item.user_id
-            setDestinationUrl(`/store/${storeOwnerId}?highlight=${item.id}`)
+            setDestinationUrl(`/listings/${item.id}`)
         }
     }
 
@@ -137,17 +127,41 @@ export function AdCreationPage({
 
     // Upload new media handler
     const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            if (mediaList.length >= 5) {
-                alert('You can select up to 5 images for the carousel.')
-                return
-            }
-            try {
-                const url = await uploadImageToSupabase(e.target.files[0], 'marketspace-media', 'ad-creatives')
+        const file = e.target.files?.[0]
+        if (!file) return
+        if (mediaList.length >= 5) {
+            alert('You can select up to 5 media items for the ad.')
+            return
+        }
+        try {
+            if (file.type.startsWith('video/')) {
+                const duration = await new Promise<number>((resolve, reject) => {
+                    const video = document.createElement('video')
+                    const url = URL.createObjectURL(file)
+                    video.preload = 'metadata'
+                    video.onloadedmetadata = () => { URL.revokeObjectURL(url); resolve(video.duration) }
+                    video.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Unable to read video duration')) }
+                    video.src = url
+                })
+                if (!Number.isFinite(duration) || duration > 35) {
+                    alert('Video must be 35 seconds or shorter.')
+                    return
+                }
+                const url = await uploadVideoToSupabase(file, 'marketspace-media', 'ad-creatives')
                 setMediaList(prev => [...prev, url])
-            } catch (err) {
-                console.error('Error uploading ad image:', err)
+                setMediaTypes(prev => [...prev, 'video'])
+            } else if (file.type.startsWith('image/')) {
+                const url = await uploadImageToSupabase(file, 'marketspace-media', 'ad-creatives')
+                setMediaList(prev => [...prev, url])
+                setMediaTypes(prev => [...prev, 'image'])
+            } else {
+                alert('Please choose an image or video.')
             }
+        } catch (err) {
+            console.error('Error uploading ad media:', err)
+            alert(err instanceof Error ? err.message : 'Unable to upload media.')
+        } finally {
+            e.target.value = ''
         }
     }
 
@@ -155,6 +169,7 @@ export function AdCreationPage({
         if (mediaList.length <= 1) return
         const updated = mediaList.filter((_, i) => i !== index)
         setMediaList(updated)
+        setMediaTypes(prev => prev.filter((_, i) => i !== index))
         if (activeMediaIndex >= updated.length) {
             setActiveMediaIndex(updated.length - 1)
         }
@@ -171,6 +186,9 @@ export function AdCreationPage({
         }
 
         setIsPublishing(true)
+        const canonicalDestination = selectedListing
+            ? `/listings/${selectedListing.id}`
+            : (businessProfile?.userId ? `/store/${businessProfile.userId}` : '/')
         const newAd: BusinessAd = {
             id: `ad-${Date.now()}`,
             targetType,
@@ -181,8 +199,9 @@ export function AdCreationPage({
             adText,
             headline,
             media: mediaList,
+            mediaTypes: mediaTypes.length === mediaList.length ? mediaTypes : mediaList.map(() => 'image'),
             buttonLabel,
-            destinationUrl,
+            destinationUrl: canonicalDestination,
             contactMethod: enableWhatsApp ? (contactMethod === 'WhatsApp' ? 'whatsapp' : 'messenger') : 'none',
             contactPhone: enableWhatsApp ? contactPhone : undefined,
             enableAdvantageCreative: advantageCreative,
@@ -208,6 +227,7 @@ export function AdCreationPage({
             }, 1500)
         } catch (err) {
             console.error('Failed to publish ad:', err)
+            alert(err instanceof Error ? err.message : 'The ad could not be saved. Please try publishing again.')
         } finally {
             setIsPublishing(false)
         }
@@ -253,94 +273,27 @@ export function AdCreationPage({
                 {/* ========================================================= */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-                    {/* 1. Target Entity Selection Card */}
+                    {/* Optional Listing Destination */}
                     <div className="section-card" style={{ padding: '20px', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--panel)' }}>
-                        <h3 style={{ margin: '0 0 8px 0', fontSize: '1.05rem', fontWeight: 700 }}>What are you advertising?</h3>
+                        <h3 style={{ margin: '0 0 8px 0', fontSize: '1.05rem', fontWeight: 700 }}>Where should this ad lead?</h3>
                         <p style={{ margin: '0 0 16px 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                            Select whether this campaign directs buyers to your overall storefront or a specific listed item.
+                            Optional: select a listing to promote. If no listing is selected, clicks will open your store.
                         </p>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                            {/* Option 1: Store */}
-                            <label
-                                style={{
-                                    border: targetType === 'store' ? '2px solid #2563eb' : '1px solid var(--border)',
-                                    background: targetType === 'store' ? 'rgba(37, 99, 235, 0.08)' : 'var(--surface)',
-                                    opacity: hasStore ? 1 : 0.45,
-                                    cursor: hasStore ? 'pointer' : 'not-allowed',
-                                    borderRadius: '10px',
-                                    padding: '14px',
-                                    display: 'flex',
-                                    alignItems: 'flex-start',
-                                    gap: '10px',
-                                    position: 'relative'
-                                }}
+                        {myListings.length === 0 ? (
+                            <p style={{ color: '#ef4444', fontSize: '0.84rem', margin: 0 }}>No listings are available. This ad will lead to your store.</p>
+                        ) : (
+                            <select
+                                value={selectedListingId}
+                                onChange={(e) => handleSelectListing(Number(e.target.value))}
+                                style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.9rem' }}
                             >
-                                <input
-                                    type="radio"
-                                    name="adTarget"
-                                    disabled={!hasStore}
-                                    checked={targetType === 'store'}
-                                    onChange={() => handleTargetTypeChange('store')}
-                                    style={{ marginTop: '3px' }}
-                                />
-                                <div>
-                                    <strong style={{ display: 'block', fontSize: '0.92rem' }}>Advertise My Store</strong>
-                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                                        {hasStore ? `${businessProfile?.shopName} Storefront` : 'Requires an active store profile'}
-                                    </span>
-                                </div>
-                            </label>
-
-                            {/* Option 2: Specific Listing */}
-                            <label
-                                style={{
-                                    border: targetType === 'listing' ? '2px solid #2563eb' : '1px solid var(--border)',
-                                    background: targetType === 'listing' ? 'rgba(37, 99, 235, 0.08)' : 'var(--surface)',
-                                    cursor: 'pointer',
-                                    borderRadius: '10px',
-                                    padding: '14px',
-                                    display: 'flex',
-                                    alignItems: 'flex-start',
-                                    gap: '10px'
-                                }}
-                            >
-                                <input
-                                    type="radio"
-                                    name="adTarget"
-                                    checked={targetType === 'listing'}
-                                    onChange={() => handleTargetTypeChange('listing')}
-                                    style={{ marginTop: '3px' }}
-                                />
-                                <div>
-                                    <strong style={{ display: 'block', fontSize: '0.92rem' }}>Specific Listing</strong>
-                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Highlight a single item from your catalog</span>
-                                </div>
-                            </label>
-                        </div>
-
-                        {/* Listing Dropdown Selector if targetType === 'listing' */}
-                        {targetType === 'listing' && (
-                            <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border)' }}>
-                                <label style={{ display: 'block', fontSize: '0.86rem', fontWeight: 600, marginBottom: '6px' }}>
-                                    Select listing to promote:
-                                </label>
-                                {myListings.length === 0 ? (
-                                    <p style={{ color: '#ef4444', fontSize: '0.84rem', margin: 0 }}>You haven't published any listings yet.</p>
-                                ) : (
-                                    <select
-                                        value={selectedListingId}
-                                        onChange={(e) => handleSelectListing(Number(e.target.value))}
-                                        style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.9rem' }}
-                                    >
-                                        {myListings.map(l => (
-                                            <option key={l.id} value={l.id}>
-                                                {l.title} — ZMW {l.price} ({l.category})
-                                            </option>
-                                        ))}
-                                    </select>
-                                )}
-                            </div>
+                                <option value={0}>My store</option>
+                                {myListings.map(l => (
+                                    <option key={l.id} value={l.id}>
+                                        {l.title} — ZMW {l.price} ({l.category})
+                                    </option>
+                                ))}
+                            </select>
                         )}
                     </div>
 
@@ -424,7 +377,7 @@ export function AdCreationPage({
                                 <label className="secondary-btn compact-btn" style={{ cursor: 'pointer', margin: 0, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                                     <span className="material-icons" style={{ fontSize: '16px' }}>add_photo_alternate</span>
                                     <span>Add Media</span>
-                                    <input type="file" accept="image/*" onChange={handleMediaUpload} style={{ display: 'none' }} />
+                                    <input type="file" accept="image/*,video/*" onChange={handleMediaUpload} style={{ display: 'none' }} />
                                 </label>
                             </div>
 

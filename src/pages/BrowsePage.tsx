@@ -1,8 +1,10 @@
-import { useState, useEffect, useMemo } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
-import type { Listing, BusinessProfile } from '../types'
+import { useEffect, useState, useMemo } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import type { Session } from '@supabase/supabase-js'
+import type { Listing, BusinessProfile, BusinessAd } from '../types'
 import { Listing as ListingView } from '../components/Listing'
 import { isBestSeller, isNewArrival } from '../utils/listingSections'
+import { supabase } from '../lib/supabaseClient'
 
 type BrowsePageProps = {
   listings: Listing[]
@@ -13,6 +15,106 @@ type BrowsePageProps = {
   onToggleSave: (id: number) => void
   onAddToCart: (item: { id: number | string; title: string; price: number; image?: string; sellerName?: string; sellerUserId?: string }) => void
   onOpenListing: (listing: Listing) => void
+  session?: Session | null
+}
+
+function MarketplaceAdCard({ ad, session }: { ad: BusinessAd & { sellerName: string; sellerUserId: string }, session?: Session | null }) {
+  const navigate = useNavigate()
+  const media = ad.media || []
+  const mediaTypes = ad.mediaTypes || media.map(() => 'image' as const)
+  const [activeMedia, setActiveMedia] = useState(0)
+  const [userInterrupted, setUserInterrupted] = useState(false)
+  const [likeCount, setLikeCount] = useState(0)
+  const [liked, setLiked] = useState(false)
+  const [comments, setComments] = useState<Array<{ id: string, user_id: string, content: string, created_at: string }>>([])
+  const [comment, setComment] = useState('')
+  const [engagementBusy, setEngagementBusy] = useState(false)
+
+  const imagesOnly = media.length > 0 && mediaTypes.every(type => type === 'image')
+
+  useEffect(() => {
+    if (!imagesOnly || userInterrupted || media.length < 2) return
+    const timer = window.setInterval(() => setActiveMedia(index => (index + 1) % media.length), 2500)
+    return () => window.clearInterval(timer)
+  }, [imagesOnly, media.length, userInterrupted])
+
+  useEffect(() => {
+    let active = true
+    const load = async () => {
+      const [{ count }, { data: currentLike }, { data: commentRows }] = await Promise.all([
+        supabase.from('ad_likes').select('user_id', { count: 'exact', head: true }).eq('ad_id', ad.id),
+        session ? supabase.from('ad_likes').select('user_id').eq('ad_id', ad.id).eq('user_id', session.user.id).maybeSingle() : Promise.resolve({ data: null }),
+        supabase.from('ad_comments').select('id,user_id,content,created_at').eq('ad_id', ad.id).order('created_at', { ascending: false }).limit(20),
+      ])
+      if (!active) return
+      setLikeCount(count || 0)
+      setLiked(Boolean(currentLike))
+      setComments(commentRows || [])
+    }
+    void load()
+    return () => { active = false }
+  }, [ad.id, session?.user?.id])
+
+  const selectMedia = (index: number) => {
+    setUserInterrupted(true)
+    setActiveMedia(index)
+  }
+
+  const toggleLike = async () => {
+    if (!session) { navigate('/login'); return }
+    setEngagementBusy(true)
+    if (liked) await supabase.from('ad_likes').delete().eq('ad_id', ad.id).eq('user_id', session.user.id)
+    else await supabase.from('ad_likes').insert({ ad_id: ad.id, user_id: session.user.id })
+    setLiked(!liked)
+    setLikeCount(count => Math.max(0, count + (liked ? -1 : 1)))
+    setEngagementBusy(false)
+  }
+
+  const submitComment = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (!session) { navigate('/login'); return }
+    if (!comment.trim()) return
+    setEngagementBusy(true)
+    const { data, error } = await supabase.from('ad_comments').insert({ ad_id: ad.id, user_id: session.user.id, content: comment.trim() }).select('id,user_id,content,created_at').single()
+    if (!error && data) setComments(current => [data, ...current])
+    setComment('')
+    setEngagementBusy(false)
+  }
+
+  const destination = ad.destinationUrl || (ad.listingId ? `/listings/${ad.listingId}` : `/store/${ad.sellerUserId}`)
+  const currentType = mediaTypes[activeMedia] || 'image'
+
+  return (
+    <article style={{ borderRadius: 24, overflow: 'hidden', minHeight: 280, background: '#0f172a', position: 'relative', color: '#fff' }}>
+      <div style={{ height: 320, position: 'relative', overflow: 'hidden', background: '#111827' }}>
+        {media[activeMedia] && currentType === 'video'
+          ? <video key={media[activeMedia]} src={media[activeMedia]} controls muted preload="metadata" playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', background: '#111827' }} />
+          : media[activeMedia] && <img src={media[activeMedia]} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(15,23,42,.92), rgba(15,23,42,.18))', pointerEvents: 'none' }} />
+        <Link to={destination} aria-label={`View ${ad.headline || ad.adTitle || 'advertisement'}`} style={{ position: 'absolute', inset: 0, zIndex: 3, color: 'inherit', textDecoration: 'none', pointerEvents: 'none' }}>
+          <div style={{ padding: '24px 28px 56px', maxWidth: 360, pointerEvents: 'none' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', opacity: .8 }}>Sponsored · {ad.sellerName}</span>
+            <h3 style={{ fontSize: 'clamp(1.35rem, 2vw, 1.75rem)', margin: '10px 0 8px', lineHeight: 1.05 }}>{ad.headline || ad.adTitle}</h3>
+            <p style={{ margin: '0 0 18px', opacity: .88, lineHeight: 1.45, fontSize: '.88rem', maxHeight: 72, overflow: 'hidden' }}>{ad.adText}</p>
+            <span style={{ display: 'inline-flex', pointerEvents: 'auto', borderRadius: 999, padding: '10px 18px', background: '#fff', color: '#0f172a', fontWeight: 800 }}>{ad.buttonLabel || 'View'}</span>
+          </div>
+        </Link>
+      </div>
+      {media.length > 1 && (
+        <div style={{ position: 'absolute', zIndex: 5, right: 14, top: 286, display: 'flex', gap: 7 }}>
+          {media.map((_, index) => <button key={index} type="button" aria-label={`Show ad media ${index + 1}`} onClick={() => selectMedia(index)} style={{ width: 8, height: 8, borderRadius: '50%', border: 0, padding: 0, cursor: 'pointer', background: index === activeMedia ? '#fff' : 'rgba(255,255,255,.45)' }} />)}
+        </div>
+      )}
+      <div style={{ background: '#fff', color: '#0f172a', padding: '12px 16px', position: 'relative', zIndex: 4 }}>
+        <button type="button" disabled={engagementBusy} onClick={toggleLike} style={{ border: 0, background: 'none', cursor: 'pointer', fontWeight: 800, color: liked ? '#ea580c' : '#334155' }}>♥ {likeCount}</button>
+        <form onSubmit={submitComment} style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+          <input value={comment} onChange={event => setComment(event.target.value)} maxLength={1000} placeholder={session ? 'Write a comment…' : 'Sign in to comment…'} style={{ flex: 1, minWidth: 0, border: '1px solid #e2e8f0', borderRadius: 999, padding: '8px 12px' }} />
+          <button type="submit" disabled={engagementBusy || !comment.trim()} style={{ borderRadius: 999, border: 0, padding: '8px 12px', background: '#ea580c', color: '#fff', fontWeight: 800 }}>Post</button>
+        </form>
+        {comments.slice(0, 3).map(item => <p key={item.id} style={{ margin: '8px 0 0', fontSize: '.86rem' }}><strong>{item.user_id === session?.user.id ? 'You' : 'MarketSpace user'}</strong> {item.content}</p>)}
+      </div>
+    </article>
+  )
 }
 
 export function BrowsePage({
@@ -24,6 +126,7 @@ export function BrowsePage({
   onToggleSave = () => {},
   onAddToCart,
   onOpenListing,
+  session,
 }: BrowsePageProps) {
   const [searchParams] = useSearchParams()
   const initialFilter = searchParams.get('category') || searchParams.get('filter')
@@ -31,27 +134,6 @@ export function BrowsePage({
   const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory)
   const [sortBy, setSortBy] = useState('featured')
   const [quickViewListing, setQuickViewListing] = useState<Listing | null>(null)
-
-  // Countdown timer for Flash Sale (starts at 2d 15h 45m 30s)
-  const [timeLeft, setTimeLeft] = useState({
-    days: 2,
-    hours: 15,
-    mins: 45,
-    secs: 30,
-  })
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev.secs > 0) return { ...prev, secs: prev.secs - 1 }
-        if (prev.mins > 0) return { ...prev, mins: 59, secs: 59 }
-        if (prev.hours > 0) return { ...prev, hours: prev.hours - 1, mins: 59, secs: 59 }
-        if (prev.days > 0) return { ...prev, days: prev.days - 1, hours: 23, mins: 59, secs: 59 }
-        return prev
-      })
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [])
 
   const categories = [
     {
@@ -97,6 +179,26 @@ export function BrowsePage({
       count: '430+ Items',
     },
   ]
+
+  const marketplaceAds = useMemo(() => {
+    const now = Date.now()
+    return Object.values(allBusinesses).flatMap((business): Array<BusinessAd & { sellerName: string; sellerUserId: string }> => {
+      if (!business.userId) return []
+      return (business.ads || []).filter((ad) => {
+        if (ad.status !== 'Active') return false
+        if (ad.placements && !ad.placements.includes('Marketplace') && !ad.placements.includes('Feed')) return false
+        const start = ad.startDate ? new Date(`${ad.startDate}T00:00:00`).getTime() : 0
+        if (start && start > now) return false
+        if (ad.scheduleType === 'end_date' && ad.endDate && new Date(`${ad.endDate}T23:59:59`).getTime() < now) return false
+        return true
+      }).map((ad) => ({
+        ...ad,
+        destinationUrl: ad.listingId ? `/listings/${ad.listingId}` : `/store/${business.userId}`,
+        sellerName: business.shopName || 'MarketSpace Seller',
+        sellerUserId: business.userId,
+      }))
+    }).slice(0, 8)
+  }, [allBusinesses])
 
   const newArrivals = useMemo(
     () => listings
@@ -685,164 +787,19 @@ export function BrowsePage({
       )}
 
       {/* ---------------- 5. DUAL PROMO FLASH BANNERS (NovaTrend Style) ---------------- */}
-      <section style={{ maxWidth: '1280px', margin: '48px auto', padding: '0 24px' }}>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-            gap: '24px',
-          }}
-        >
-          {/* Left Flash Sale Banner with Live Timer */}
-          <div
-            style={{
-              borderRadius: '28px',
-              padding: '36px 32px',
-              background: 'linear-gradient(135deg, #f97316 0%, #ea580c 50%, #c2410c 100%)',
-              color: '#ffffff',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              position: 'relative',
-              overflow: 'hidden',
-              boxShadow: '0 16px 36px rgba(234, 88, 12, 0.25)',
-            }}
-          >
-            <div style={{ position: 'relative', zIndex: 2, maxWidth: '280px' }}>
-              <span
-                style={{
-                  display: 'inline-block',
-                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                  padding: '4px 12px',
-                  borderRadius: '12px',
-                  fontSize: '0.74rem',
-                  fontWeight: 800,
-                  textTransform: 'uppercase',
-                  marginBottom: '10px',
-                }}
-              >
-                Flash Sale
-              </span>
-              <h3 style={{ fontSize: '2rem', fontWeight: 900, margin: '0 0 16px', lineHeight: 1.15 }}>
-                Up To 70% Off
-              </h3>
-
-              {/* Countdown Ticker */}
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '22px' }}>
-                <div style={{ backgroundColor: 'rgba(0,0,0,0.25)', padding: '6px 10px', borderRadius: '10px', textAlign: 'center', minWidth: '40px' }}>
-                  <strong style={{ display: 'block', fontSize: '1.1rem' }}>{String(timeLeft.days).padStart(2, '0')}</strong>
-                  <span style={{ fontSize: '0.62rem', opacity: 0.8 }}>Days</span>
-                </div>
-                <div style={{ backgroundColor: 'rgba(0,0,0,0.25)', padding: '6px 10px', borderRadius: '10px', textAlign: 'center', minWidth: '40px' }}>
-                  <strong style={{ display: 'block', fontSize: '1.1rem' }}>{String(timeLeft.hours).padStart(2, '0')}</strong>
-                  <span style={{ fontSize: '0.62rem', opacity: 0.8 }}>Hours</span>
-                </div>
-                <div style={{ backgroundColor: 'rgba(0,0,0,0.25)', padding: '6px 10px', borderRadius: '10px', textAlign: 'center', minWidth: '40px' }}>
-                  <strong style={{ display: 'block', fontSize: '1.1rem' }}>{String(timeLeft.mins).padStart(2, '0')}</strong>
-                  <span style={{ fontSize: '0.62rem', opacity: 0.8 }}>Mins</span>
-                </div>
-                <div style={{ backgroundColor: 'rgba(0,0,0,0.25)', padding: '6px 10px', borderRadius: '10px', textAlign: 'center', minWidth: '40px' }}>
-                  <strong style={{ display: 'block', fontSize: '1.1rem' }}>{String(timeLeft.secs).padStart(2, '0')}</strong>
-                  <span style={{ fontSize: '0.62rem', opacity: 0.8 }}>Secs</span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={scrollToCatalog}
-                style={{
-                  backgroundColor: '#ffffff',
-                  color: '#ea580c',
-                  border: 'none',
-                  borderRadius: '999px',
-                  padding: '11px 24px',
-                  fontWeight: 800,
-                  fontSize: '0.88rem',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                }}
-              >
-                Shop Sale Now
-              </button>
-            </div>
-
-            {/* Sneaker Graphic */}
-            <div style={{ width: '220px', height: '180px', position: 'relative', zIndex: 1 }}>
-              <img
-                src="/illustrations/banner_flash_sale.jpg"
-                alt="Flash Sale Sneaker"
-                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-              />
+      {marketplaceAds.length > 0 && (
+        <section style={{ maxWidth: '1280px', margin: '48px auto', padding: '0 24px' }}>
+          <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: 16, marginBottom: 18 }}>
+            <div>
+              <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase' }}>Sponsored</span>
+              <h2 style={{ margin: '4px 0 0', fontSize: '1.55rem', color: '#0f172a' }}>Promoted on MarketSpace</h2>
             </div>
           </div>
-
-          {/* Right Summer Collection Banner */}
-          <div
-            style={{
-              borderRadius: '28px',
-              padding: '36px 32px',
-              backgroundColor: '#0f172a',
-              color: '#ffffff',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              position: 'relative',
-              overflow: 'hidden',
-              boxShadow: '0 16px 36px rgba(15, 23, 42, 0.2)',
-            }}
-          >
-            <div style={{ position: 'relative', zIndex: 2, maxWidth: '260px' }}>
-              <span
-                style={{
-                  display: 'inline-block',
-                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                  padding: '4px 12px',
-                  borderRadius: '12px',
-                  fontSize: '0.74rem',
-                  fontWeight: 800,
-                  textTransform: 'uppercase',
-                  marginBottom: '10px',
-                }}
-              >
-                New Collection
-              </span>
-              <h3 style={{ fontSize: '2rem', fontWeight: 900, margin: '0 0 10px', lineHeight: 1.15 }}>
-                Summer 2026
-              </h3>
-              <p style={{ margin: '0 0 24px', fontSize: '0.86rem', color: '#94a3b8', lineHeight: 1.5 }}>
-                Discover the latest trending athletic wear and fresh creator styles.
-              </p>
-
-              <button
-                type="button"
-                onClick={scrollToCatalog}
-                style={{
-                  backgroundColor: '#ffffff',
-                  color: '#0f172a',
-                  border: 'none',
-                  borderRadius: '999px',
-                  padding: '11px 24px',
-                  fontWeight: 800,
-                  fontSize: '0.88rem',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                }}
-              >
-                Shop Collection
-              </button>
-            </div>
-
-            {/* Model Graphic */}
-            <div style={{ width: '220px', height: '220px', position: 'relative', zIndex: 1 }}>
-              <img
-                src="/illustrations/banner_summer_collection.jpg"
-                alt="Summer Collection"
-                style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '18px' }}
-              />
-            </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: 20 }}>
+            {marketplaceAds.map((ad) => <MarketplaceAdCard key={ad.id} ad={ad} session={session} />)}
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* ---------------- 6. COMPLETE MARKETPLACE CATALOG (Filterable) ---------------- */}
       <section id="marketplace-catalog" style={{ maxWidth: '1280px', margin: '60px auto 60px', padding: '0 24px' }}>

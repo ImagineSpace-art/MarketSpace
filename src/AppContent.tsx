@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation, useNavigate, useParams } from 're
 import './App.css'
 import { Shell } from './components/Shell'
 import { useMarketplaceApp } from './features/marketplace/useMarketplaceApp'
+import { isListingExpired } from './features/marketplace/listingExpiry'
 import { ListingDetailPage, ListingFormPage } from './pages/ListingPage'
 import { SavedItemsPage } from './pages/SavedNotificationsPage'
 import { MessagesPage } from './pages/MessagesPage'
@@ -334,6 +335,10 @@ export function AppContent() {
                 addStoreReview={app.addStoreReview}
                 replyToStoreReview={app.replyToStoreReview}
                 handleUpdateListingCollection={app.handleUpdateListingCollection}
+                globalRenewalFrequency={app.globalRenewalFrequency}
+                globalRenewalDay={app.globalRenewalDay}
+                onEditListing={openEditListing}
+                onRenewListing={handleRenewListing}
               />
             }
           />
@@ -441,6 +446,7 @@ export function AppContent() {
                 onToggleSave={(id) => toggleSave(Number(id))}
                 onAddToCart={(it) => cart.addToCart(it)}
                 onOpenListing={openListing}
+                session={session}
               />
             }
           />
@@ -459,6 +465,8 @@ export function AppContent() {
                 allBusinesses={allBusinesses}
                 handleRenewListing={handleRenewListing}
                 handleDeleteListing={handleDeleteListing}
+                globalRenewalFrequency={app.globalRenewalFrequency}
+                globalRenewalDay={app.globalRenewalDay}
               />
             }
           />
@@ -559,6 +567,10 @@ export function AppContent() {
                 replyToStoreReview={app.replyToStoreReview}
                 handleUpdateListingCollection={app.handleUpdateListingCollection}
                 onSaveStoreTheme={app.handleSaveStoreTheme}
+                globalRenewalFrequency={app.globalRenewalFrequency}
+                globalRenewalDay={app.globalRenewalDay}
+                onEditListing={openEditListing}
+                onRenewListing={handleRenewListing}
               />
             }
           />
@@ -633,7 +645,9 @@ export function AppContent() {
                 onOpenListing={openListing}
                 onToggleSave={toggleSave}
                 onUpdateListingCollection={app.handleUpdateListingCollection}
-                onSaveStoreTemplate={(content: Record<string, unknown>) => app.handleSaveStoreTemplate('boutique-grid', content)}
+                globalRenewalFrequency={app.globalRenewalFrequency}
+                globalRenewalDay={app.globalRenewalDay}
+                onSaveStoreTemplate={(content: Record<string, unknown>, departments?: Array<{ name: string; image?: string }>, templateId: 'boutique-grid' | 'storefront-landing' = 'boutique-grid') => app.handleSaveStoreTemplate(templateId, content, departments)}
                 theme={theme}
                 locationString="Lusaka"
                 onToggleTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')}
@@ -880,9 +894,12 @@ function ProfileTabRoute({ session, ...props }: any) {
   )
 }
 
-function ListingDetailRoute({ listings, loading, session, navigate, handleStartChat, toggleSave, openEditListing, allBusinesses, handleRenewListing, handleDeleteListing }: { listings: Listing[]; loading: boolean; session: any; navigate: any; handleStartChat: any; toggleSave: any; openEditListing: any; allBusinesses: any; handleRenewListing: any; handleDeleteListing: any }) {
+function ListingDetailRoute({ listings, loading, session, navigate, handleStartChat, toggleSave, openEditListing, allBusinesses, handleRenewListing, handleDeleteListing, globalRenewalFrequency = 'weekly', globalRenewalDay = 'Monday' }: { listings: Listing[]; loading: boolean; session: any; navigate: any; handleStartChat: any; toggleSave: any; openEditListing: any; allBusinesses: any; handleRenewListing: any; handleDeleteListing: any; globalRenewalFrequency?: any; globalRenewalDay?: string }) {
   const { id } = useParams()
   const listing = listings.find((l: Listing) => String(l.id) === id)
+  if (listing && listing.user_id !== session?.user?.id && (isListingExpired(listing, globalRenewalFrequency, globalRenewalDay) || (listing.status && !['active', 'available'].includes(listing.status.toLowerCase())))) {
+    return <Navigate to="/browse" replace />
+  }
   if (!listing) {
     if (loading) return <p style={{ padding: '24px' }}>Loading listing details...</p>
     return <p style={{ padding: '24px' }}>Listing not found.</p>
@@ -1030,7 +1047,7 @@ function ListingEditRoute({
   )
 }
 
-function StoreViewRoute({ stores, businessProfile, allBusinesses, listings, navigate, handleStartChat, openListing, toggleSave, savedIds, loading, followingIds, notifyStoreIds, toggleFollowStore, toggleNotifyStore, session, storeReviews, addStoreReview, replyToStoreReview, handleUpdateListingCollection, onSaveStoreTheme }: any) {
+function StoreViewRoute({ stores, businessProfile, allBusinesses, listings, navigate, handleStartChat, openListing, toggleSave, savedIds, loading, followingIds, notifyStoreIds, toggleFollowStore, toggleNotifyStore, session, storeReviews, addStoreReview, replyToStoreReview, handleUpdateListingCollection, onSaveStoreTheme, globalRenewalFrequency, globalRenewalDay, onEditListing, onRenewListing }: any) {
   const { userId } = useParams()
 
   const regStore: BusinessProfile | null =
@@ -1093,14 +1110,15 @@ function StoreViewRoute({ stores, businessProfile, allBusinesses, listings, navi
       shop={storeWithTheme}
       listings={listings}
       onBack={() => navigate('/stores')}
-      onMessageSeller={() => {
+      onMessageSeller={(customMessage?: string) => {
         if (session?.user?.id === effectiveStore.userId) {
-          navigate('/inbox')
           return
         }
-        const shopListing = listings.find((l: Listing) => l.user_id === effectiveStore.userId)
+        const listingId = new URLSearchParams(window.location.search).get('listing')
+        const shopListing = (listingId ? listings.find((l: Listing) => String(l.id) === listingId && l.user_id === effectiveStore.userId) : undefined)
+          || listings.find((l: Listing) => l.user_id === effectiveStore.userId)
         if (shopListing) {
-          void handleStartChat(shopListing)
+          void handleStartChat(shopListing, customMessage, true)
         } else {
           void handleStartChat({
             id: 0,
@@ -1109,7 +1127,7 @@ function StoreViewRoute({ stores, businessProfile, allBusinesses, listings, navi
             price: 0,
             category: effectiveStore.category,
             user_id: effectiveStore.userId,
-          })
+          }, customMessage, true)
         }
       }}
       onOpenListing={openListing}
@@ -1125,6 +1143,10 @@ function StoreViewRoute({ stores, businessProfile, allBusinesses, listings, navi
       onReplyToReview={replyToStoreReview}
       onUpdateListingCollection={handleUpdateListingCollection}
       onSaveStoreTheme={(config) => onSaveStoreTheme?.(config, effectiveStore.userId)}
+      globalRenewalFrequency={globalRenewalFrequency}
+      globalRenewalDay={globalRenewalDay}
+      onEditListing={onEditListing}
+      onRenewListing={onRenewListing}
     />
   )
 }

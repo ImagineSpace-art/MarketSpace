@@ -47,6 +47,7 @@ export function ListingDetailPage({
   const [formError, setFormError] = useState('')
   const [copied, setCopied] = useState(false)
   const [activeImageIdx, setActiveImageIdx] = useState(0)
+  const isOwner = session?.user?.id === selectedListing?.user_id
 
   useEffect(() => {
     if (storeId && selectedListing?.id) {
@@ -80,6 +81,7 @@ export function ListingDetailPage({
   const acceptsOffers = Boolean(selectedListing?.lowest_acceptable_price != null && Number(selectedListing.lowest_acceptable_price) > 0)
 
   const handleSendInquiry = () => {
+    if (selectedListing?.user_id === session?.user?.id) return
     if (!session) {
       alert('Please sign in to send inquiries or chat with sellers.')
       navigate('/login')
@@ -136,6 +138,7 @@ export function ListingDetailPage({
   }
 
   const handleBuyNow = () => {
+    if (selectedListing?.user_id === session?.user?.id) return
     if (!session) {
       alert('Please sign in to place orders or contact sellers.')
       navigate('/login')
@@ -615,6 +618,8 @@ export function ListingDetailPage({
                 fontWeight: 700
               }}
               onClick={handleSendInquiry}
+              disabled={isOwner}
+              title={isOwner ? 'You cannot message yourself' : undefined}
             >
               <span className="material-icons" style={{ fontSize: '20px' }}>chat</span>
               Chat with Seller / Send Inquiry
@@ -625,6 +630,7 @@ export function ListingDetailPage({
               className="secondary-btn"
               style={{ width: '100%', padding: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
               onClick={handleBuyNow}
+              disabled={isOwner}
             >
               <span className="material-icons" style={{ fontSize: '18px' }}>shopping_bag</span>
               Instant Buy
@@ -740,14 +746,11 @@ export function ListingDetailPage({
   )
 }
 
-function ListingRatingReviewBox({ listingId, currentUserName }: { listingId: number; currentUserName: string }) {
+function ListingRatingReviewBox({ listingId: _listingId, currentUserName }: { listingId: number; currentUserName: string }) {
   const [rating, setRating] = useState(5)
-  console.log('Viewing reviews for listing:', listingId)
   const [comment, setComment] = useState('')
   const [isAnonymous, setIsAnonymous] = useState(false)
-  const [reviews, setReviews] = useState<Array<{ id: string; name: string; rating: number; comment: string; isAnon: boolean; date: string }>>([
-    { id: '1', name: 'Anonymous Buyer', rating: 5, comment: 'Great seller! Product arrived exactly as described.', isAnon: true, date: '2 days ago' }
-  ])
+  const [reviews, setReviews] = useState<Array<{ id: string; name: string; rating: number; comment: string; isAnon: boolean; date: string }>>([])
 
   const handleSubmitReview = (e: FormEvent) => {
     e.preventDefault()
@@ -766,7 +769,9 @@ function ListingRatingReviewBox({ listingId, currentUserName }: { listingId: num
     alert('Thank you! Your rating has been posted successfully.')
   }
 
-  const avgRating = (reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1)
+  const avgRating = reviews.length
+    ? (reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1)
+    : '0.0'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -1278,16 +1283,26 @@ export function ListingFormPage({
               <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text)' }}>
                 Store Department / Category
               </label>
-              <select
-                value={collectionId || ''}
-                onChange={(e) => onCollectionIdChange && onCollectionIdChange(e.target.value)}
-                style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.92rem' }}
-              >
-                <option value="">General Store Catalog (Uncategorized)</option>
-                {(businessProfile.collections || []).map((col) => (
-                  <option key={col.id} value={col.id}>{col.name}</option>
-                ))}
-              </select>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {(businessProfile.collections || []).map((col) => {
+                  const selectedIds = collectionId ? collectionId.split(',').filter(Boolean) : []
+                  const selected = selectedIds.includes(col.id)
+                  return (
+                    <label key={col.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)' }}>
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => {
+                          const nextIds = selected ? selectedIds.filter(id => id !== col.id) : [...selectedIds, col.id]
+                          onCollectionIdChange?.(nextIds.join(','))
+                        }}
+                      />
+                      {col.name}
+                    </label>
+                  )
+                })}
+              </div>
+              <small style={{ color: 'var(--text-secondary)' }}>Select one or more departments. You can leave this empty for the general catalog.</small>
             </div>
           )}
 

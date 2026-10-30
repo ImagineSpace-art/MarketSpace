@@ -195,6 +195,7 @@ ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS announcement_bar TEXT;
 -- Migration: Add global renewal preferences to profiles
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS global_renewal_frequency TEXT DEFAULT 'weekly';
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS global_renewal_day TEXT DEFAULT 'Monday';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS enable_global_renewal BOOLEAN NOT NULL DEFAULT true;
 
 -- 9. ANALYTICS_EVENTS TABLE (Real User Actions & Metrics)
 CREATE TABLE IF NOT EXISTS public.analytics_events (

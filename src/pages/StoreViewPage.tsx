@@ -10,7 +10,10 @@ import { StoreFooter } from '../components/store-theme/StoreFooter'
 import { StoreInfoPanel } from '../components/store-theme/StoreInfoPanel'
 import { StoreCartDrawer } from '../components/store-theme/StoreCartDrawer'
 import { HYPER_THEME } from '../components/store-theme/defaultSections'
+import { isListingExpired } from '../features/marketplace/listingExpiry'
 import { BoutiqueGridTemplate, type BoutiqueGridContent } from './BoutiqueGridTemplate'
+import { StorefrontLandingTemplate, type StorefrontLandingContent } from './StorefrontLandingTemplate'
+import { TemplateStoreListingView } from './TemplateStoreListingView'
 import './StoreTemplates.css'
 
 // ---------------- PUBLIC STORE VIEW ----------------
@@ -18,7 +21,7 @@ type StoreViewPageProps = {
     shop: BusinessProfile
     listings: Listing[]
     onBack?: () => void
-    onMessageSeller: () => void
+    onMessageSeller: (customMessage?: string) => void
     onOpenListing: (listing: Listing) => void
     onToggleSave: (listingId: number) => void
     savedIds: string[]
@@ -32,6 +35,10 @@ type StoreViewPageProps = {
     onReplyToReview?: (reviewId: string, replyText: string) => void
     onUpdateListingCollection?: (listingId: number, colId: string | null) => void
     onSaveStoreTheme?: (config: StoreThemeConfig) => Promise<void> | void
+    globalRenewalFrequency?: 'daily' | 'weekly' | 'biweekly' | 'monthly'
+    globalRenewalDay?: string
+    onEditListing?: (listing: Listing) => void
+    onRenewListing?: (listingId: number) => void
 }
 
 export function StoreViewPage({
@@ -51,6 +58,10 @@ export function StoreViewPage({
     onReplyToReview = () => { },
     onUpdateListingCollection,
     onSaveStoreTheme,
+    globalRenewalFrequency = 'weekly',
+    globalRenewalDay = 'Monday',
+    onEditListing,
+    onRenewListing,
 }: StoreViewPageProps) {
     const navigate = useNavigate()
     const collectionsList = shop.collections || []
@@ -118,23 +129,27 @@ export function StoreViewPage({
     const [formRating, setFormRating] = useState(0)
     const [inStoreSearch, setInStoreSearch] = useState('')
     const [selectedModalListing, setSelectedModalListing] = useState<Listing | null>(null)
+    const [isInStoreMessageOpen, setIsInStoreMessageOpen] = useState(false)
     const [modalActiveImgIdx, setModalActiveImgIdx] = useState(0)
     const [copiedShareLink, setCopiedShareLink] = useState(false)
     const [modalSelectedColor, setModalSelectedColor] = useState<string | null>(null)
     const [modalQuantity, setModalQuantity] = useState<number>(1)
 
-    const shopListings = listings.filter(l => l.user_id === shop.userId)
+    const isOwner = currentUserId === shop.userId
+    const shopListings = listings.filter(l => l.user_id === shop.userId && (isOwner || (!isListingExpired(l, globalRenewalFrequency, globalRenewalDay) && (!l.status || ['active', 'available'].includes(l.status.toLowerCase())))))
     const displayedListings = shopListings.filter(l => {
         if (!inStoreSearch.trim()) return true
         const q = inStoreSearch.toLowerCase()
         return l.title.toLowerCase().includes(q) || (l.description && l.description.toLowerCase().includes(q))
     })
-    const isOwner = currentUserId === shop.userId
 
     const activeThemedListing = useMemo(() => {
         if (!listingQueryId) return null
-        return shopListings.find(l => String(l.id) === listingQueryId) || listings.find(l => String(l.id) === listingQueryId) || null
-    }, [listingQueryId, shopListings, listings])
+        const requestedListing = listings.find(l => String(l.id) === listingQueryId && l.user_id === shop.userId)
+        if (!requestedListing) return null
+        if (isOwner) return requestedListing
+        return shopListings.find(l => String(l.id) === listingQueryId) || null
+    }, [listingQueryId, shopListings, listings, isOwner, shop.userId])
 
     const handleOpenThemedListing = (targetListing: Listing) => {
         setIsCartDrawerOpen(false)
@@ -154,6 +169,22 @@ export function StoreViewPage({
     const handleOpenStoreListing = (listing: Listing) => {
         handleOpenThemedListing(listing)
     }
+
+    const handleTemplateMessage = (customMessage?: string) => {
+        if (isOwner) return
+        setIsInStoreMessageOpen(true)
+        onMessageSeller(customMessage)
+    }
+
+    const storeMessagePanel = isInStoreMessageOpen ? (
+        <div className="store-inquiry-panel" role="dialog" aria-label="Store messages">
+            <button type="button" className="store-inquiry-close" onClick={() => setIsInStoreMessageOpen(false)} aria-label="Close messages"><span className="material-icons">close</span></button>
+            <span className="store-inquiry-icon"><span className="material-icons">chat_bubble_outline</span></span>
+            <h2>Message started</h2>
+            <p>Your conversation is ready. You can continue it here without leaving the store.</p>
+            <button type="button" onClick={() => { setIsInStoreMessageOpen(false); navigate('/inbox') }}>Open conversation</button>
+        </div>
+    ) : null
 
     const [liveThemeConfig, setLiveThemeConfig] = useState<StoreThemeConfig>(() => {
         try {
@@ -390,6 +421,7 @@ export function StoreViewPage({
         ? (reviewsList.reduce((acc, r) => acc + r.rating, 0) / reviewsList.length).toFixed(1)
         : null
     const boutiqueContent = (shop.templateContent?.['boutique-grid'] || {}) as BoutiqueGridContent
+    const landingContent = (shop.templateContent?.['storefront-landing'] || {}) as StorefrontLandingContent
 
     const handleNavigateTarget = (target: string) => {
         if (listingQueryId) {
@@ -430,8 +462,37 @@ export function StoreViewPage({
         }
     }
 
+    if (shop.templateId === 'storefront-landing' && !activeThemedListing) {
+        return (
+            <>
+            <StorefrontLandingTemplate
+                shop={shop}
+                listings={shopListings}
+                content={landingContent}
+                currentUserId={currentUserId}
+                savedIds={savedIds}
+                storeReviews={storeReviews}
+                cartCount={cartCount}
+                cartItems={cartItems}
+                onOpenListing={handleOpenStoreListing}
+                onToggleSave={onToggleSave}
+                onMessageSeller={handleTemplateMessage}
+                onOpenCart={() => setIsCartDrawerOpen(true)}
+                onCloseCart={() => setIsCartDrawerOpen(false)}
+                onUpdateCartQuantity={handleUpdateCartQuantity}
+                onRemoveCartItem={handleRemoveCartItem}
+                onClearCart={handleClearCart}
+                onRequireSignIn={() => navigate('/login')}
+                isCartOpen={isCartDrawerOpen}
+            />
+            {storeMessagePanel}
+            </>
+        )
+    }
+
     if (shop.templateId === 'boutique-grid' && !activeThemedListing) {
         return (
+            <>
             <BoutiqueGridTemplate
                 shop={shop}
                 listings={shopListings}
@@ -446,7 +507,7 @@ export function StoreViewPage({
                 cartItems={cartItems}
                 onOpenListing={handleOpenStoreListing}
                 onToggleSave={onToggleSave}
-                onMessageSeller={onMessageSeller}
+                onMessageSeller={handleTemplateMessage}
                 onToggleFollow={() => onToggleFollowStore(shop.userId)}
                 onToggleNotify={() => onToggleNotifyStore(shop.userId)}
                 onAddReview={onAddReview}
@@ -462,6 +523,31 @@ export function StoreViewPage({
                 isCartOpen={isCartDrawerOpen}
                 isInfoOpen={isStorePanelOpen}
             />
+            {storeMessagePanel}
+            </>
+        )
+    }
+
+    if ((shop.templateId === 'boutique-grid' || shop.templateId === 'storefront-landing') && activeThemedListing) {
+        return (
+            <>
+            <TemplateStoreListingView
+                templateId={shop.templateId}
+                listing={activeThemedListing}
+                shop={shop}
+                storeListings={shopListings}
+                isSaved={savedIds.includes(String(activeThemedListing.id))}
+                onBack={handleBackToStoreCatalog}
+                onAddToCart={handleAddToCart}
+                onToggleSave={onToggleSave}
+                onSelectListing={handleOpenThemedListing}
+                onMessageSeller={handleTemplateMessage}
+                isOwner={isOwner}
+                onEditListing={onEditListing}
+                onRenewListing={onRenewListing}
+            />
+            {storeMessagePanel}
+            </>
         )
     }
 
@@ -952,7 +1038,10 @@ export function StoreViewPage({
                             const colId = activeSubTab.replace('col-', '')
                             const targetCol = collectionsList.find(c => c.id === colId)
                             const colTitle = targetCol?.name || 'Department'
-                            const filteredColListings = shopListings.filter(l => String(l.collection_id) === String(colId))
+                            const filteredColListings = shopListings.filter(l =>
+                                (Array.isArray(l.collection_ids) && l.collection_ids.map(String).includes(String(colId)))
+                                || String(l.collection_id) === String(colId),
+                            )
 
                             return (
                                 <section>

@@ -25,6 +25,7 @@ export type Listing = {
   renewal_frequency?: 'daily' | 'weekly' | 'biweekly' | 'monthly'
   use_global_renewal?: boolean
   collection_id?: string
+  collection_ids?: string[]
   publish_as?: 'private' | 'store'
   how_it_works?: string
 }
@@ -40,6 +41,7 @@ export type Profile = {
   phone_verified?: boolean
   global_renewal_frequency?: 'daily' | 'weekly' | 'biweekly' | 'monthly'
   global_renewal_day?: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday'
+  enable_global_renewal?: boolean
 }
 
 export type CatalogItem = {
@@ -60,6 +62,7 @@ export type BusinessAd = {
   adText?: string
   headline?: string
   media?: string[]
+  mediaTypes?: Array<'image' | 'video'>
   buttonLabel?: string
   destinationUrl?: string
   contactMethod?: 'whatsapp' | 'messenger' | 'none'

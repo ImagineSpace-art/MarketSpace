@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState, type Dispatch, type FormEvent, type SetSt
 import type { Session } from '@supabase/supabase-js'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
+import { isListingExpired } from './listingExpiry'
 import { CATEGORY_OPTIONS, CONDITION_OPTIONS, DELIVERY_OPTIONS } from './constants'
-import type { Listing, Profile, View, BusinessProfile, StoreReview, PaymentMethodItem, NotificationConfig, StoreThemeConfig, StoreTemplateContent, StoreTemplateId } from '../../types'
+import type { Listing, Profile, View, BusinessProfile, StoreCollection, StoreReview, PaymentMethodItem, NotificationConfig, StoreThemeConfig, StoreTemplateContent, StoreTemplateId } from '../../types'
 import { logAnalyticsEvent, toggleStoreFollowInDb } from '../../services/analytics'
 import { getFunctionErrorMessage } from '../../utils/functionError'
 
@@ -153,12 +154,12 @@ export interface MarketplaceAppModel {
   setUploadedImages: Dispatch<SetStateAction<string[]>>
   handleCreateOrUpdateBusiness: (profile: BusinessProfile) => void
   handleSaveStoreTheme: (config: StoreThemeConfig, storeUserId?: string) => Promise<void>
-  handleSaveStoreTemplate: (templateId: StoreTemplateId, content: Record<string, unknown>, storeUserId?: string) => Promise<void>
+  handleSaveStoreTemplate: (templateId: StoreTemplateId, content: Record<string, unknown>, departments?: Array<{ name: string; image?: string }>, storeUserId?: string) => Promise<void>
   handleDeleteListing: (listingId: number) => Promise<void>
   handleRenewListing: (listingId: number) => Promise<void>
   handleUpdateListingStatus: (listingId: number, status: string) => Promise<void>
   handleUploadAvatar: (base64: string) => Promise<void>
-  handleStartChat: (listing: Listing, customMessage?: string) => Promise<void>
+  handleStartChat: (listing: Listing, customMessage?: string, stayInCurrentPage?: boolean) => Promise<void>
   availableColors: string[]
   setAvailableColors: Dispatch<SetStateAction<string[]>>
   listingKindFilter: 'all' | 'item' | 'service'
@@ -252,23 +253,35 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     return (stored as any) || 'Monday'
   })
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('marketspace-global-renewal', globalRenewalFrequency)
-    }
-  }, [globalRenewalFrequency])
-
-  const [enableGlobalRenewal, setEnableGlobalRenewal] = useState<boolean>(() => {
+  const [enableGlobalRenewal, setEnableGlobalRenewalState] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true
     const stored = window.localStorage.getItem('marketspace-enable-global-renewal')
     return stored !== null ? JSON.parse(stored) : true
   })
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('marketspace-enable-global-renewal', JSON.stringify(enableGlobalRenewal))
-    }
-  }, [enableGlobalRenewal])
+  const persistGlobalRenewalPreferences = async (updates: Partial<Pick<Profile, 'global_renewal_frequency' | 'global_renewal_day' | 'enable_global_renewal'>>) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    await supabase.from('profiles').update(updates).eq('user_id', user.id)
+  }
+
+  const updateGlobalRenewalFrequency = (value: SetStateAction<'daily' | 'weekly' | 'biweekly' | 'monthly'>) => {
+    const next = typeof value === 'function' ? value(globalRenewalFrequency) : value
+    setGlobalRenewalFrequency(next)
+    void persistGlobalRenewalPreferences({ global_renewal_frequency: next })
+  }
+
+  const updateGlobalRenewalDay = (value: SetStateAction<'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday'>) => {
+    const next = typeof value === 'function' ? value(globalRenewalDay) : value
+    setGlobalRenewalDay(next)
+    void persistGlobalRenewalPreferences({ global_renewal_day: next })
+  }
+
+  const setEnableGlobalRenewal: Dispatch<SetStateAction<boolean>> = (value) => {
+    const next = typeof value === 'function' ? value(enableGlobalRenewal) : value
+    setEnableGlobalRenewalState(next)
+    void persistGlobalRenewalPreferences({ enable_global_renewal: next })
+  }
   const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
     if (typeof window === 'undefined') return []
     const stored = window.localStorage.getItem('marketspace-notifications')
@@ -465,29 +478,50 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     window.localStorage.setItem('marketspace-deleted-chats', JSON.stringify(deletedChatIds))
   }, [deletedChatIds])
 
+  const persistChatState = async (chatId: number, update: Record<string, boolean>) => {
+    if (!session?.user?.id) return
+    await supabase.from('chat_user_states').upsert({
+      chat_id: chatId,
+      user_id: session.user.id,
+      ...update,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'chat_id,user_id' })
+  }
+
   const togglePinChat = (chatId: number) => {
+    const next = !chatFlags[chatId]?.isPinned
     setChatFlags((prev) => ({
       ...prev,
-      [chatId]: { ...prev[chatId], isPinned: !prev[chatId]?.isPinned }
+      [chatId]: { ...prev[chatId], isPinned: next }
     }))
+    setChatThreads(prev => prev.map(thread => thread.id === chatId ? { ...thread, isPinned: next } : thread))
+    void persistChatState(chatId, { is_pinned: next })
   }
 
   const toggleFavoriteChat = (chatId: number) => {
+    const next = !chatFlags[chatId]?.isFavorite
     setChatFlags((prev) => ({
       ...prev,
-      [chatId]: { ...prev[chatId], isFavorite: !prev[chatId]?.isFavorite }
+      [chatId]: { ...prev[chatId], isFavorite: next }
     }))
+    setChatThreads(prev => prev.map(thread => thread.id === chatId ? { ...thread, isFavorite: next } : thread))
+    void persistChatState(chatId, { is_favorite: next })
   }
 
   const toggleArchiveChat = (chatId: number) => {
+    const next = !chatFlags[chatId]?.isArchived
     setChatFlags((prev) => ({
       ...prev,
-      [chatId]: { ...prev[chatId], isArchived: !prev[chatId]?.isArchived }
+      [chatId]: { ...prev[chatId], isArchived: next }
     }))
+    setChatThreads(prev => prev.map(thread => thread.id === chatId ? { ...thread, isArchived: next } : thread))
+    void persistChatState(chatId, { is_archived: next })
   }
 
   const deleteChat = (chatId: number) => {
-    setDeletedChatIds((prev) => [...prev, chatId])
+    setDeletedChatIds((prev) => prev.includes(chatId) ? prev : [...prev, chatId])
+    void persistChatState(chatId, { is_deleted: true })
+    setChatThreads(prev => prev.filter(thread => thread.id !== chatId))
     if (activeChatId === chatId) {
       setActiveChatId(null)
     }
@@ -638,8 +672,12 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       await supabase.from('profiles').update({ username: fallbackUsername }).eq('user_id', userId)
     }
 
-    setProfile(data as Profile)
-    return data as Profile
+    const loadedProfile = data as Profile
+    if (loadedProfile.global_renewal_frequency) setGlobalRenewalFrequency(loadedProfile.global_renewal_frequency)
+    if (loadedProfile.global_renewal_day) setGlobalRenewalDay(loadedProfile.global_renewal_day)
+    if (typeof loadedProfile.enable_global_renewal === 'boolean') setEnableGlobalRenewalState(loadedProfile.enable_global_renewal)
+    setProfile(loadedProfile)
+    return loadedProfile
   }
 
   async function fetchChatThreads() {
@@ -695,6 +733,23 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       nameMap.set(p.user_id, p.username || 'User')
     })
 
+    const { data: stateRows } = await supabase
+      .from('chat_user_states')
+      .select('chat_id, is_pinned, is_favorite, is_archived, is_deleted')
+      .eq('user_id', session.user.id)
+      .in('chat_id', chatIds)
+
+    const databaseChatFlags: Record<number, { isPinned?: boolean; isFavorite?: boolean; isArchived?: boolean }> = {}
+    const databaseDeletedIds: number[] = []
+    stateRows?.forEach((state: any) => {
+      databaseChatFlags[state.chat_id] = {
+        isPinned: Boolean(state.is_pinned),
+        isFavorite: Boolean(state.is_favorite),
+        isArchived: Boolean(state.is_archived),
+      }
+      if (state.is_deleted) databaseDeletedIds.push(Number(state.chat_id))
+    })
+
     const threads: ChatThread[] = chatsData.map((c) => {
       const otherId = c.buyer_id === session.user.id ? c.seller_id : c.buyer_id
       const participantName = nameMap.get(otherId) || 'User'
@@ -707,10 +762,12 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         listingTitle: c.title || 'Marketplace Item',
         unread: false,
         messages: msgs,
+        ...databaseChatFlags[c.id],
       }
     })
 
-    setChatThreads(threads)
+    const effectiveDeletedIds = new Set([...deletedChatIds, ...databaseDeletedIds])
+    setChatThreads(threads.filter(thread => !effectiveDeletedIds.has(thread.id)))
   }
 
   useEffect(() => {
@@ -931,7 +988,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       renewal_frequency: effectiveRenewal,
       use_global_renewal: useGlobalRenewal,
       publish_as: publishAs,
-      collection_id: publishAs === 'store' ? collectionId : null,
+      collection_id: publishAs === 'store' ? collectionId.split(',')[0] || null : null,
+      collection_ids: publishAs === 'store' ? collectionId.split(',').filter(Boolean) : [],
       how_it_works: howItWorks,
       last_renewed_at: new Date().toISOString(),
     })
@@ -967,7 +1025,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       renewal_frequency: effectiveRenewal,
       use_global_renewal: useGlobalRenewal,
       publish_as: publishAs,
-      collection_id: publishAs === 'store' ? collectionId : null,
+      collection_id: publishAs === 'store' ? collectionId.split(',')[0] || null : null,
+      collection_ids: publishAs === 'store' ? collectionId.split(',').filter(Boolean) : [],
       how_it_works: howItWorks,
     }).eq('id', editingListing.id)
 
@@ -1016,7 +1075,10 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setAvailableColors(listing.available_colors ?? [])
     setRenewalFrequency(listing.renewal_frequency ?? 'weekly')
     setPublishAs((listing.publish_as as any) ?? 'private')
-    setCollectionId(listing.collection_id ?? '')
+    const departmentIds = Array.isArray(listing.collection_ids) && listing.collection_ids.length
+      ? listing.collection_ids.map(String)
+      : (listing.collection_id ? [listing.collection_id] : [])
+    setCollectionId(departmentIds.join(','))
     setHowItWorks(listing.how_it_works ?? '')
     setUseGlobalRenewal(listing.use_global_renewal ?? true)
     navigate(`/edit/${listing.id}`)
@@ -1125,7 +1187,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     }
   }
 
-  const handleStartChat = async (listing: Listing, customMessage?: string) => {
+  const handleStartChat = async (listing: Listing, customMessage?: string, stayInCurrentPage = false) => {
     if (!session) {
       setMessage('Please sign in to message the seller')
       navigate('/login')
@@ -1188,7 +1250,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         listing_id: listing.id,
         actor_id: session.user.id
       })
-      navigate('/inbox')
+      if (!stayInCurrentPage) navigate('/inbox')
     } catch (err: any) {
       setMessage(err.message || 'Failed to start chat')
     } finally {
@@ -1214,37 +1276,10 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       .filter((listing) => {
         const listingPrice = Number(String(listing.price).replace(/[^\d.]/g, ''))
 
-        // Dynamic Renewal Frequency Rule: listings older than their renewal interval or cycle day are paused from homepage
-        const DAY_MS = 24 * 60 * 60 * 1000
-        const now = Date.now()
-        const lastRenewedTime = new Date(listing.last_renewed_at || listing.created_at || Date.now()).getTime()
-        const daysSinceRenewed = (now - lastRenewedTime) / DAY_MS
-
-        let isExpired = false
-
-        if (listing.use_global_renewal === false) {
-          const freq = listing.renewal_frequency ?? 'weekly'
-          const expiryIntervalMs = freq === 'daily' ? DAY_MS : freq === 'biweekly' ? 14 * DAY_MS : freq === 'monthly' ? 30 * DAY_MS : 7 * DAY_MS
-          isExpired = now - lastRenewedTime > expiryIntervalMs
-        } else {
-          // Global Renewal Mode: Frequency + Preferred Day of Week
-          const freq = globalRenewalFrequency || 'weekly'
-          const cycleDays = freq === 'daily' ? 1 : freq === 'biweekly' ? 14 : freq === 'monthly' ? 30 : 7
-          const dayIndexMap: Record<string, number> = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 }
-          const targetDay = dayIndexMap[globalRenewalDay] ?? 1
-          const currentDay = new Date(now).getDay()
-
-          if (daysSinceRenewed >= cycleDays) {
-            isExpired = true
-          } else if (freq === 'weekly' || freq === 'biweekly') {
-            const lastRenewedDay = new Date(lastRenewedTime).getDay()
-            if (daysSinceRenewed >= 1 && currentDay === targetDay && lastRenewedDay !== targetDay) {
-              isExpired = true
-            }
-          }
+        if (listing.user_id !== session?.user?.id && isListingExpired(listing, globalRenewalFrequency, globalRenewalDay)) {
+          return false
         }
-
-        if (isExpired) {
+        if (listing.status && !['active', 'available'].includes(listing.status.toLowerCase())) {
           return false
         }
 
@@ -1344,15 +1379,15 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     }
   }
 
-  const handleCreateOrUpdateBusiness = (updated: BusinessProfile) => {
+  const handleCreateOrUpdateBusiness = async (updated: BusinessProfile) => {
+    if (!session?.user?.id || updated.userId !== session.user.id) {
+      throw new Error('You can only save your own store.')
+    }
+
     const nextAll = { ...allBusinesses, [updated.userId]: updated }
-    setAllBusinesses(nextAll)
-    setBusinessProfile(updated)
-    window.localStorage.setItem('marketspace-all-businesses', JSON.stringify(nextAll))
-    setMessage('Business profile updated successfully')
 
     if (session?.user?.id) {
-      void supabase.from('stores').upsert({
+      const { error } = await supabase.from('stores').upsert({
         user_id: updated.userId,
         shop_name: updated.shopName,
         description: updated.description,
@@ -1369,7 +1404,13 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         ads: updated.ads,
         theme_config: updated.themeConfig || {},
       }, { onConflict: 'user_id' })
+      if (error) throw error
     }
+
+    setAllBusinesses(nextAll)
+    setBusinessProfile(updated)
+    window.localStorage.setItem('marketspace-all-businesses', JSON.stringify(nextAll))
+    setMessage('Business profile updated successfully')
     navigate('/profile/store-dashboard')
   }
 
@@ -1431,6 +1472,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   const handleSaveStoreTemplate = async (
     templateId: StoreTemplateId,
     content: Record<string, unknown>,
+    departments?: Array<{ name: string; image?: string }>,
     storeUserId?: string,
   ) => {
     if (!session?.user.id) throw new Error('Your session expired, please sign in again.')
@@ -1441,9 +1483,10 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       success?: boolean
       templateId?: StoreTemplateId
       content?: Record<string, string>
+      departments?: StoreCollection[]
       error?: string
     }>('store-template-save', {
-      body: { templateId, content },
+      body: { templateId, content, ...(departments ? { departments } : {}) },
     })
     if (error) throw new Error(await getFunctionErrorMessage(error))
     if (!data?.success || !data.templateId || !data.content) {
@@ -1460,6 +1503,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       ...existing,
       templateId: data.templateId,
       templateContent,
+      ...(data.departments ? { collections: data.departments } : {}),
     }
     const nextAll = { ...allBusinesses, [targetUserId]: updated }
     setAllBusinesses(nextAll)
@@ -1663,9 +1707,9 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     useGlobalRenewal,
     setUseGlobalRenewal,
     globalRenewalFrequency,
-    setGlobalRenewalFrequency,
+    setGlobalRenewalFrequency: updateGlobalRenewalFrequency,
     globalRenewalDay,
-    setGlobalRenewalDay,
+    setGlobalRenewalDay: updateGlobalRenewalDay,
     enableGlobalRenewal,
     setEnableGlobalRenewal,
     listingKindFilter,

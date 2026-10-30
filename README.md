@@ -73,6 +73,17 @@ Customize Theme** to edit the original **Boutique Grid** template. The live
 storefront is selected by its saved `template_id`; the legacy theme editor
 remains in place until the planned cleanup phase.
 
+Phase 3 departments reuse the existing `stores.collections` JSON array and
+add `listings.collection_ids` JSONB for multi-department assignments.
+Redeploy `store-template-save` for department validation and persistence.
+preserving `collection_id` for compatibility. Apply
+`202610290003_store_departments.sql` with `supabase db push`. Boutique Grid
+shows only departments that have listings, and deleting a department does not
+delete its listings; those listings remain accessible under their other
+departments or the uncategorized catalog. Department management is saved through
+`store-template-save`, while listing assignment fields are written by the listing
+form.
+
 Store reports use `202610290002_store_reports.sql` and the `store-report` Edge
 Function. Apply the migration and deploy the function before enabling the
 storefront report action or moderator queue. Reports require a confirmed email,

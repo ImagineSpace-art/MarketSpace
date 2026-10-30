@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
   getStoreTemplateId,
+  validateDepartmentNames,
   validateStoreTemplateContent,
 } from '../_shared/storeTemplateSchema.ts'
 
@@ -64,7 +65,7 @@ Deno.serve(async (request: Request) => {
     })
     const { data: store, error: storeError } = await admin
       .from('stores')
-      .select('user_id, shop_name, template_content')
+      .select('user_id, shop_name, template_content, collections')
       .eq('user_id', userId)
       .eq('status', 'approved')
       .maybeSingle()
@@ -76,6 +77,32 @@ Deno.serve(async (request: Request) => {
       return respond({ error: 'Template content is invalid.', details: validated.errors }, 400)
     }
 
+    const existingCollections = Array.isArray(store.collections)
+      ? store.collections as Array<{ id?: unknown; name?: unknown; bannerImage?: unknown }>
+      : []
+    let nextCollections = existingCollections.filter(collection => typeof collection.id === 'string' && typeof collection.name === 'string')
+    if (Object.hasOwn(requestBody, 'departments')) {
+      const departmentInput = requestBody.departments
+      const departmentEntries = Array.isArray(departmentInput)
+        ? departmentInput.map(department => typeof department === 'string'
+          ? { name: department }
+          : department && typeof department === 'object'
+            ? department as Record<string, unknown>
+            : {})
+        : []
+      const validatedDepartments = validateDepartmentNames(departmentEntries.map(department => department.name))
+      if (validatedDepartments.errors.length > 0) {
+        return respond({ error: 'Departments are invalid.', details: validatedDepartments.errors }, 400)
+      }
+      nextCollections = validatedDepartments.names.map(name => {
+        const entry = departmentEntries.find(department => typeof department.name === 'string' && department.name.toLocaleLowerCase() === name.toLocaleLowerCase())
+        const image = entry?.image
+        const existing = existingCollections.find(collection => typeof collection.name === 'string' && collection.name.toLocaleLowerCase() === name.toLocaleLowerCase())
+        const bannerImage = typeof image === 'string' && (!image || (image.startsWith(`${userId}/`) && image.length <= 512)) ? image : existing?.bannerImage
+        return { id: existing?.id || crypto.randomUUID(), name, ...(typeof bannerImage === 'string' && bannerImage ? { bannerImage } : {}) }
+      })
+    }
+
     const existingContent = store.template_content && typeof store.template_content === 'object'
       && !Array.isArray(store.template_content)
       ? store.template_content as Record<string, unknown>
@@ -85,12 +112,13 @@ Deno.serve(async (request: Request) => {
       .update({
         template_id: templateId,
         template_content: { ...existingContent, [templateId]: validated.content },
+        collections: nextCollections,
       })
       .eq('user_id', userId)
       .eq('status', 'approved')
     if (updateError) throw new Error('Your store template could not be saved.')
 
-    return respond({ success: true, templateId, content: validated.content })
+    return respond({ success: true, templateId, content: validated.content, departments: nextCollections })
   } catch (error) {
     console.error('Store template save failed:', error)
     return respond({

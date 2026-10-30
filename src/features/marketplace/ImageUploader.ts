@@ -106,6 +106,21 @@ export function compressImageToWebpDataUrl(
  * Sends compressed .webp binary Blob to Supabase Storage bucket ('marketspace-media')
  * and returns the public CDN URL for PostgreSQL database storage.
  */
+export async function uploadVideoToSupabase(
+  file: File,
+  bucketName = 'marketspace-media',
+  folder = 'ad-creatives'
+): Promise<string> {
+  const extension = file.name.split('.').pop()?.toLowerCase() || 'mp4'
+  const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${extension}`
+  const { data, error } = await supabase.storage.from(bucketName).upload(fileName, file, {
+    contentType: file.type || 'video/mp4',
+    upsert: true,
+  })
+  if (error) throw error
+  return supabase.storage.from(bucketName).getPublicUrl(data.path).data.publicUrl
+}
+
 export async function uploadImageToSupabase(
   file: File,
   bucketName = 'marketspace-media',
