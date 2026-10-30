@@ -5,6 +5,7 @@ import { TurnstileCaptcha } from '../components/TurnstileCaptcha'
 import { isAtLeast18 } from '../../supabase/functions/_shared/storeRegistrationValidation'
 import { getFunctionErrorMessage } from '../utils/functionError'
 import './StoreRegistrationWizard.css'
+import { STORE_MARKET_LOCATIONS } from '../features/marketplace/storeLocations'
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
 
@@ -27,6 +28,7 @@ type RegistrationData = {
     businessRegistrationNumber: string
   }
   location: {
+    marketplaceLocation: string
     streetAddress: string
     latitude: string
     longitude: string
@@ -68,6 +70,7 @@ const INITIAL_DATA: RegistrationData = {
     businessRegistrationNumber: '',
   },
   location: {
+    marketplaceLocation: '',
     streetAddress: '',
     latitude: '',
     longitude: '',
@@ -483,6 +486,7 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
         }
         await saveDraft(3)
       } else if (step === 4) {
+        if (!data.location.marketplaceLocation.trim()) throw new Error('Select the marketplace location for your store.')
         if (data.store.type === 'physical') {
           if (data.location.streetAddress.trim().length < 8) throw new Error('Enter the physical storefront address.')
           if (!data.location.latitude || !data.location.longitude) throw new Error('Add the map coordinates for the physical storefront.')
@@ -727,6 +731,12 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
 
       {step === 4 && (
         <div className="store-wizard-fields">
+          <label>Marketplace location
+            <select value={data.location.marketplaceLocation} onChange={(event) => update('location', { marketplaceLocation: event.target.value })} required>
+              <option value="">Select a location</option>
+              {STORE_MARKET_LOCATIONS.map(location => <option key={location} value={location}>{location}</option>)}
+            </select>
+          </label>
           {data.store.type === 'physical' ? (
             <>
               <label>Street address<input value={data.location.streetAddress} onChange={(event) => update('location', { streetAddress: event.target.value })} /></label>

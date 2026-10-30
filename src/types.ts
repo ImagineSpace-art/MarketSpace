@@ -214,6 +214,8 @@ export type BusinessProfile = {
   description: string
   category: string
   address: string
+  locationId?: string
+  locationName?: string
   whatsapp: string
   logo: string // base64 data url
   cover: string // base64 data url

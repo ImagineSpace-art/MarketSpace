@@ -154,6 +154,7 @@ function validateDraftStep(step: number, data: Json) {
   if (step >= 4) {
     const store = getStepData(data, 'store')
     const location = getStepData(data, 'location')
+    if (!getString(location.marketplaceLocation)) return 'Select the marketplace location for your store.'
     if (store.type === 'physical') {
       const latitude = Number(location.latitude)
       const longitude = Number(location.longitude)
@@ -474,6 +475,10 @@ async function submitApplication(context: HandlerContext, body: Json) {
     description: getString(storeData.description),
     category: getString(storeData.category),
     address: storeAddress,
+    location_name: getString(location.marketplaceLocation) || null,
+    location_id: getString(location.marketplaceLocation)
+      ? getString(location.marketplaceLocation).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+      : null,
     whatsapp: isPhone(getString(storeData.supportContact)) ? getString(storeData.supportContact) : '',
     logo: getString(storeData.logo),
     logo: getString(storeData.logo),

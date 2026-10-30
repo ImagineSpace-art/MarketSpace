@@ -179,6 +179,7 @@ export interface MarketplaceAppModel {
   browsingHistory: Array<{ id: number; title: string; price: number; image?: string; timestamp: string }>
   clearBrowsingHistory: () => void
   searchHistory: string[]
+  addSearchHistory: (query: string) => void
   clearSearchHistory: () => void
   togglePinChat: (chatId: number) => void
   toggleFavoriteChat: (chatId: number) => void
@@ -451,6 +452,16 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     const stored = window.localStorage.getItem('marketspace-search-history')
     return stored ? JSON.parse(stored) : []
   })
+
+  const addSearchHistory = (query: string) => {
+    const clean = query.trim()
+    if (!clean) return
+    setSearchHistory(current => {
+      const next = [clean, ...current.filter(item => item.toLowerCase() !== clean.toLowerCase())].slice(0, 20)
+      window.localStorage.setItem('marketspace-search-history', JSON.stringify(next))
+      return next
+    })
+  }
 
   const clearSearchHistory = () => {
     setSearchHistory([])
@@ -1393,6 +1404,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         description: updated.description,
         category: updated.category,
         address: updated.address,
+        location_id: updated.locationId,
+        location_name: updated.locationName,
         whatsapp: updated.whatsapp,
         logo: updated.logo,
         cover: updated.cover,
@@ -1550,6 +1563,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
           description: s.description,
           category: s.category,
           address: s.address,
+          locationId: s.location_id || undefined,
+          locationName: s.location_name || undefined,
           whatsapp: s.whatsapp,
           logo: s.logo,
           cover: s.cover,
@@ -1733,6 +1748,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     browsingHistory,
     clearBrowsingHistory,
     searchHistory,
+    addSearchHistory,
     clearSearchHistory,
     togglePinChat,
     toggleFavoriteChat,

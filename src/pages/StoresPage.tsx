@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import type { BusinessProfile, Listing } from '../types'
+import { STORE_MARKET_LOCATIONS, groupStoreLocation } from '../features/marketplace/storeLocations'
 
 // ---------------- STORES & STORE LISTINGS PAGE ----------------
 type StoresPageProps = {
@@ -23,6 +24,7 @@ export function StoresPage({
   const activeShops = Object.values(allBusinesses || {}).filter(b => Boolean(b && b.shopName))
   const [currentSlide, setCurrentSlide] = useState(0)
   const [selectedStoreCategory, setSelectedStoreCategory] = useState('All')
+  const [selectedLocation, setSelectedLocation] = useState('All')
   const normalizedSearchQuery = searchQuery.trim().toLowerCase()
 
   const slides = [
@@ -46,6 +48,8 @@ export function StoresPage({
       (shop.address || '').toLowerCase().includes(normalizedSearchQuery)
 
     if (!matchesSearch) return false
+    const shopLocation = groupStoreLocation(shop.address, shop.locationName)
+    if (selectedLocation !== 'All' && shopLocation !== selectedLocation) return false
     if (selectedStoreCategory !== 'All' && shop.category !== selectedStoreCategory) return false
 
     if (listingKindFilter === 'service') {
@@ -59,7 +63,7 @@ export function StoresPage({
     }
 
     return true
-  })
+  }).sort((a, b) => groupStoreLocation(a.address, a.locationName).localeCompare(groupStoreLocation(b.address, b.locationName)))
 
   const storeCategories = [
     { name: 'Electronics', image: slides[2], description: 'Tech and accessories' },
@@ -198,6 +202,17 @@ export function StoresPage({
           {/* Directory search */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', paddingBottom: '18px', borderBottom: '1px solid #f1f5f9' }}>
             <h2 style={{ margin: 0, fontSize: '1.2rem' }}>Merchant Directory ({filteredShops.length})</h2>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <select aria-label="Filter stores by location" value={selectedLocation} onChange={event => setSelectedLocation(event.target.value)} style={{ minWidth: 190, borderRadius: 999, border: '1px solid #e2e8f0', padding: '9px 14px', background: '#fff' }}>
+                <option value="All">All locations</option>
+                {STORE_MARKET_LOCATIONS.map(location => <option key={location} value={location}>{location}</option>)}
+                <option value="Other locations">Other locations</option>
+              </select>
+              <select aria-label="Filter stores by category" value={selectedStoreCategory} onChange={event => setSelectedStoreCategory(event.target.value)} style={{ minWidth: 160, borderRadius: 999, border: '1px solid #e2e8f0', padding: '9px 14px', background: '#fff' }}>
+                <option value="All">All categories</option>
+                {storeCategories.map(category => <option key={category.name} value={category.name}>{category.name}</option>)}
+              </select>
+            </div>
           </div>
 
           {/* ========================================================================= */}
@@ -213,10 +228,14 @@ export function StoresPage({
                 </div>
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
-                  {filteredShops.map((shop) => {
+                  {filteredShops.map((shop, index) => {
                     const shopListingsCount = listings.filter(l => l.user_id === shop.userId).length
+                    const shopLocation = groupStoreLocation(shop.address, shop.locationName)
+                    const previousLocation = index > 0 ? groupStoreLocation(filteredShops[index - 1].address, filteredShops[index - 1].locationName) : null
                     return (
-                      <article
+                      <>
+                        {shopLocation !== previousLocation && <h3 style={{ gridColumn: '1 / -1', margin: '8px 0 0', paddingTop: 12, fontSize: '1rem', color: '#334155', borderTop: index ? '1px solid #e2e8f0' : undefined }}>{shopLocation}</h3>}
+                        <article
                         key={shop.userId}
                         style={{
                           borderRadius: '20px',
@@ -304,6 +323,7 @@ export function StoresPage({
                           </div>
                         </div>
                       </article>
+                      </>
                     )
                   })}
                 </div>

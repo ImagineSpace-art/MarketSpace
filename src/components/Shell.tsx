@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
-import type { Profile } from '../types'
+import type { BusinessProfile, Profile } from '../types'
+import { STORE_MARKET_LOCATIONS } from '../features/marketplace/storeLocations'
 import { CartDrawer, type CartItem } from './CartDrawer'
 import { SettingsNavigationDrawer } from './SettingsNavigation'
 
@@ -24,6 +25,7 @@ type ShellProps = {
   onListingKindChange: (value: 'all' | 'item' | 'service') => void
   savedCount?: number
   unreadChatCount?: number
+  allBusinesses?: Record<string, BusinessProfile>
   searchQuery: string
   onSearchQueryChange: (query: string) => void
   hasNewArrivals: boolean
@@ -91,6 +93,7 @@ export function Shell({
   profile,
   savedCount = 0,
   unreadChatCount = 0,
+  allBusinesses = {},
   searchQuery,
   onSearchQueryChange,
   hasNewArrivals,
@@ -108,26 +111,57 @@ export function Shell({
   const [isMobileCategoryDrawerOpen, setIsMobileCategoryDrawerOpen] = useState(false)
   const [isSettingsNavigationOpen, setIsSettingsNavigationOpen] = useState(false)
   const [selectedDrawerCategory, setSelectedDrawerCategory] = useState<string | null>(null)
+  const [megaLocation, setMegaLocation] = useState('All')
+  const [megaCondition, setMegaCondition] = useState('All')
+  const [megaStore, setMegaStore] = useState('All')
+  const [megaMinPrice, setMegaMinPrice] = useState('')
+  const [megaMaxPrice, setMegaMaxPrice] = useState('')
+  const [megaRating, setMegaRating] = useState('0')
   const navigate = useNavigate()
   const location = useLocation()
 
   const isCategoryPage = location.pathname === '/' || location.pathname === '/discovery' || location.pathname === '/browse'
   const isDiscoveryPage = location.pathname === '/' || location.pathname === '/discovery'
 
+  const applyMegaFilters = (categoryOverride?: string) => {
+    const params = new URLSearchParams()
+    const category = categoryOverride || hoveredCategory || ''
+    if (searchQuery.trim()) params.set('q', searchQuery.trim())
+    if (category) params.set('category', category)
+    if (megaLocation !== 'All') params.set('location', megaLocation)
+    if (megaCondition !== 'All') params.set('condition', megaCondition)
+    if (megaStore !== 'All') params.set('store', megaStore)
+    if (megaMinPrice) params.set('min', megaMinPrice)
+    if (megaMaxPrice) params.set('max', megaMaxPrice)
+    if (megaRating !== '0') params.set('rating', megaRating)
+    setHoveredCategory(null)
+    navigate(`/search${params.toString() ? `?${params.toString()}` : ''}`)
+  }
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const query = searchQuery.trim()
-    const targetPath = location.pathname === '/stores' ? '/stores' : '/browse'
     onSearchQueryChange(query)
-    navigate(`${targetPath}${query ? `?search=${encodeURIComponent(query)}` : ''}`)
+    navigate(`/search${query ? `?q=${encodeURIComponent(query)}` : ''}`)
   }
 
   const handleSearchClear = () => {
     onSearchQueryChange('')
     const searchParams = new URLSearchParams(location.search)
     searchParams.delete('search')
+    searchParams.delete('q')
     const remainingSearch = searchParams.toString()
     navigate(`${location.pathname}${remainingSearch ? `?${remainingSearch}` : ''}`, { replace: true })
+  }
+
+  const handleSearchInputChange = (value: string) => {
+    onSearchQueryChange(value)
+    if (location.pathname === '/search') {
+      const searchParams = new URLSearchParams(location.search)
+      if (value.trim()) searchParams.set('q', value.trim())
+      else searchParams.delete('q')
+      navigate(`/search${searchParams.toString() ? `?${searchParams.toString()}` : ''}`, { replace: true })
+    }
   }
 
   const cartCount = cartItems.reduce((acc, it) => acc + it.quantity, 0)
@@ -247,9 +281,9 @@ export function Shell({
           >
               <input
                 type="text"
-                placeholder={location.pathname === '/stores' ? 'Search for stores' : 'Search for listings'}
+                placeholder="Search MarketSpace"
                 value={searchQuery}
-                onChange={(e) => onSearchQueryChange(e.target.value)}
+                onChange={(e) => handleSearchInputChange(e.target.value)}
                 className="header-search-input"
               />
               {searchQuery && (
@@ -418,9 +452,9 @@ export function Shell({
             <form onSubmit={handleSearchSubmit} className="header-search-container">
               <input
                 type="text"
-                placeholder={location.pathname === '/stores' ? 'Search for stores' : 'Search for listings'}
+                placeholder="Search MarketSpace"
                 value={searchQuery}
-                onChange={(e) => onSearchQueryChange(e.target.value)}
+                onChange={(e) => handleSearchInputChange(e.target.value)}
                 className="header-search-input"
               />
               {searchQuery && (
@@ -655,17 +689,14 @@ export function Shell({
                   </a>
                 ))}
               </div>
-              <div
-                className="mega-dropdown-card"
-                style={{ background: MEGA_CATEGORIES[hoveredCategory].bannerGradient }}
-              >
-                <div>
-                  <h3>{MEGA_CATEGORIES[hoveredCategory].bannerTitle}</h3>
-                  <p style={{ margin: '8px 0 0 0', fontSize: '0.84rem', opacity: 0.9 }}>
-                    Upgraded marketplace offerings with verified seller reviews.
-                  </p>
-                </div>
-                <span className="mega-card-badge">Explore Special Offers</span>
+              <div className="mega-dropdown-col mega-search-filter-panel">
+                <h4>FILTER RESULTS</h4>
+                <label>Location<select value={megaLocation} onChange={e => setMegaLocation(e.target.value)}><option>All</option>{STORE_MARKET_LOCATIONS.map(name => <option key={name}>{name}</option>)}</select></label>
+                <label>Condition<select value={megaCondition} onChange={e => setMegaCondition(e.target.value)}><option>All</option><option>New</option><option>Used - Like New</option><option>Used - Good</option></select></label>
+                <label>Seller<select value={megaStore} onChange={e => setMegaStore(e.target.value)}><option value="All">All sellers</option>{Object.values(allBusinesses).map(store => <option key={store.userId} value={store.userId}>{store.shopName}</option>)}</select></label>
+                <div className="mega-price-fields"><label>Min<input type="number" min="0" value={megaMinPrice} onChange={e => setMegaMinPrice(e.target.value)} /></label><label>Max<input type="number" min="0" value={megaMaxPrice} onChange={e => setMegaMaxPrice(e.target.value)} /></label></div>
+                <label>Rating<select value={megaRating} onChange={e => setMegaRating(e.target.value)}><option value="0">Any rating</option><option value="3">3+</option><option value="4">4+</option><option value="4.5">4.5+</option></select></label>
+                <button type="button" className="mega-filter-apply" onClick={() => applyMegaFilters()}>View {hoveredCategory} results</button>
               </div>
             </div>
           </div>
@@ -955,6 +986,15 @@ export function Shell({
                         </div>
                       </div>
                     )}
+                    <div className="mobile-mega-filter-panel">
+                      <h3>Filter results</h3>
+                      <label>Location<select value={megaLocation} onChange={e => setMegaLocation(e.target.value)}><option>All</option>{STORE_MARKET_LOCATIONS.map(name => <option key={name}>{name}</option>)}</select></label>
+                      <label>Condition<select value={megaCondition} onChange={e => setMegaCondition(e.target.value)}><option>All</option><option>New</option><option>Used - Like New</option><option>Used - Good</option></select></label>
+                      <label>Seller<select value={megaStore} onChange={e => setMegaStore(e.target.value)}><option value="All">All sellers</option>{Object.values(allBusinesses).map(store => <option key={store.userId} value={store.userId}>{store.shopName}</option>)}</select></label>
+                      <div className="mobile-mega-price"><label>Min price<input type="number" min="0" value={megaMinPrice} onChange={e => setMegaMinPrice(e.target.value)} /></label><label>Max price<input type="number" min="0" value={megaMaxPrice} onChange={e => setMegaMaxPrice(e.target.value)} /></label></div>
+                      <label>Minimum rating<select value={megaRating} onChange={e => setMegaRating(e.target.value)}><option value="0">Any rating</option><option value="3">3+</option><option value="4">4+</option><option value="4.5">4.5+</option></select></label>
+                      <button type="button" className="mobile-mega-filter-apply" onClick={() => { applyMegaFilters(selectedDrawerCategory || undefined); setIsMobileCategoryDrawerOpen(false); setSelectedDrawerCategory(null) }}>View {catData.label} results</button>
+                    </div>
                   </>
                 )
               })()

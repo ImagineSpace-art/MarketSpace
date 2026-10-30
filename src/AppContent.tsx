@@ -11,6 +11,7 @@ import { AuthPage } from './pages/AuthenticationPage'
 import { OnboardingPage } from './pages/OnboardingPage'
 import { StoreViewPage } from './pages/StoreViewPage'
 import { StoresPage } from './pages/StoresPage'
+import { SearchPage } from './pages/SearchPage'
 import { DiscoveryPage } from './pages/DiscoveryPage'
 import { BrowsePage } from './pages/BrowsePage'
 import { useCart } from './features/marketplace/useCart'
@@ -159,9 +160,12 @@ export function AppContent() {
   useEffect(() => {
     window.scrollTo(0, 0)
     const searchParams = new URLSearchParams(location.search)
-    const query = searchParams.get('search') || ''
+    const query = searchParams.get('search') || searchParams.get('q') || ''
     if (query !== app.searchQuery) {
       app.setSearchQuery(query)
+    }
+    if (location.pathname === '/search' && query) {
+      app.addSearchHistory(query)
     }
   }, [location.pathname, location.search])
 
@@ -393,6 +397,7 @@ export function AppContent() {
         onListingKindChange={setListingKindFilter}
         savedCount={savedIds.length}
         unreadChatCount={app.chatThreads.filter((t) => t.unread).length}
+        allBusinesses={allBusinesses}
         searchQuery={app.searchQuery}
         onSearchQueryChange={app.setSearchQuery}
         hasNewArrivals={listings.some((listing) => isNewArrival(listing))}
@@ -451,6 +456,26 @@ export function AppContent() {
             }
           />
           <Route path="/shop" element={<Navigate to="/browse" replace />} />
+          <Route
+            path="/search"
+            element={
+              <SearchPage
+                listings={listings}
+                allBusinesses={allBusinesses}
+                searchHistory={app.searchHistory}
+                clearSearchHistory={app.clearSearchHistory}
+                savedIds={savedIds}
+                onToggleSave={(id) => toggleSave(id)}
+                onVisitStore={(userId) => window.open(`/store/${userId}`, '_blank')}
+                onAddToCart={(listing) => cart.addToCart(listing)}
+                onSearch={(query) => {
+                  app.setSearchQuery(query)
+                  if (query) app.addSearchHistory(query)
+                }}
+                onOpenListing={openListing}
+              />
+            }
+          />
           <Route
             path="/listings/:id"
             element={
