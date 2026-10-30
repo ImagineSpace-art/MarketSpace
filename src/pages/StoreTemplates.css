@@ -991,12 +991,25 @@
 
   .boutique-store-preview {
     zoom: 0.72;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .template-editor-preview {
+    width: 100%;
+    max-width: 100%;
   }
 }
 
 @media (max-width: 440px) {
   .store-template-editor {
     padding: 16px 12px;
+  }
+
+  .boutique-store-preview {
+    zoom: 1;
+    width: 100%;
+    max-width: 100%;
   }
 
   .template-editor-header {
