@@ -109,6 +109,26 @@ describe.skipIf(!enabled)('ad moderation Supabase integration', () => {
     expect(data?.moderation_status).toBe('pending')
   })
 
+  it('rejects oversized or unsafe ad payloads', async () => {
+    const oversizedId = crypto.randomUUID()
+    const unsafeId = crypto.randomUUID()
+    adIds.push(oversizedId, unsafeId)
+    const { error: oversizedError } = await owner.from('store_ads').insert({
+      id: oversizedId,
+      store_id: storeId,
+      user_id: ownerId,
+      ad_data: { headline: 'x'.repeat(20_000) },
+    })
+    const { error: unsafeError } = await owner.from('store_ads').insert({
+      id: unsafeId,
+      store_id: storeId,
+      user_id: ownerId,
+      ad_data: { destinationUrl: 'javascript:alert(1)' },
+    })
+    expect(oversizedError).not.toBeNull()
+    expect(unsafeError).not.toBeNull()
+  })
+
   it('returns an approved ad to pending when a probation-store owner edits it', async () => {
     const id = crypto.randomUUID()
     adIds.push(id)
@@ -173,5 +193,79 @@ describe.skipIf(!enabled)('ad moderation Supabase integration', () => {
     expect(likes).toEqual([{ ad_id: id }])
     expect(comments).toHaveLength(1)
     expect(comments?.[0].ad_id).toBe(id)
+  })
+
+  it('generates a safe id for a legacy ad that had no id', async () => {
+    const headline = `Legacy ad without id ${crypto.randomUUID()}`
+    const { error: legacyError } = await admin.from('stores')
+      .update({ ads: [{ status: 'Active', headline }] })
+      .eq('id', storeId)
+    expect(legacyError).toBeNull()
+
+    const { error: migrationError } = await admin.rpc('migrate_legacy_store_ads', {
+      p_store_id: storeId,
+    })
+    expect(migrationError).toBeNull()
+
+    const { data: migrated, error: adError } = await admin.from('store_ads')
+      .select('id,ad_data')
+      .eq('store_id', storeId)
+      .eq('ad_data->>headline', headline)
+      .single()
+    expect(adError).toBeNull()
+    expect(migrated?.id).toMatch(/^legacy-/)
+    if (migrated?.id) adIds.push(migrated.id)
+  })
+
+  it('prevents a moderator from reviewing their own ad', async () => {
+    const id = crypto.randomUUID()
+    adIds.push(id)
+    const { error: insertError } = await owner.from('store_ads').insert({
+      id,
+      store_id: storeId,
+      user_id: ownerId,
+      ad_data: { headline: 'Own ad review test' },
+    })
+    expect(insertError).toBeNull()
+    const { error: moderatorError } = await admin.from('store_admins').insert({ user_id: ownerId })
+    expect(moderatorError).toBeNull()
+
+    const { error: reviewError } = await admin.rpc('review_store_ad_moderation', {
+      p_ad_id: id,
+      p_reviewer_id: ownerId,
+      p_decision: 'approved',
+      p_reason: '',
+    })
+    expect(reviewError?.message).toContain('cannot review their own ads')
+    await admin.from('store_admins').delete().eq('user_id', ownerId)
+  })
+
+  it('notifies the seller after an ad approval or rejection', async () => {
+    const id = crypto.randomUUID()
+    adIds.push(id)
+    const { error: insertError } = await owner.from('store_ads').insert({
+      id,
+      store_id: storeId,
+      user_id: ownerId,
+      ad_data: { headline: 'Seller notification test' },
+    })
+    expect(insertError).toBeNull()
+    const { error: moderatorError } = await admin.from('store_admins').insert({ user_id: otherUserId })
+    expect(moderatorError).toBeNull()
+
+    const { error: reviewError } = await admin.rpc('review_store_ad_moderation', {
+      p_ad_id: id,
+      p_reviewer_id: otherUserId,
+      p_decision: 'approved',
+      p_reason: '',
+    })
+    expect(reviewError).toBeNull()
+    const { data: notifications, error: notificationError } = await admin.from('notifications')
+      .select('title,body')
+      .eq('user_id', ownerId)
+      .eq('title', 'Ad approved')
+    expect(notificationError).toBeNull()
+    expect(notifications?.some(item => item.body.includes('Seller notification test'))).toBe(true)
+    await admin.from('store_admins').delete().eq('user_id', otherUserId)
   })
 })

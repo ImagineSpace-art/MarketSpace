@@ -2,6 +2,13 @@ ALTER TABLE public.listings
   ADD COLUMN IF NOT EXISTS price_unit TEXT NOT NULL DEFAULT 'fixed',
   ADD COLUMN IF NOT EXISTS service_area_id TEXT REFERENCES public.marketplace_locations(id) ON DELETE SET NULL;
 
+ALTER TABLE public.listings
+  ADD COLUMN IF NOT EXISTS delivery_option TEXT;
+
+ALTER TABLE public.listings
+  ALTER COLUMN condition DROP NOT NULL,
+  ALTER COLUMN delivery_option DROP NOT NULL;
+
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -39,7 +46,7 @@ AS $$
 DECLARE
   prohibited_text TEXT;
 BEGIN
-  IF NEW.listing_type <> 'service' THEN
+  IF NEW.listing_type IS DISTINCT FROM 'service' THEN
     NEW.price_unit := 'fixed';
     NEW.service_area_id := NULL;
     RETURN NEW;
@@ -52,9 +59,15 @@ BEGIN
   NEW.lowest_acceptable_price := NULL;
   NEW.delivery_paid_by := NULL;
 
-  prohibited_text := lower(concat_ws(' ', NEW.title, NEW.description, NEW.how_it_works));
-  IF prohibited_text ~ '(counterfeit|fake[[:space:]]+id|stolen[[:space:]]+goods|illegal[[:space:]]+drugs|firearms|weapon[[:space:]]+sales|human[[:space:]]+trafficking|child[[:space:]]+exploitation)' THEN
-    RAISE EXCEPTION 'Listing contains prohibited content';
+  IF TG_OP = 'INSERT'
+     OR NEW.listing_type IS DISTINCT FROM OLD.listing_type
+     OR NEW.title IS DISTINCT FROM OLD.title
+     OR NEW.description IS DISTINCT FROM OLD.description
+     OR NEW.how_it_works IS DISTINCT FROM OLD.how_it_works THEN
+    prohibited_text := lower(concat_ws(' ', NEW.title, NEW.description, NEW.how_it_works));
+    IF prohibited_text ~ '(counterfeit|fake[[:space:]]+id|stolen[[:space:]]+goods|illegal[[:space:]]+drugs|firearms|weapon[[:space:]]+sales|human[[:space:]]+trafficking|child[[:space:]]+exploitation)' THEN
+      RAISE EXCEPTION 'Listing contains prohibited content';
+    END IF;
   END IF;
 
   RETURN NEW;

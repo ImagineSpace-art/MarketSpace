@@ -18,7 +18,7 @@ import { useCart } from './features/marketplace/useCart'
 import { ProfilePage } from './pages/ProfilePage'
 import { UserProfilePage } from './pages/UserProfilePage'
 import { SettingsPage } from './pages/SettingsPage'
-import { AdminStoreReviewPage } from './pages/AdminStoreReviewPage'
+import { AdminArea } from './pages/AdminArea'
 import type { Listing, Profile, BusinessProfile } from './types'
 import { isBestSeller, isNewArrival } from './utils/listingSections'
 import { supabase } from './lib/supabaseClient'
@@ -280,6 +280,10 @@ export function AppContent() {
   } = app
 
   const cart = useCart()
+
+  if (location.pathname.startsWith('/admin')) {
+    return <AdminArea />
+  }
 
   if (loading) {
     return <SlowlyFlashingMarketSpaceTemplate message="Loading MarketSpace..." />
@@ -872,12 +876,18 @@ export function AppContent() {
               )
             }
           />
-          <Route
-            path="/admin/store-review"
-            element={session ? <AdminStoreReviewPage /> : <Navigate to="/login" replace />}
-          />
           <Route path="/auth" element={<Navigate to="/login" replace />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route
+            path="*"
+            element={
+              <main className="marketspace-not-found">
+                <span className="material-icons" aria-hidden="true">search_off</span>
+                <h1>Page not found</h1>
+                <p>The page you’re looking for doesn’t exist or may have moved.</p>
+                <a href="/">Return to MarketSpace</a>
+              </main>
+            }
+          />
         </Routes>
       </Shell>
       {showScrollTop && (

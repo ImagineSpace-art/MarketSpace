@@ -188,6 +188,26 @@ describe.skipIf(!enabled)('listing moderation Supabase integration', () => {
     expect(result.data?.error).toContain('not authorized')
   })
 
+  it('keeps moderators subject to owner protections and prevents self-review', async () => {
+    const listing = await createListing(noStoreSeller, noStoreSellerId, 'Moderator-owned listing')
+    const { error: moderatorError } = await admin.from('store_admins').insert({ user_id: noStoreSellerId })
+    expect(moderatorError).toBeNull()
+
+    const { error: ownerUpdateError } = await noStoreSeller.from('listings')
+      .update({ moderation_status: 'approved' })
+      .eq('id', listing.id)
+    expect(ownerUpdateError).not.toBeNull()
+
+    const { error: selfReviewError } = await admin.rpc('review_listing_moderation', {
+      p_listing_id: listing.id,
+      p_reviewer_id: noStoreSellerId,
+      p_decision: 'approved',
+      p_reason: '',
+    })
+    expect(selfReviewError?.message).toContain('cannot review their own listings')
+    await admin.from('store_admins').delete().eq('user_id', noStoreSellerId)
+  })
+
   it('keeps trusted store edits approved after rechecking the trust rule', async () => {
     const listing = await createListing(seller, sellerId, 'Approved before edit', trustedStoreId)
     const { error: approvalError } = await admin.from('listings')

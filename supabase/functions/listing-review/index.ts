@@ -131,6 +131,9 @@ async function reviewListing(context: AuthenticatedContext, body: Json) {
     p_reason: reason,
   })
   if (error) {
+    if (error.message.includes('cannot review their own listings')) {
+      return respond({ error: 'You cannot review your own listing.' }, 403)
+    }
     if (error.message.includes('no longer pending')) {
       return respond({ error: 'This listing has already been reviewed.' }, 409)
     }
@@ -209,6 +212,9 @@ async function reviewAd(context: AuthenticatedContext, body: Json) {
     p_reason: reason,
   })
   if (error) {
+    if (error.message.includes('cannot review their own ads')) {
+      return respond({ error: 'You cannot review your own ad.' }, 403)
+    }
     if (error.message.includes('no longer pending')) {
       return respond({ error: 'This ad has already been reviewed.' }, 409)
     }

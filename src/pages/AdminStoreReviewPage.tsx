@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { supabase } from '../lib/supabaseClient'
+import { adminSupabase } from '../lib/adminSupabaseClient'
 import { getFunctionErrorMessage } from '../utils/functionError'
 import type { BusinessAd, Listing } from '../types'
 
@@ -12,6 +12,7 @@ type PendingListing = Listing & {
 type PendingAd = BusinessAd & {
   moderation_status: 'pending'
   moderation_reason: string | null
+  user_id: string
   store_name: string
   seller_name: string
 }
@@ -56,6 +57,17 @@ type NotificationRecipient = {
   username: string | null
 }
 
+type AuditEvent = {
+  created_at: string
+  source: string
+  entity_type: string
+  entity_id: string
+  actor_user_id: string | null
+  action: string
+  reason: string | null
+  details: Record<string, unknown>
+}
+
 const REPORT_REASON_LABELS: Record<StoreReport['reason'], string> = {
   scam_or_fake_store: 'Scam or fake store',
   prohibited_items: 'Prohibited items',
@@ -69,7 +81,7 @@ export function AdminStoreReviewPage() {
   const [reportGroups, setReportGroups] = useState<StoreReportGroup[]>([])
   const [pendingListings, setPendingListings] = useState<PendingListing[]>([])
   const [pendingAds, setPendingAds] = useState<PendingAd[]>([])
-  const [activeQueue, setActiveQueue] = useState<'applications' | 'reports' | 'listings' | 'ads' | 'notifications'>('applications')
+  const [activeQueue, setActiveQueue] = useState<'applications' | 'reports' | 'listings' | 'ads' | 'notifications' | 'audit'>('applications')
   const [loading, setLoading] = useState(true)
   const [reportsLoading, setReportsLoading] = useState(false)
   const [listingsLoading, setListingsLoading] = useState(false)
@@ -91,16 +103,20 @@ export function AdminStoreReviewPage() {
   const [notificationLink, setNotificationLink] = useState('')
   const [sendingNotification, setSendingNotification] = useState(false)
   const [notificationAdminStatus, setNotificationAdminStatus] = useState<'loading' | 'allowed' | 'denied'>('loading')
+  const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([])
+  const [auditLoading, setAuditLoading] = useState(false)
+  const [moderatorUserId, setModeratorUserId] = useState('')
 
   useEffect(() => {
     let active = true
     void (async () => {
-      const { data: userData, error: userError } = await supabase.auth.getUser()
+      const { data: userData, error: userError } = await adminSupabase.auth.getUser()
       if (userError || !userData.user) {
         if (active) setNotificationAdminStatus('denied')
         return
       }
-      const { data, error: adminError } = await supabase
+      if (active) setModeratorUserId(userData.user.id)
+      const { data, error: adminError } = await adminSupabase
         .from('store_admins')
         .select('user_id')
         .eq('user_id', userData.user.id)
@@ -112,7 +128,7 @@ export function AdminStoreReviewPage() {
 
   const loadQueue = useCallback(async () => {
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke<{ applications: ReviewApplication[] }>('store-registration', {
+      const { data, error: invokeError } = await adminSupabase.functions.invoke<{ applications: ReviewApplication[] }>('store-registration', {
         body: { action: 'review_queue' },
       })
       if (invokeError) setError(await getFunctionErrorMessage(invokeError))
@@ -128,7 +144,7 @@ export function AdminStoreReviewPage() {
     setError('')
     setReportsLoading(true)
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke<{ reports: StoreReportGroup[] }>('store-report', {
+      const { data, error: invokeError } = await adminSupabase.functions.invoke<{ reports: StoreReportGroup[] }>('store-report', {
         body: { action: 'open_reports' },
       })
       if (invokeError) setError(await getFunctionErrorMessage(invokeError))
@@ -144,7 +160,7 @@ export function AdminStoreReviewPage() {
     setError('')
     setListingsLoading(true)
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke<{ listings: PendingListing[] }>('listing-review', {
+      const { data, error: invokeError } = await adminSupabase.functions.invoke<{ listings: PendingListing[] }>('listing-review', {
         body: { action: 'pending_listings' },
       })
       if (invokeError) setError(await getFunctionErrorMessage(invokeError))
@@ -160,7 +176,7 @@ export function AdminStoreReviewPage() {
     setError('')
     setAdsLoading(true)
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke<{ ads: PendingAd[] }>('listing-review', {
+      const { data, error: invokeError } = await adminSupabase.functions.invoke<{ ads: PendingAd[] }>('listing-review', {
         body: { action: 'pending_ads' },
       })
       if (invokeError) setError(await getFunctionErrorMessage(invokeError))
@@ -172,10 +188,25 @@ export function AdminStoreReviewPage() {
     }
   }, [])
 
+  const loadAudit = useCallback(async () => {
+    setError('')
+    setAuditLoading(true)
+    const { data, error: auditError } = await adminSupabase.rpc('get_moderation_audit_log')
+    if (auditError) setError(`Audit history could not be loaded: ${auditError.message}`)
+    else setAuditEvents((data || []) as AuditEvent[])
+    setAuditLoading(false)
+  }, [])
+
   useEffect(() => {
     const timer = window.setTimeout(() => { void loadQueue() }, 0)
     return () => window.clearTimeout(timer)
   }, [loadQueue])
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void Promise.all([loadReports(), loadPendingListings(), loadPendingAds()])
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [loadReports, loadPendingListings, loadPendingAds])
   const refreshQueue = () => {
     setLoading(true)
     void loadQueue()
@@ -184,7 +215,7 @@ export function AdminStoreReviewPage() {
   const loadNotificationRecipients = async () => {
     setError('')
     setRecipientsLoading(true)
-    const query = supabase.from('public_profiles').select('user_id, username').limit(50)
+    const query = adminSupabase.from('public_profiles').select('user_id, username').limit(50)
     const { data, error: recipientsError } = recipientSearch.trim()
       ? await query.ilike('username', `%${recipientSearch.trim()}%`)
       : await query.order('username', { ascending: true })
@@ -217,7 +248,7 @@ export function AdminStoreReviewPage() {
 
     setSendingNotification(true)
     try {
-      const { data, error: sendError } = await supabase.rpc('send_moderator_notification', {
+      const { data, error: sendError } = await adminSupabase.rpc('send_moderator_notification', {
         p_title: notificationTitle.trim(),
         p_body: notificationBody.trim(),
         p_link_url: notificationLink.trim() || null,
@@ -243,13 +274,14 @@ export function AdminStoreReviewPage() {
 
   const renderQueueNavigation = (currentQueue: typeof activeQueue) => (
     <nav aria-label="Moderation queues" className="admin-queue-navigation">
-      <button type="button" className={currentQueue === 'applications' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'applications' ? 'page' : undefined} onClick={() => setActiveQueue('applications')}>Store applications</button>
-      <button type="button" className={currentQueue === 'reports' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'reports' ? 'page' : undefined} onClick={() => { setActiveQueue('reports'); void loadReports() }}>Reports</button>
-      <button type="button" className={currentQueue === 'listings' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'listings' ? 'page' : undefined} onClick={() => { setActiveQueue('listings'); void loadPendingListings() }}>Listings ({pendingListings.length})</button>
-      <button type="button" className={currentQueue === 'ads' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'ads' ? 'page' : undefined} onClick={() => { setActiveQueue('ads'); void loadPendingAds() }}>Ads ({pendingAds.length})</button>
+      <button type="button" className={currentQueue === 'applications' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'applications' ? 'page' : undefined} onClick={() => { setActiveQueue('applications'); void loadQueue() }}>Store applications <span className="admin-pending-count">{applications.length}</span></button>
+      <button type="button" className={currentQueue === 'reports' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'reports' ? 'page' : undefined} onClick={() => { setActiveQueue('reports'); void loadReports() }}>Reports <span className="admin-pending-count">{reportGroups.reduce((count, group) => count + group.reports.length, 0)}</span></button>
+      <button type="button" className={currentQueue === 'listings' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'listings' ? 'page' : undefined} onClick={() => { setActiveQueue('listings'); void loadPendingListings() }}>Listings <span className="admin-pending-count">{pendingListings.length}</span></button>
+      <button type="button" className={currentQueue === 'ads' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'ads' ? 'page' : undefined} onClick={() => { setActiveQueue('ads'); void loadPendingAds() }}>Ads <span className="admin-pending-count">{pendingAds.length}</span></button>
       {notificationAdminStatus === 'allowed' && (
         <button type="button" className={currentQueue === 'notifications' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'notifications' ? 'page' : undefined} onClick={() => setActiveQueue('notifications')}>Notifications</button>
       )}
+      <button type="button" className={currentQueue === 'audit' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'audit' ? 'page' : undefined} onClick={() => { setActiveQueue('audit'); void loadAudit() }}>Audit log</button>
     </nav>
   )
 
@@ -263,7 +295,7 @@ export function AdminStoreReviewPage() {
       registeredBusiness: false,
     }
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke<{ emailWarning?: string }>('store-registration', {
+      const { data, error: invokeError } = await adminSupabase.functions.invoke<{ emailWarning?: string }>('store-registration', {
         body: {
           action: 'review_application',
           storeId: application.id,
@@ -289,7 +321,7 @@ export function AdminStoreReviewPage() {
     setNotice('')
     setWorkingId(report.id)
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke<{ success?: boolean }>('store-report', {
+      const { data, error: invokeError } = await adminSupabase.functions.invoke<{ success?: boolean }>('store-report', {
         body: { action: 'review_report', reportId: report.id, decision },
       })
       if (invokeError) setError(await getFunctionErrorMessage(invokeError))
@@ -310,7 +342,7 @@ export function AdminStoreReviewPage() {
     setNotice('')
     setWorkingId(String(listing.id))
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke<{ success?: boolean }>('listing-review', {
+      const { data, error: invokeError } = await adminSupabase.functions.invoke<{ success?: boolean }>('listing-review', {
         body: {
           action: 'review_listing',
           listingId: listing.id,
@@ -336,7 +368,7 @@ export function AdminStoreReviewPage() {
     setNotice('')
     setWorkingId(ad.id)
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke<{ success?: boolean }>('listing-review', {
+      const { data, error: invokeError } = await adminSupabase.functions.invoke<{ success?: boolean }>('listing-review', {
         body: {
           action: 'review_ad',
           adId: ad.id,
@@ -454,6 +486,44 @@ export function AdminStoreReviewPage() {
     )
   }
 
+  if (activeQueue === 'audit') {
+    return (
+      <section className="admin-queue-page">
+        <header className="admin-queue-heading">
+          <div>
+            <p className="admin-eyebrow">MARKETSPACE MODERATION</p>
+            <h2>Audit log</h2>
+            <p>Read-only history of store applications, reports, listings, and ads.</p>
+          </div>
+          <button type="button" className="secondary-btn" disabled={auditLoading} onClick={() => void loadAudit()}>
+            {auditLoading ? 'Refreshing…' : 'Refresh audit log'}
+          </button>
+        </header>
+        {renderQueueNavigation('audit')}
+        {error && <p role="alert" className="store-wizard-alert error">{error}</p>}
+        {auditLoading ? (
+          <section className="section-card"><p>Loading audit history…</p></section>
+        ) : auditEvents.length === 0 ? (
+          <section className="section-card"><p>No audit events have been recorded.</p></section>
+        ) : (
+          <div className="admin-audit-list">
+            {auditEvents.map((event, index) => (
+              <article className="admin-audit-row" key={`${event.source}-${event.created_at}-${event.entity_id}-${index}`}>
+                <div>
+                  <strong>{event.action.replaceAll('_', ' ')}</strong>
+                  <span>{event.entity_type.replaceAll('_', ' ')} · {event.entity_id}</span>
+                  <small>{event.source.replaceAll('_', ' ')} · Actor {event.actor_user_id || 'system'}</small>
+                  {event.reason && <p>{event.reason}</p>}
+                </div>
+                <time dateTime={event.created_at}>{new Date(event.created_at).toLocaleString()}</time>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+    )
+  }
+
   if (activeQueue === 'listings') {
     return (
       <section style={{ width: 'min(100%, 1100px)', boxSizing: 'border-box', margin: '0 auto', padding: 20 }}>
@@ -484,6 +554,7 @@ export function AdminStoreReviewPage() {
                     <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
                       {listing.seller_name || 'Seller'}{listing.store_name ? ` · ${listing.store_name}` : ' · Individual seller'}
                     </p>
+                    {listing.user_id === moderatorUserId && <p role="note" style={{ margin: '5px 0 0', color: '#b45309' }}>You cannot review your own listing.</p>}
                   </div>
                   <strong>{listing.category} · ZMW {listing.price}</strong>
                 </header>
@@ -508,7 +579,7 @@ export function AdminStoreReviewPage() {
                   <button
                     type="button"
                     className="secondary-btn"
-                    disabled={workingId === String(listing.id) || !listingReasons[listing.id]?.trim()}
+                    disabled={listing.user_id === moderatorUserId || workingId === String(listing.id) || !listingReasons[listing.id]?.trim()}
                     onClick={() => void reviewListing(listing, 'reject')}
                   >
                     Reject
@@ -516,7 +587,7 @@ export function AdminStoreReviewPage() {
                   <button
                     type="button"
                     className="primary-btn"
-                    disabled={workingId === String(listing.id)}
+                    disabled={listing.user_id === moderatorUserId || workingId === String(listing.id)}
                     onClick={() => void reviewListing(listing, 'approve')}
                   >
                     {workingId === String(listing.id) ? 'Saving…' : 'Approve'}
@@ -558,6 +629,7 @@ export function AdminStoreReviewPage() {
                   <div style={{ minWidth: 0 }}>
                     <h3 style={{ margin: '0 0 4px', overflowWrap: 'anywhere' }}>{ad.headline || ad.adTitle || 'Untitled ad'}</h3>
                     <p style={{ margin: 0, color: 'var(--text-secondary)' }}>{ad.seller_name} · {ad.store_name}</p>
+                    {ad.user_id === moderatorUserId && <p role="note" style={{ margin: '5px 0 0', color: '#b45309' }}>You cannot review your own ad.</p>}
                   </div>
                   <strong>{ad.status} · {ad.budget}</strong>
                 </header>
@@ -582,7 +654,7 @@ export function AdminStoreReviewPage() {
                   <button
                     type="button"
                     className="secondary-btn"
-                    disabled={workingId === ad.id || !adReasons[ad.id]?.trim()}
+                    disabled={ad.user_id === moderatorUserId || workingId === ad.id || !adReasons[ad.id]?.trim()}
                     onClick={() => void reviewAd(ad, 'reject')}
                   >
                     Reject
@@ -590,7 +662,7 @@ export function AdminStoreReviewPage() {
                   <button
                     type="button"
                     className="primary-btn"
-                    disabled={workingId === ad.id}
+                    disabled={ad.user_id === moderatorUserId || workingId === ad.id}
                     onClick={() => void reviewAd(ad, 'approve')}
                   >
                     {workingId === ad.id ? 'Saving…' : 'Approve'}

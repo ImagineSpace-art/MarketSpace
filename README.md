@@ -127,9 +127,61 @@ moderators can send to everyone or select up to 500 recipients by username.
 Direct notification inserts are revoked from browser clients.
 
 Add moderator user IDs to `public.store_admins` using the Supabase SQL editor.
-Moderators can open `/admin/store-review` and use the Listings queue. To run the
-optional database integration tests, use a disposable local Supabase project,
-apply the migration, deploy/serve `listing-review`, then set
+Phase 4 adds the `role` column and places the moderator workspace at `/admin`.
+The first admin must be assigned manually; moderator assignment changes remain
+SQL-only, and database guards prevent removing or demoting the last admin. The
+workspace uses a separate Supabase auth storage key from the shopper session
+and blocks access when both sessions belong to the same Auth user. Use distinct
+accounts for moderator and shopper activity.
+After reviewing and applying the new migrations, deploy the updated review and
+authentication functions with `supabase functions deploy listing-review` and
+`supabase functions deploy admin-auth`.
+Create the first administrator from an already-created, email-confirmed Auth
+user in the SQL editor:
+
+```sql
+INSERT INTO public.store_admins (user_id, role)
+SELECT id, 'admin'
+FROM auth.users
+WHERE lower(email) = lower('owner@example.com')
+  AND email_confirmed_at IS NOT NULL;
+```
+
+Moderators open `/admin/login` to establish the isolated moderator session; the
+shopper Shell only displays the moderator workspace shortcut while that
+moderator session is active.
+
+For a confirmed account already in `auth.users`, grant temporary moderator
+access for a sign-in test with:
+
+```sql
+INSERT INTO public.store_admins (user_id, role)
+SELECT id, 'moderator'
+FROM auth.users
+WHERE lower(email) = lower('owner@example.com')
+  AND email_confirmed_at IS NOT NULL
+ON CONFLICT (user_id) DO UPDATE SET role = EXCLUDED.role;
+```
+
+Use the project owner's own confirmed email address in place of the example.
+The Supabase built-in mailer can be used only for eligible project-team
+addresses and is suitable for this limited test. For broader delivery, configure
+a verified SMTP sender in Supabase Dashboard → Authentication → SMTP Settings;
+the Edge Function delegates delivery to Supabase Auth and does not store SMTP
+credentials. Set the Supabase Auth email OTP expiry to 600 seconds and its code
+length to six digits, and use `{{ .Token }}` in the email template. Configure
+`VITE_TURNSTILE_SITE_KEY` for the frontend and the `TURNSTILE_SECRET_KEY`,
+`ADMIN_AUTH_HASH_SECRET`, and exact frontend `ALLOWED_ORIGIN` Edge Function
+secrets before testing. The hash secret must be a random, private value; it is
+used only to hash rate-limit identifiers. Do not use the same Auth user for
+simultaneous shopper and moderator sessions; the `/admin` gate rejects matching
+user IDs.
+If the built-in mailer cannot deliver to the owner's address, configure SMTP
+before testing. Remove a temporary moderator row with SQL after the test; do
+not remove the last account assigned the `admin` role.
+
+To run the optional database integration tests, use a disposable local Supabase
+project, apply the migration, deploy/serve `listing-review`, then set
 `LISTING_MODERATION_INTEGRATION=1` and the `LISTING_MODERATION_TEST_URL`,
 `LISTING_MODERATION_TEST_ANON_KEY`, and
 `LISTING_MODERATION_TEST_SERVICE_ROLE_KEY` variables before running:

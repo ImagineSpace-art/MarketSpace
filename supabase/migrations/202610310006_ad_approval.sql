@@ -7,12 +7,69 @@ CREATE TABLE IF NOT EXISTS public.store_ads (
   moderation_status TEXT NOT NULL DEFAULT 'pending'
     CHECK (moderation_status IN ('pending', 'approved', 'rejected', 'removed')),
   moderation_reason TEXT,
-  reviewed_by UUID REFERENCES auth.users(id),
+  reviewed_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   reviewed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CHECK (moderation_reason IS NULL OR char_length(moderation_reason) <= 500)
+  CHECK (moderation_reason IS NULL OR char_length(moderation_reason) <= 500),
+  CHECK (pg_column_size(ad_data) < 20000)
 );
+
+ALTER TABLE public.store_ads
+  DROP CONSTRAINT IF EXISTS store_ads_reviewed_by_fkey;
+ALTER TABLE public.store_ads
+  ADD CONSTRAINT store_ads_reviewed_by_fkey
+  FOREIGN KEY (reviewed_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+CREATE OR REPLACE FUNCTION public.store_ad_payload_is_safe(p_ad_data JSONB)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+IMMUTABLE
+SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+  media_item TEXT;
+  destination TEXT := p_ad_data ->> 'destinationUrl';
+BEGIN
+  IF p_ad_data IS NULL OR jsonb_typeof(p_ad_data) <> 'object' THEN
+    RETURN FALSE;
+  END IF;
+
+  IF destination IS NOT NULL AND (
+    left(destination, 1) <> '/'
+    OR destination LIKE '//%'
+    OR destination ~ '[[:space:]]'
+  ) THEN
+    RETURN FALSE;
+  END IF;
+
+  IF p_ad_data ? 'media' THEN
+    IF jsonb_typeof(p_ad_data -> 'media') NOT IN ('array', 'null') THEN
+      RETURN FALSE;
+    END IF;
+    IF jsonb_typeof(p_ad_data -> 'media') = 'array' THEN
+      IF jsonb_array_length(p_ad_data -> 'media') > 5 THEN
+        RETURN FALSE;
+      END IF;
+      FOR media_item IN SELECT jsonb_array_elements_text(p_ad_data -> 'media')
+      LOOP
+        IF (
+          media_item !~ '^https://[^[:space:]]+$'
+          AND left(media_item, 1) <> '/'
+        ) OR media_item LIKE '//%' OR media_item ~ '[[:space:]]' THEN
+          RETURN FALSE;
+        END IF;
+      END LOOP;
+    END IF;
+  END IF;
+
+  RETURN TRUE;
+END;
+$$;
+
+ALTER TABLE public.store_ads
+  ADD CONSTRAINT store_ads_payload_safe_check
+  CHECK (public.store_ad_payload_is_safe(ad_data));
 
 CREATE INDEX IF NOT EXISTS store_ads_public_idx
   ON public.store_ads (moderation_status, status, created_at DESC);
@@ -41,10 +98,10 @@ BEGIN
   LOOP
     FOR legacy_ad IN SELECT value FROM jsonb_array_elements(COALESCE(store_row.ads, '[]'::jsonb))
     LOOP
-      legacy_id := NULLIF(btrim(legacy_ad ->> 'id'), '');
-      IF legacy_id IS NULL THEN
-        RAISE EXCEPTION 'Cannot migrate a legacy ad without its original id for store %', store_row.id;
-      END IF;
+      legacy_id := COALESCE(
+        NULLIF(btrim(legacy_ad ->> 'id'), ''),
+        'legacy-' || gen_random_uuid()::TEXT
+      );
 
       INSERT INTO public.store_ads (
         id, store_id, user_id, status, ad_data, moderation_status
@@ -144,10 +201,6 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  IF public.is_moderator() THEN
-    RETURN NEW;
-  END IF;
-
   IF NEW.id IS DISTINCT FROM OLD.id
      OR NEW.store_id IS DISTINCT FROM OLD.store_id
      OR NEW.user_id IS DISTINCT FROM OLD.user_id THEN
@@ -212,6 +265,16 @@ BEGIN
     RAISE EXCEPTION 'Reviewer is not an ad moderator';
   END IF;
 
+  IF EXISTS (
+    SELECT 1
+    FROM public.store_ads a
+    WHERE a.id = p_ad_id
+      AND a.user_id = p_reviewer_id
+      AND a.moderation_status = 'pending'
+  ) THEN
+    RAISE EXCEPTION 'Moderators cannot review their own ads';
+  END IF;
+
   UPDATE public.store_ads
   SET moderation_status = p_decision,
       moderation_reason = NULLIF(clean_reason, ''),
@@ -235,6 +298,17 @@ BEGIN
     p_decision,
     NULLIF(clean_reason, ''),
     jsonb_build_object('store_id', reviewed_ad.store_id, 'user_id', reviewed_ad.user_id)
+  );
+
+  INSERT INTO public.notifications (user_id, title, body, link_url)
+  VALUES (
+    reviewed_ad.user_id,
+    CASE p_decision WHEN 'approved' THEN 'Ad approved' ELSE 'Ad rejected' END,
+    CASE p_decision
+      WHEN 'approved' THEN format('Your ad "%s" is now live.', COALESCE(reviewed_ad.ad_data ->> 'headline', reviewed_ad.ad_data ->> 'adTitle', 'Untitled ad'))
+      ELSE format('Your ad "%s" was rejected. Reason: %s', COALESCE(reviewed_ad.ad_data ->> 'headline', reviewed_ad.ad_data ->> 'adTitle', 'Untitled ad'), clean_reason)
+    END,
+    '/profile'
   );
 
   RETURN jsonb_build_object(
