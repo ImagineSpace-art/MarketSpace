@@ -42,6 +42,9 @@ type ProfilePageProps = {
     // Notifications panel specific props
     notifications: NotificationItem[]
     onMarkAllRead: () => void
+    onMarkNotificationRead: (notificationId: string | number, unread: boolean) => void
+    onToggleNotificationPin: (notificationId: string | number) => void
+    onDeleteNotification: (notificationId: string | number) => void
 
     // ListingFormPage props
     createListingProps: {
@@ -111,6 +114,9 @@ export function ProfilePage({
     activeSection,
     notifications,
     onMarkAllRead,
+    onMarkNotificationRead,
+    onToggleNotificationPin,
+    onDeleteNotification,
     createListingProps,
     storeSetupProps,
     allBusinesses = {},
@@ -216,6 +222,9 @@ export function ProfilePage({
                     <NotificationsPage
                         notifications={notifications}
                         onMarkAllRead={onMarkAllRead}
+                        onMarkRead={onMarkNotificationRead}
+                        onTogglePin={onToggleNotificationPin}
+                        onDelete={onDeleteNotification}
                     />
                 ) : activeSection === 'create' ? (
                     <ListingFormPage
@@ -755,6 +764,32 @@ export function ProfilePage({
                                                             <strong style={{ color: 'var(--primary)', fontSize: '0.95rem' }}>ZMW {listing.price}</strong>
                                                             <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                                                                 {(() => {
+                                                                    const moderationStatus = listing.moderation_status || 'approved'
+                                                                    const statusLabel = moderationStatus === 'approved'
+                                                                        ? 'Live'
+                                                                        : moderationStatus === 'pending'
+                                                                            ? 'Pending review'
+                                                                            : moderationStatus === 'rejected'
+                                                                                ? 'Rejected'
+                                                                                : 'Removed'
+                                                                    const statusColor = moderationStatus === 'approved' ? '#059669' : moderationStatus === 'pending' ? '#b45309' : '#dc2626'
+                                                                    return (
+                                                                        <span
+                                                                            role="status"
+                                                                            title={moderationStatus === 'rejected' ? listing.moderation_reason || undefined : undefined}
+                                                                            style={{ fontSize: '0.75rem', padding: '3px 8px', borderRadius: '12px', background: `${statusColor}18`, color: statusColor, border: `1px solid ${statusColor}55`, fontWeight: 700 }}
+                                                                        >
+                                                                            {statusLabel}
+                                                                        </span>
+                                                                    )
+                                                                })()}
+                                                                {listing.moderation_status === 'rejected' && listing.moderation_reason && (
+                                                                    <span style={{ flexBasis: '100%', color: '#b91c1c', fontSize: '0.78rem' }}>
+                                                                        Reason: {listing.moderation_reason}
+                                                                    </span>
+                                                                )}
+                                                                {(() => {
+                                                                    if (listing.moderation_status && listing.moderation_status !== 'approved') return null
                                                                     const now = Date.now()
                                                                     const remainingMs = getListingTimeRemainingMs(listing, globalRenewalFrequency, now)
                                                                     const expired = isListingExpired(listing, globalRenewalFrequency, globalRenewalDay, now)

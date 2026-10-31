@@ -9,11 +9,16 @@ import { logAnalyticsEvent, toggleStoreFollowInDb } from '../../services/analyti
 import { getFunctionErrorMessage } from '../../utils/functionError'
 
 export type NotificationItem = {
-  id: number
+  id: number | string
+  user_id?: string | null
   title: string
   body: string
   time: string
   unread: boolean
+  link_url?: string
+  isPinned?: boolean
+  isBroadcast?: boolean
+  unreadOverride?: boolean | null
 }
 
 export type ChatMessage = {
@@ -124,7 +129,7 @@ export interface MarketplaceAppModel {
   canMessage: boolean
   setCanMessage: Dispatch<SetStateAction<boolean>>
   userEmail: string
-  fetchListings: () => Promise<void>
+  fetchListings: (userId?: string) => Promise<void>
   fetchStores: () => Promise<void>
   loadProfile: (userId: string, userObj?: any) => Promise<Profile>
   handleLogin: () => Promise<void>
@@ -138,7 +143,11 @@ export interface MarketplaceAppModel {
   toggleSave: (listingId: number) => void
   clearAllFilters: () => void
   handleUpdateListingCollection: (listingId: number, targetColId: string | null) => Promise<void>
-  markAllRead: () => void
+  markAllRead: () => Promise<void>
+  markNotificationRead: (notificationId: string | number, unread: boolean) => Promise<void>
+  toggleNotificationPin: (notificationId: string | number) => Promise<void>
+  deleteNotification: (notificationId: string | number) => Promise<void>
+  setChatUnread: (chatId: number, unread: boolean) => Promise<void>
   sendInboxMessage: () => void
   filteredListings: Listing[]
   savedListings: Listing[]
@@ -182,6 +191,7 @@ export interface MarketplaceAppModel {
   addSearchHistory: (query: string) => void
   clearSearchHistory: () => void
   togglePinChat: (chatId: number) => void
+  toggleUnreadChat: (chatId: number) => void
   toggleFavoriteChat: (chatId: number) => void
   toggleArchiveChat: (chatId: number) => void
   deleteChat: (chatId: number) => void
@@ -220,6 +230,15 @@ function getStoredSavedIds(): string[] {
   }
 }
 
+function isDatabaseNotificationId(id: string | number): id is string {
+  return typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
+}
+
+function isMissingSchemaObject(error: { code?: string; message: string }): boolean {
+  return ['PGRST204', 'PGRST205', '42P01', '42703'].includes(error.code || '')
+    || /schema cache|does not exist/i.test(error.message)
+}
+
 export function useMarketplaceApp(): MarketplaceAppModel {
   const navigate = useNavigate()
   const [view, setView] = useState<View>('home')
@@ -227,6 +246,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [listings, setListings] = useState<Listing[]>([])
+  const [myListings, setMyListings] = useState<Listing[]>([])
   const [stores, setStores] = useState<Profile[]>([])
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null)
   const [editingListing, setEditingListing] = useState<Listing | null>(null)
@@ -283,46 +303,71 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setEnableGlobalRenewalState(next)
     void persistGlobalRenewalPreferences({ enable_global_renewal: next })
   }
-  const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
-    if (typeof window === 'undefined') return []
-    const stored = window.localStorage.getItem('marketspace-notifications')
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored)
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed
-      } catch { }
-    }
-    return [
-      {
-        id: 'notif-1',
-        user_id: 'all',
-        title: 'Welcome to MarketSpace!',
-        body: 'Explore thousands of verified local listings, stores, and services in Zambia.',
-        time: 'Just now',
-        unread: true
-      },
-      {
-        id: 'notif-2',
-        user_id: 'all',
-        title: 'System Currency Update',
-        body: 'All item and service prices automatically display in ZMW (Zambian Kwacha).',
-        time: 'Today',
-        unread: true
-      },
-      {
-        id: 'notif-3',
-        user_id: 'all',
-        title: 'Verified Store Feature',
-        body: 'Create your digital storefront on MarketSpace and publish your product catalogs.',
-        time: 'Yesterday',
-        unread: false
-      }
-    ]
-  })
+  const [notifications, setNotifications] = useState<NotificationItem[]>([])
 
   useEffect(() => {
-    window.localStorage.setItem('marketspace-notifications', JSON.stringify(notifications))
-  }, [notifications])
+    let active = true
+    const userId = session?.user.id
+    if (!userId) {
+      return () => { active = false }
+    }
+
+    const loadNotifications = async () => {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('id,user_id,title,body,time,unread,link_url,created_at')
+        .or(`user_id.eq.${userId},user_id.is.null`)
+        .order('created_at', { ascending: false })
+      if (!active) return
+      if (error) {
+        setMessage(`Notifications could not be loaded: ${error.message}`)
+        return
+      }
+
+      const notificationRows = data || []
+      const notificationIds = notificationRows.map(item => item.id)
+      const { data: stateRows, error: stateError } = notificationIds.length
+        ? await supabase
+          .from('notification_user_states')
+          .select('notification_id,is_pinned,is_deleted,unread_override')
+          .eq('user_id', userId)
+          .in('notification_id', notificationIds)
+        : { data: [], error: null }
+      if (!active) return
+      if (stateError && !isMissingSchemaObject(stateError)) {
+        setMessage(`Notification settings could not be loaded: ${stateError.message}`)
+        return
+      }
+
+      if (stateError) {
+        setMessage('Notification actions need the latest database migration. Existing notifications are still shown.')
+      }
+
+      const stateById = new Map((stateRows || []).map(state => [state.notification_id, state]))
+      const databaseNotifications: NotificationItem[] = notificationRows
+        .filter(item => !stateById.get(item.id)?.is_deleted)
+        .map(item => {
+          const state = stateById.get(item.id)
+          return {
+            id: item.id,
+            user_id: item.user_id,
+            title: item.title,
+            body: item.body,
+            time: item.created_at ? new Date(item.created_at).toLocaleString() : item.time || '',
+            unread: state?.unread_override ?? item.unread,
+            link_url: item.link_url || undefined,
+            isPinned: state?.is_pinned || false,
+            isBroadcast: item.user_id === null,
+            unreadOverride: state?.unread_override,
+          }
+        })
+      setNotifications(databaseNotifications)
+    }
+
+    void loadNotifications()
+    return () => { active = false }
+  }, [session?.user.id])
+
   const [chatThreads, setChatThreads] = useState<ChatThread[]>([])
   const [activeChatId, setActiveChatId] = useState<number | null>(1)
   const [chatDraft, setChatDraft] = useState('')
@@ -490,53 +535,71 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   }, [deletedChatIds])
 
   const persistChatState = async (chatId: number, update: Record<string, boolean>) => {
-    if (!session?.user?.id) return
-    await supabase.from('chat_user_states').upsert({
+    if (!session?.user?.id) return true
+    const { error } = await supabase.from('chat_user_states').upsert({
       chat_id: chatId,
       user_id: session.user.id,
       ...update,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'chat_id,user_id' })
+    if (error) {
+      setMessage(`Chat settings could not be saved: ${error.message}`)
+      return false
+    }
+    return true
   }
 
   const togglePinChat = (chatId: number) => {
-    const next = !chatFlags[chatId]?.isPinned
-    setChatFlags((prev) => ({
-      ...prev,
-      [chatId]: { ...prev[chatId], isPinned: next }
-    }))
-    setChatThreads(prev => prev.map(thread => thread.id === chatId ? { ...thread, isPinned: next } : thread))
-    void persistChatState(chatId, { is_pinned: next })
+    const next = !chatThreads.find(thread => thread.id === chatId)?.isPinned
+    void (async () => {
+      if (!await persistChatState(chatId, { is_pinned: next })) return
+      setChatFlags(prev => ({ ...prev, [chatId]: { ...prev[chatId], isPinned: next } }))
+      setChatThreads(prev => prev.map(thread => thread.id === chatId ? { ...thread, isPinned: next } : thread))
+    })()
+  }
+
+  const setChatUnread = async (chatId: number, unread: boolean) => {
+    if (!await persistChatState(chatId, { is_unread: unread })) return
+    setChatThreads(previous => previous.map(thread => thread.id === chatId ? { ...thread, unread } : thread))
+  }
+
+  const toggleUnreadChat = (chatId: number) => {
+    const thread = chatThreads.find(item => item.id === chatId)
+    if (thread) void setChatUnread(chatId, !thread.unread)
   }
 
   const toggleFavoriteChat = (chatId: number) => {
-    const next = !chatFlags[chatId]?.isFavorite
-    setChatFlags((prev) => ({
-      ...prev,
-      [chatId]: { ...prev[chatId], isFavorite: next }
-    }))
-    setChatThreads(prev => prev.map(thread => thread.id === chatId ? { ...thread, isFavorite: next } : thread))
-    void persistChatState(chatId, { is_favorite: next })
+    const next = !chatThreads.find(thread => thread.id === chatId)?.isFavorite
+    void (async () => {
+      if (!await persistChatState(chatId, { is_favorite: next })) return
+      setChatFlags(prev => ({ ...prev, [chatId]: { ...prev[chatId], isFavorite: next } }))
+      setChatThreads(prev => prev.map(thread => thread.id === chatId ? { ...thread, isFavorite: next } : thread))
+    })()
   }
 
   const toggleArchiveChat = (chatId: number) => {
-    const next = !chatFlags[chatId]?.isArchived
-    setChatFlags((prev) => ({
-      ...prev,
-      [chatId]: { ...prev[chatId], isArchived: next }
-    }))
-    setChatThreads(prev => prev.map(thread => thread.id === chatId ? { ...thread, isArchived: next } : thread))
-    void persistChatState(chatId, { is_archived: next })
+    const next = !chatThreads.find(thread => thread.id === chatId)?.isArchived
+    void (async () => {
+      if (!await persistChatState(chatId, { is_archived: next })) return
+      setChatFlags(prev => ({ ...prev, [chatId]: { ...prev[chatId], isArchived: next } }))
+      setChatThreads(prev => prev.map(thread => thread.id === chatId ? { ...thread, isArchived: next } : thread))
+    })()
   }
 
   const deleteChat = (chatId: number) => {
-    setDeletedChatIds((prev) => prev.includes(chatId) ? prev : [...prev, chatId])
-    void persistChatState(chatId, { is_deleted: true })
-    setChatThreads(prev => prev.filter(thread => thread.id !== chatId))
-    if (activeChatId === chatId) {
-      setActiveChatId(null)
+    if (chatThreads.find(thread => thread.id === chatId)?.isPinned) {
+      setMessage('Unpin this chat before deleting it')
+      return
     }
-    setMessage('Chat thread deleted')
+    void (async () => {
+      if (!await persistChatState(chatId, { is_deleted: true })) return
+      if (!session?.user?.id) {
+        setDeletedChatIds((prev) => prev.includes(chatId) ? prev : [...prev, chatId])
+      }
+      setChatThreads(prev => prev.filter(thread => thread.id !== chatId))
+      if (activeChatId === chatId) setActiveChatId(null)
+      setMessage('Chat thread deleted')
+    })()
   }
 
   useEffect(() => {
@@ -633,9 +696,44 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     })))
   }
 
-  async function fetchListings() {
-    const { data, error } = await supabase.from('listings').select('*').order('created_at', { ascending: false })
-    if (error) return
+  async function fetchListings(userId?: string) {
+    const fetchListingRows = async (ownerId?: string) => {
+      const rows: ListingRow[] = []
+      let offset = 0
+
+      while (true) {
+        let query = supabase
+          .from('listings')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(offset, offset + 999)
+        query = ownerId
+          ? query.eq('user_id', ownerId)
+          : query.eq('moderation_status', 'approved')
+
+        const { data, error } = await query
+        if (error) return { rows: null, error }
+
+        const page = (data ?? []) as ListingRow[]
+        rows.push(...page)
+        if (page.length === 0) break
+        offset += page.length
+      }
+
+      return { rows, error: null }
+    }
+
+    const [publicResult, sellerResult] = await Promise.all([
+      fetchListingRows(),
+      userId ? fetchListingRows(userId) : Promise.resolve({ rows: [], error: null }),
+    ])
+    if (publicResult.error) {
+      setMessage(`Listings could not be loaded: ${publicResult.error.message}`)
+      return
+    }
+    if (sellerResult.error) {
+      setMessage(`Your listings could not be loaded: ${sellerResult.error.message}`)
+    }
 
     const { data: profilesData } = await supabase.from('public_profiles').select('user_id, username')
     const sellerMap = new Map<string, string>()
@@ -645,12 +743,15 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         }
       })
 
-    const enriched = ((data ?? []) as ListingRow[]).map((item) => ({
+    const enrichListings = (rows: ListingRow[]) => rows.map((item) => ({
       ...item,
       seller_name: sellerMap.get(item.user_id ?? '') ?? 'Seller',
     }))
 
-    setListings(enriched)
+    setListings(enrichListings(publicResult.rows ?? []))
+    if (!sellerResult.error) {
+      setMyListings(enrichListings(sellerResult.rows ?? []))
+    }
   }
 
   async function fetchStores() {
@@ -699,7 +800,10 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       .select('*')
       .or(`buyer_id.eq.${session.user.id},seller_id.eq.${session.user.id}`)
 
-    if (chatsError) return
+    if (chatsError) {
+      setMessage(`Chats could not be loaded: ${chatsError.message}`)
+      return
+    }
 
     if (!chatsData || chatsData.length === 0) {
       setChatThreads([])
@@ -714,7 +818,10 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       .in('chat_id', chatIds)
       .order('created_at', { ascending: true })
 
-    if (messagesError) return
+    if (messagesError) {
+      setMessage(`Chat messages could not be loaded: ${messagesError.message}`)
+      return
+    }
 
     const threadMap = new Map<number, ChatMessage[]>()
     messagesData?.forEach((m: any) => {
@@ -744,22 +851,49 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       nameMap.set(p.user_id, p.username || 'User')
     })
 
-    const { data: stateRows } = await supabase
+    const { data: stateRows, error: stateError } = await supabase
       .from('chat_user_states')
-      .select('chat_id, is_pinned, is_favorite, is_archived, is_deleted')
+      .select('chat_id, is_pinned, is_favorite, is_archived, is_deleted, is_unread')
       .eq('user_id', session.user.id)
       .in('chat_id', chatIds)
+    if (stateError && !isMissingSchemaObject(stateError)) {
+      setMessage(`Chat settings could not be loaded: ${stateError.message}`)
+      return
+    }
 
-    const databaseChatFlags: Record<number, { isPinned?: boolean; isFavorite?: boolean; isArchived?: boolean }> = {}
+    const databaseChatFlags: Record<number, { isPinned?: boolean; isFavorite?: boolean; isArchived?: boolean; unread?: boolean }> = {}
     const databaseDeletedIds: number[] = []
-    stateRows?.forEach((state: any) => {
+    const applyChatStates = (rows: Array<{
+      chat_id: number
+      is_pinned: boolean
+      is_favorite: boolean
+      is_archived: boolean
+      is_deleted: boolean
+      is_unread?: boolean
+    }> | null) => rows?.forEach(state => {
       databaseChatFlags[state.chat_id] = {
         isPinned: Boolean(state.is_pinned),
         isFavorite: Boolean(state.is_favorite),
         isArchived: Boolean(state.is_archived),
+        unread: Boolean(state.is_unread),
       }
       if (state.is_deleted) databaseDeletedIds.push(Number(state.chat_id))
     })
+    if (stateError) {
+      setMessage('Unread chat controls need the latest database migration. Existing chats are still shown.')
+      const { data: legacyStateRows, error: legacyStateError } = await supabase
+        .from('chat_user_states')
+        .select('chat_id, is_pinned, is_favorite, is_archived, is_deleted')
+        .eq('user_id', session.user.id)
+        .in('chat_id', chatIds)
+      if (legacyStateError) {
+        setMessage(`Chat settings could not be loaded: ${legacyStateError.message}`)
+        return
+      }
+      applyChatStates(legacyStateRows)
+    } else {
+      applyChatStates(stateRows)
+    }
 
     const threads: ChatThread[] = chatsData.map((c) => {
       const otherId = c.buyer_id === session.user.id ? c.seller_id : c.buyer_id
@@ -777,8 +911,10 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       }
     })
 
-    const effectiveDeletedIds = new Set([...deletedChatIds, ...databaseDeletedIds])
-    setChatThreads(threads.filter(thread => !effectiveDeletedIds.has(thread.id)))
+    const effectiveDeletedIds = new Set(session?.user?.id ? databaseDeletedIds : deletedChatIds)
+    setChatThreads(threads
+      .filter(thread => !effectiveDeletedIds.has(thread.id))
+      .sort((a, b) => Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned))))
   }
 
   useEffect(() => {
@@ -812,7 +948,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         }
       }
 
-      await Promise.all([fetchListings(), fetchStores(), fetchStoreReviews()])
+      await Promise.all([fetchListings(currentSession?.user.id), fetchStores(), fetchStoreReviews()])
       setLoading(false)
 
       const needsOnboarding = currentSession && (
@@ -838,7 +974,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       setSession(currentSession)
       if (currentSession) {
         const loadedProfile = await loadProfile(currentSession.user.id, currentSession.user)
-        void fetchListings()
+        void fetchListings(currentSession.user.id)
 
         const needsOnboarding = !loadedProfile?.onboarding_choice
 
@@ -847,7 +983,9 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         }
       } else {
         setProfile(null)
+        setMyListings([])
         setChatThreads([])
+        setNotifications(current => current.filter(item => !item.user_id || item.user_id === 'all'))
       }
     })
 
@@ -933,6 +1071,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     await supabase.auth.signOut()
     setSession(null)
     setProfile(null)
+    setNotifications([])
     navigate('/login')
   }
 
@@ -948,6 +1087,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       setSession(null)
       setProfile(null)
       setSavedIds([])
+      setNotifications([])
       setBusinessProfile(null)
       window.localStorage.removeItem('marketspace-saved')
       window.localStorage.removeItem('marketspace-notify-store-ids')
@@ -1175,7 +1315,124 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     await fetchListings()
   }
 
-  const markAllRead = () => {
+  const markNotificationRead = async (notificationId: string | number, unread: boolean) => {
+    const notification = notifications.find(item => String(item.id) === String(notificationId))
+    if (!notification) return
+
+    if (session?.user.id && isDatabaseNotificationId(notificationId)) {
+      if (notification.user_id === session.user.id) {
+        const { error } = await supabase.from('notifications')
+          .update({ unread })
+          .eq('id', notificationId)
+          .eq('user_id', session.user.id)
+        if (error) {
+          setMessage(`Notification could not be updated: ${error.message}`)
+          return
+        }
+      } else if (notification.isBroadcast) {
+        const { error } = await supabase.from('notification_user_states').upsert({
+          notification_id: notificationId,
+          user_id: session.user.id,
+          is_pinned: Boolean(notification.isPinned),
+          unread_override: unread,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'notification_id,user_id' })
+        if (error) {
+          setMessage(`Notification could not be updated: ${error.message}`)
+          return
+        }
+      }
+    }
+
+    setNotifications(current => current.map(item => String(item.id) === String(notificationId)
+      ? { ...item, unread, unreadOverride: notification.isBroadcast ? unread : item.unreadOverride }
+      : item))
+  }
+
+  const toggleNotificationPin = async (notificationId: string | number) => {
+    const notification = notifications.find(item => String(item.id) === String(notificationId))
+    if (!notification) return
+    const isPinned = !notification.isPinned
+
+    if (session?.user.id && isDatabaseNotificationId(notificationId)) {
+      const { error } = await supabase.from('notification_user_states').upsert({
+        notification_id: notificationId,
+        user_id: session.user.id,
+        is_pinned: isPinned,
+        unread_override: notification.isBroadcast ? notification.unreadOverride ?? null : null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'notification_id,user_id' })
+      if (error) {
+        setMessage(`Notification could not be pinned: ${error.message}`)
+        return
+      }
+    }
+
+    setNotifications(current => current.map(item => String(item.id) === String(notificationId)
+      ? { ...item, isPinned }
+      : item))
+  }
+
+  const deleteNotification = async (notificationId: string | number) => {
+    const notification = notifications.find(item => String(item.id) === String(notificationId))
+    if (!notification) return
+    if (notification.isPinned) {
+      setMessage('Unpin this notification before deleting it')
+      return
+    }
+
+    if (session?.user.id && isDatabaseNotificationId(notificationId)) {
+      const { data, error } = await supabase.rpc('delete_notification_for_user', {
+        p_notification_id: notificationId,
+      })
+      if (error) {
+        setMessage(`Notification could not be deleted: ${error.message}`)
+        return
+      }
+      if (data !== true) {
+        setMessage('Notification could not be deleted. Unpin it first if it is pinned.')
+        return
+      }
+    }
+
+    setNotifications(current => current.filter(item => String(item.id) !== String(notificationId)))
+  }
+
+  const markAllRead = async () => {
+    if (session?.user.id) {
+      const ownIds = notifications
+        .filter(item => item.user_id === session.user.id && isDatabaseNotificationId(item.id))
+        .map(item => item.id as string)
+      if (ownIds.length) {
+        const { error } = await supabase
+        .from('notifications')
+        .update({ unread: false })
+          .in('id', ownIds)
+          .eq('user_id', session.user.id)
+        if (error) {
+          setMessage(`Notifications could not be marked as read: ${error.message}`)
+          return
+        }
+      }
+
+      const broadcasts = notifications.filter(item => item.isBroadcast && isDatabaseNotificationId(item.id))
+      if (broadcasts.length) {
+        const { error } = await supabase.from('notification_user_states').upsert(
+          broadcasts.map(item => ({
+            notification_id: item.id,
+            user_id: session.user.id,
+            is_pinned: Boolean(item.isPinned),
+            unread_override: false,
+            updated_at: new Date().toISOString(),
+          })),
+          { onConflict: 'notification_id,user_id' },
+        )
+        if (error) {
+          setMessage(`Notifications could not be marked as read: ${error.message}`)
+          return
+        }
+      }
+    }
     setNotifications((current) => current.map((item) => ({ ...item, unread: false })))
   }
 
@@ -1331,12 +1588,6 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   const savedListings = useMemo(() => {
     return listings.filter((listing) => savedIds.includes(String(listing.id)))
   }, [listings, savedIds])
-
-  const myListings = useMemo(() => {
-    if (!session?.user?.id) return []
-    // Using type assertion because user_id comes from ListingRow
-    return listings.filter((listing) => (listing as ListingRow).user_id === session.user.id)
-  }, [listings, session])
 
   const heroStats = useMemo(() => [
     { label: 'Total Listings', value: String(listings.length) },
@@ -1688,6 +1939,9 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     openEditListing,
     toggleSave,
     markAllRead,
+    markNotificationRead,
+    toggleNotificationPin,
+    deleteNotification,
     sendInboxMessage,
     filteredListings,
     savedListings,
@@ -1751,6 +2005,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     addSearchHistory,
     clearSearchHistory,
     togglePinChat,
+    toggleUnreadChat,
+    setChatUnread,
     toggleFavoriteChat,
     toggleArchiveChat,
     deleteChat,

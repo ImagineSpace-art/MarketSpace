@@ -14,3 +14,6 @@ verify_jwt = true
 
 [functions.store-report]
 verify_jwt = true
+
+[functions.listing-review]
+verify_jwt = true

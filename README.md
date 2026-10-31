@@ -95,6 +95,70 @@ The report workflow currently supports reports about stores only. It does not
 apply strikes, suspend stores automatically, report individual listings, or send
 report emails.
 
+Listing approval uses `202610310003_listing_moderation.sql` and the
+`listing-review` Edge Function. Apply the migration, then deploy the function:
+
+```bash
+supabase db push
+supabase functions deploy listing-review
+```
+
+The migration backfills existing listings as approved. New listings are assigned
+to the caller's approved store by a database trigger; any client-provided
+`store_id` is ignored. Listings from sellers without an approved store, stores
+in probation, and sellers with any upheld store report enter the pending queue.
+New listings from trusted stores without upheld reports are auto-approved.
+Public listing queries are restricted by RLS; owners and moderators may also
+read listings awaiting review. Editing an approved listing's title, description,
+price, category, images, or type sends it back to review. Moderation decisions,
+audit records, seller notifications, probation limits, and expiration are
+handled server-side.
+
+Notification and inbox actions use
+`202610310004_notification_and_chat_actions.sql`. Apply pending migrations with
+`supabase db push` before using individual read/unread, pin, and delete controls.
+Notification pins and broadcast read/deleted state are stored per user; personal
+notification reads remain on the notification row. Pinned notifications and
+chats must be unpinned before they can be deleted. Selecting an unread chat
+marks it read, and pinned chats are ordered before other inbox threads.
+Only users listed in `public.store_admins` can publish notifications, through
+the protected `send_moderator_notification` function. In `/admin/store-review`,
+moderators can send to everyone or select up to 500 recipients by username.
+Direct notification inserts are revoked from browser clients.
+
+Add moderator user IDs to `public.store_admins` using the Supabase SQL editor.
+Moderators can open `/admin/store-review` and use the Listings queue. To run the
+optional database integration tests, use a disposable local Supabase project,
+apply the migration, deploy/serve `listing-review`, then set
+`LISTING_MODERATION_INTEGRATION=1` and the `LISTING_MODERATION_TEST_URL`,
+`LISTING_MODERATION_TEST_ANON_KEY`, and
+`LISTING_MODERATION_TEST_SERVICE_ROLE_KEY` variables before running:
+
+```bash
+npx vitest run supabase/tests/listing-moderation.integration.test.ts
+```
+
+The tests create and remove temporary users and listings. They intentionally
+avoid reviewing items so the append-only moderation audit log is not polluted.
+
+The previous probation-limit trigger skipped listing inserts with a null
+`store_id`, which the client currently omits. The migration assigns stores on
+new inserts and backfills existing listings for approved stores. It does not
+silently delist legacy listings if a probation store is already above its cap;
+check and resolve those listings before expecting additional approvals:
+
+```sql
+SELECT s.id, s.shop_name, s.active_listing_limit, COUNT(l.id) AS active_approved_listings
+FROM public.stores s
+JOIN public.listings l ON l.store_id = s.id
+WHERE s.status = 'approved'
+  AND s.probation_state = 'probation'
+  AND l.moderation_status = 'approved'
+  AND lower(COALESCE(l.status, '')) IN ('available', 'active')
+GROUP BY s.id, s.shop_name, s.active_listing_limit
+HAVING COUNT(l.id) > s.active_listing_limit;
+```
+
 ### Supabase project configuration
 
 1. Enable email confirmation and configure Auth SMTP. Enable Cloudflare Turnstile

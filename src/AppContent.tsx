@@ -252,6 +252,9 @@ export function AppContent() {
     openEditListing,
     toggleSave,
     markAllRead,
+    markNotificationRead,
+    toggleNotificationPin,
+    deleteNotification,
     sendInboxMessage,
     businessProfile,
     allBusinesses,
@@ -499,7 +502,7 @@ export function AppContent() {
             path="/edit/:id"
             element={
               <ListingEditRoute
-                listings={listings}
+                listings={myListings}
                 loading={loading}
                 navigate={navigate}
                 handleUpdateListing={handleUpdateListing}
@@ -631,7 +634,7 @@ export function AppContent() {
                 profile={profile}
                 sessionUserId={session.user.id}
                 userEmail={userEmail}
-                listings={myListings}
+                listings={listings.filter((listing) => listing.user_id === session.user.id)}
                 businessProfile={businessProfile}
                 followingIds={followingIds}
                 savedIds={savedIds}
@@ -679,6 +682,9 @@ export function AppContent() {
                 onGoHome={() => navigate('/')}
                 notifications={notifications}
                 onMarkAllRead={markAllRead}
+                onMarkNotificationRead={markNotificationRead}
+                onToggleNotificationPin={toggleNotificationPin}
+                onDeleteNotification={deleteNotification}
                 currency={app.currency}
                 setCurrency={app.setCurrency}
                 notificationsConfig={app.notificationsConfig}
@@ -779,7 +785,12 @@ export function AppContent() {
                   activeChatId={activeChatId}
                   canMessage={canMessage}
                   chatDraft={chatDraft}
-                  onSelectThread={setActiveChatId}
+                  onSelectThread={(threadId) => {
+                    setActiveChatId(threadId || null)
+                    if (threadId && chatThreads.find(thread => thread.id === threadId)?.unread) {
+                      app.setChatUnread(threadId, false)
+                    }
+                  }}
                   onToggleMute={() => setCanMessage((value) => !value)}
                   onDraftChange={setChatDraft}
                   onSendMessage={sendInboxMessage}
@@ -787,6 +798,7 @@ export function AppContent() {
                   onToggleFavoriteChat={app.toggleFavoriteChat}
                   onToggleArchiveChat={app.toggleArchiveChat}
                   onDeleteChat={app.deleteChat}
+                  onToggleUnreadChat={app.toggleUnreadChat}
                 />
               ) : (
                 <Navigate to="/login" replace />
@@ -922,6 +934,9 @@ function ProfileTabRoute({ session, ...props }: any) {
 function ListingDetailRoute({ listings, loading, session, navigate, handleStartChat, toggleSave, openEditListing, allBusinesses, handleRenewListing, handleDeleteListing, globalRenewalFrequency = 'weekly', globalRenewalDay = 'Monday' }: { listings: Listing[]; loading: boolean; session: any; navigate: any; handleStartChat: any; toggleSave: any; openEditListing: any; allBusinesses: any; handleRenewListing: any; handleDeleteListing: any; globalRenewalFrequency?: any; globalRenewalDay?: string }) {
   const { id } = useParams()
   const listing = listings.find((l: Listing) => String(l.id) === id)
+  if (listing && listing.moderation_status !== 'approved') {
+    return <Navigate to="/browse" replace />
+  }
   if (listing && listing.user_id !== session?.user?.id && (isListingExpired(listing, globalRenewalFrequency, globalRenewalDay) || (listing.status && !['active', 'available'].includes(listing.status.toLowerCase())))) {
     return <Navigate to="/browse" replace />
   }

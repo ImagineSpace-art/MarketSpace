@@ -202,6 +202,7 @@ type MessagesPageProps = {
   onToggleFavoriteChat?: (chatId: number) => void
   onToggleArchiveChat?: (chatId: number) => void
   onDeleteChat?: (chatId: number) => void
+  onToggleUnreadChat?: (chatId: number) => void
 }
 
 export function MessagesPage({
@@ -217,6 +218,7 @@ export function MessagesPage({
   onToggleFavoriteChat,
   onToggleArchiveChat,
   onDeleteChat,
+  onToggleUnreadChat,
 }: MessagesPageProps) {
   const [chatCategory, setChatCategory] = useState('All')
   const activeThread = chatThreads.find((thread) => thread.id === activeChatId)
@@ -224,19 +226,19 @@ export function MessagesPage({
   const chatCategories = ['All', 'Unread', 'Pinned', 'Favorites', 'Archived']
   
   const filteredThreads = useMemo(() => {
+    let matchingThreads: ChatThread[]
     if (chatCategory === 'Unread') {
-      return chatThreads.filter((thread) => thread.unread && !thread.isArchived)
+      matchingThreads = chatThreads.filter((thread) => thread.unread && !thread.isArchived)
+    } else if (chatCategory === 'Pinned') {
+      matchingThreads = chatThreads.filter((thread) => thread.isPinned && !thread.isArchived)
+    } else if (chatCategory === 'Favorites') {
+      matchingThreads = chatThreads.filter((thread) => thread.isFavorite && !thread.isArchived)
+    } else if (chatCategory === 'Archived') {
+      matchingThreads = chatThreads.filter((thread) => thread.isArchived)
+    } else {
+      matchingThreads = chatThreads.filter((thread) => !thread.isArchived)
     }
-    if (chatCategory === 'Pinned') {
-      return chatThreads.filter((thread) => thread.isPinned && !thread.isArchived)
-    }
-    if (chatCategory === 'Favorites') {
-      return chatThreads.filter((thread) => thread.isFavorite && !thread.isArchived)
-    }
-    if (chatCategory === 'Archived') {
-      return chatThreads.filter((thread) => thread.isArchived)
-    }
-    return chatThreads.filter((thread) => !thread.isArchived)
+    return matchingThreads.sort((a, b) => Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned)))
   }, [chatCategory, chatThreads])
 
   const [sidebarWidth, setSidebarWidth] = useState(340)
@@ -291,10 +293,14 @@ export function MessagesPage({
                 <div
                   key={thread.id}
                   className={`thread-item ${isActive ? 'active' : ''}`}
-                  onClick={() => onSelectThread(thread.id)}
-                  style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                 >
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flex: 1, minWidth: 0 }}>
+                  <button
+                    type="button"
+                    className="thread-main"
+                    onClick={() => onSelectThread(thread.id)}
+                    aria-label={`Open chat with ${thread.participant}`}
+                  >
                     <div className="thread-avatar">{initial}</div>
                     <div className="thread-details" style={{ overflow: 'hidden' }}>
                       <div className="thread-top-row" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -305,12 +311,22 @@ export function MessagesPage({
                         {thread.listingTitle}
                       </span>
                     </div>
-                  </div>
+                  </button>
 
-                  <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }} onClick={(e) => e.stopPropagation()}>
+                  <div className="thread-actions">
+                    <button
+                      className="icon-btn-compact"
+                      title={thread.unread ? 'Mark chat as read' : 'Mark chat as unread'}
+                      aria-label={thread.unread ? 'Mark chat as read' : 'Mark chat as unread'}
+                      onClick={() => onToggleUnreadChat?.(thread.id)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: thread.unread ? 'var(--primary)' : 'var(--text-muted)', padding: '2px 4px' }}
+                    >
+                      <span className="material-icons" style={{ fontSize: '18px' }}>{thread.unread ? 'mark_email_read' : 'mark_email_unread'}</span>
+                    </button>
                     <button
                       className="icon-btn-compact"
                       title={thread.isPinned ? "Unpin Chat" : "Pin Chat"}
+                      aria-label={thread.isPinned ? 'Unpin chat' : 'Pin chat'}
                       onClick={() => onTogglePinChat?.(thread.id)}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: thread.isPinned ? 'var(--primary)' : 'var(--text-muted)', padding: '2px 4px' }}
                     >
@@ -319,6 +335,7 @@ export function MessagesPage({
                     <button
                       className="icon-btn-compact"
                       title={thread.isFavorite ? "Remove Favorite" : "Favorite Chat"}
+                      aria-label={thread.isFavorite ? 'Remove chat from favorites' : 'Add chat to favorites'}
                       onClick={() => onToggleFavoriteChat?.(thread.id)}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: thread.isFavorite ? '#f59e0b' : 'var(--text-muted)', padding: '2px 4px' }}
                     >
@@ -327,6 +344,7 @@ export function MessagesPage({
                     <button
                       className="icon-btn-compact"
                       title={thread.isArchived ? "Unarchive Chat" : "Archive Chat"}
+                      aria-label={thread.isArchived ? 'Unarchive chat' : 'Archive chat'}
                       onClick={() => onToggleArchiveChat?.(thread.id)}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: thread.isArchived ? '#10b981' : 'var(--text-muted)', padding: '2px 4px' }}
                     >
@@ -334,13 +352,15 @@ export function MessagesPage({
                     </button>
                     <button
                       className="icon-btn-compact"
-                      title="Delete Chat"
+                      title={thread.isPinned ? 'Unpin chat before deleting' : 'Delete Chat'}
+                      aria-label={thread.isPinned ? 'Unpin chat before deleting' : 'Delete Chat'}
+                      disabled={Boolean(thread.isPinned)}
                       onClick={() => {
-                        if (window.confirm('Are you sure you want to delete this chat thread?')) {
+                        if (!thread.isPinned && window.confirm('Are you sure you want to delete this chat thread?')) {
                           onDeleteChat?.(thread.id)
                         }
                       }}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '2px 4px' }}
+                      style={{ background: 'none', border: 'none', cursor: thread.isPinned ? 'not-allowed' : 'pointer', color: '#ef4444', padding: '2px 4px', opacity: thread.isPinned ? 0.45 : 1 }}
                     >
                       <span className="material-icons" style={{ fontSize: '18px' }}>delete_outline</span>
                     </button>

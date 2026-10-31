@@ -15,6 +15,10 @@ export type Listing = {
   store_id?: string | null
   images?: string[]
   sponsored?: boolean
+  moderation_status?: 'pending' | 'approved' | 'rejected' | 'removed'
+  moderation_reason?: string | null
+  reviewed_by?: string | null
+  reviewed_at?: string | null
   available_colors?: string[]
   available_sizes?: string[]
   lowest_acceptable_price?: number
