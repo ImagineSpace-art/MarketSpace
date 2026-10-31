@@ -93,7 +93,7 @@ export function StoreSetupPage({ userId, businessProfile, onSave, onCancel }: St
                 address
             },
             catalog: businessProfile?.catalog || [],
-            ads: businessProfile?.ads || []
+            ads: []
         })
     }
 

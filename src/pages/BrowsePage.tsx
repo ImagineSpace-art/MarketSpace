@@ -185,7 +185,7 @@ export function BrowsePage({
     return Object.values(allBusinesses).flatMap((business): Array<BusinessAd & { sellerName: string; sellerUserId: string }> => {
       if (!business.userId) return []
       return (business.ads || []).filter((ad) => {
-        if (ad.status !== 'Active') return false
+        if (ad.moderation_status !== 'approved' || ad.status !== 'Active') return false
         if (ad.placements && !ad.placements.includes('Marketplace') && !ad.placements.includes('Feed')) return false
         const start = ad.startDate ? new Date(`${ad.startDate}T00:00:00`).getTime() : 0
         if (start && start > now) return false

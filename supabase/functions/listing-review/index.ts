@@ -8,6 +8,16 @@ const corsHeaders = {
 
 type Json = Record<string, unknown>
 type AuthenticatedContext = { admin: SupabaseClient; userId: string }
+type PendingAdRow = {
+  id: string
+  status: string
+  ad_data: Json
+  moderation_status: 'pending'
+  moderation_reason: string | null
+  store_id: string
+  user_id: string
+  created_at: string
+}
 
 function respond(body: Json, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -135,6 +145,81 @@ async function reviewListing(context: AuthenticatedContext, body: Json) {
   return respond({ success: true, listing: data })
 }
 
+async function loadPendingAds(context: AuthenticatedContext) {
+  if (!await ensureModerator(context)) {
+    return respond({ error: 'You are not authorized to review ads.' }, 403)
+  }
+
+  const { data: ads, error } = await context.admin
+    .from('store_ads')
+    .select('id,status,ad_data,moderation_status,moderation_reason,store_id,user_id,created_at')
+    .eq('moderation_status', 'pending')
+    .order('created_at', { ascending: true })
+  if (error) throw new Error('The pending ad queue could not be loaded.')
+
+  const storeIds = [...new Set((ads || []).map(ad => ad.store_id))]
+  const userIds = [...new Set((ads || []).map(ad => ad.user_id))]
+  const [storesResult, profilesResult] = await Promise.all([
+    storeIds.length
+      ? context.admin.from('stores').select('id,shop_name').in('id', storeIds)
+      : Promise.resolve({ data: [], error: null }),
+    userIds.length
+      ? context.admin.from('public_profiles').select('user_id,username').in('user_id', userIds)
+      : Promise.resolve({ data: [], error: null }),
+  ])
+  if (storesResult.error || profilesResult.error) throw new Error('Ad seller details could not be loaded.')
+
+  const storeNames = new Map((storesResult.data || []).map(store => [store.id, store.shop_name || 'Store']))
+  const sellerNames = new Map((profilesResult.data || []).map(profile => [profile.user_id, profile.username || 'Seller']))
+  return respond({
+    ads: ((ads || []) as PendingAdRow[]).map(ad => ({
+      ...ad.ad_data,
+      id: ad.id,
+      status: ad.status,
+      moderation_status: ad.moderation_status,
+      moderation_reason: ad.moderation_reason,
+      store_id: ad.store_id,
+      user_id: ad.user_id,
+      created_at: ad.created_at,
+      store_name: storeNames.get(ad.store_id) || 'Store',
+      seller_name: sellerNames.get(ad.user_id) || 'Seller',
+    })),
+  })
+}
+
+async function reviewAd(context: AuthenticatedContext, body: Json) {
+  if (!await ensureModerator(context)) {
+    return respond({ error: 'You are not authorized to review ads.' }, 403)
+  }
+
+  const adId = getString(body.adId)
+  const decision = getString(body.decision)
+  const reason = getString(body.reason)
+  if (!adId || !['approve', 'reject'].includes(decision)) {
+    return respond({ error: 'Choose a valid ad and review decision.' }, 400)
+  }
+  if (reason.length > 500 || (decision === 'reject' && !reason)) {
+    return respond({ error: decision === 'reject' ? 'A reason is required to reject an ad.' : 'The reason must be 500 characters or fewer.' }, 400)
+  }
+
+  const { data, error } = await context.admin.rpc('review_store_ad_moderation', {
+    p_ad_id: adId,
+    p_reviewer_id: context.userId,
+    p_decision: decision === 'approve' ? 'approved' : 'rejected',
+    p_reason: reason,
+  })
+  if (error) {
+    if (error.message.includes('no longer pending')) {
+      return respond({ error: 'This ad has already been reviewed.' }, 409)
+    }
+    if (error.message.includes('Invalid ad review') || error.message.includes('reason')) {
+      return respond({ error: error.message }, 400)
+    }
+    throw new Error('The ad decision and audit record could not be saved.')
+  }
+  return respond({ success: true, ad: data })
+}
+
 Deno.serve(async (request: Request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (request.method !== 'POST') return respond({ error: 'Method not allowed.' }, 405)
@@ -153,6 +238,8 @@ Deno.serve(async (request: Request) => {
     const action = getString(body.action) || 'pending_listings'
     if (action === 'pending_listings') return await loadPendingListings(context)
     if (action === 'review_listing') return await reviewListing(context, body)
+    if (action === 'pending_ads') return await loadPendingAds(context)
+    if (action === 'review_ad') return await reviewAd(context, body)
     return respond({ error: 'Unknown listing review action.' }, 400)
   } catch (error) {
     console.error('Listing review request failed:', error)

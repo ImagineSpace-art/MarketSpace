@@ -262,6 +262,8 @@ export function AppContent() {
     uploadedImages,
     setUploadedImages,
     handleCreateOrUpdateBusiness,
+    saveAd,
+    updateAdStatus,
     handleDeleteListing,
     handleRenewListing,
     handleUpdateListingStatus,
@@ -512,6 +514,10 @@ export function AppContent() {
                 category={category}
                 status={status}
                 listingType={listingType}
+                servicePriceUnit={app.servicePriceUnit}
+                onServicePriceUnitChange={app.setServicePriceUnit}
+                serviceAreaId={app.serviceAreaId}
+                onServiceAreaIdChange={app.setServiceAreaId}
                 condition={condition}
                 deliveryOption={deliveryOption}
                 uploadedImages={uploadedImages}
@@ -685,6 +691,8 @@ export function AppContent() {
                 onMarkNotificationRead={markNotificationRead}
                 onToggleNotificationPin={toggleNotificationPin}
                 onDeleteNotification={deleteNotification}
+                onSaveAd={saveAd}
+                onUpdateAdStatus={updateAdStatus}
                 currency={app.currency}
                 setCurrency={app.setCurrency}
                 notificationsConfig={app.notificationsConfig}
@@ -705,6 +713,10 @@ export function AppContent() {
                   category,
                   status,
                   listingType,
+                  servicePriceUnit: app.servicePriceUnit,
+                  onServicePriceUnitChange: app.setServicePriceUnit,
+                  serviceAreaId: app.serviceAreaId,
+                  onServiceAreaIdChange: app.setServiceAreaId,
                   condition,
                   deliveryOption,
                   uploadedImages,
@@ -973,6 +985,10 @@ function ListingEditRoute({
   category,
   status,
   listingType,
+  servicePriceUnit,
+  onServicePriceUnitChange,
+  serviceAreaId,
+  onServiceAreaIdChange,
   condition,
   deliveryOption,
   uploadedImages,
@@ -1011,6 +1027,10 @@ function ListingEditRoute({
   category: string
   status: string
   listingType: string
+  servicePriceUnit: 'fixed' | 'from' | 'per_hour' | 'per_day'
+  onServicePriceUnitChange: (value: 'fixed' | 'from' | 'per_hour' | 'per_day') => void
+  serviceAreaId: string
+  onServiceAreaIdChange: (value: string) => void
   condition: string
   deliveryOption: string
   uploadedImages: string[]
@@ -1056,6 +1076,10 @@ function ListingEditRoute({
       category={category}
       status={status}
       listingType={listingType}
+      servicePriceUnit={servicePriceUnit}
+      onServicePriceUnitChange={onServicePriceUnitChange}
+      serviceAreaId={serviceAreaId}
+      onServiceAreaIdChange={onServiceAreaIdChange}
       condition={condition}
       deliveryOption={deliveryOption}
       uploadedImages={uploadedImages}

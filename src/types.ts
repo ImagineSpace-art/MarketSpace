@@ -8,6 +8,8 @@ export type Listing = {
   category: string
   status?: string
   listing_type?: string
+  price_unit?: 'fixed' | 'from' | 'per_hour' | 'per_day'
+  service_area_id?: string | null
   condition?: string
   delivery_option?: string
   seller_name?: string
@@ -85,6 +87,8 @@ export type BusinessAd = {
   placements?: string[]
   status: 'Active' | 'Paused' | 'Ended'
   createdAt?: string
+  moderation_status?: 'pending' | 'approved' | 'rejected' | 'removed'
+  moderation_reason?: string | null
 }
 
 export type StoreCollection = {

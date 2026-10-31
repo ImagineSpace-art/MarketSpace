@@ -7,10 +7,12 @@ type BusinessHubPageProps = {
     businessProfile: BusinessProfile
     myListings: Listing[]
     onSave: (profile: BusinessProfile) => void
+    onSaveAd: (ad: BusinessAd) => Promise<void>
+    onUpdateAdStatus: (adId: string, status: BusinessAd['status']) => Promise<void>
     onBack: () => void
 }
 
-export function BusinessHubPage({ businessProfile, myListings, onSave, onBack }: BusinessHubPageProps) {
+export function BusinessHubPage({ businessProfile, myListings, onSave, onSaveAd, onUpdateAdStatus, onBack }: BusinessHubPageProps) {
     const [activeTab, setActiveTab] = useState<'analytics' | 'catalog' | 'ads'>('analytics')
 
     // Catalog Item Creation State
@@ -78,27 +80,16 @@ export function BusinessHubPage({ businessProfile, myListings, onSave, onBack }:
             duration: adDuration,
             status: 'Active'
         }
-        onSave({
-            ...businessProfile,
-            ads: [...businessProfile.ads, newAd]
-        })
+        void onSaveAd(newAd).catch(error => window.alert(error instanceof Error ? error.message : 'The ad could not be saved.'))
         setAdTitle('')
         setAdBudget('150')
     }
 
     const handleToggleAdStatus = (adId: string) => {
-        onSave({
-            ...businessProfile,
-            ads: businessProfile.ads.map(ad => {
-                if (ad.id === adId) {
-                    return {
-                        ...ad,
-                        status: ad.status === 'Active' ? 'Paused' : 'Active'
-                    }
-                }
-                return ad
-            })
-        })
+        const ad = businessProfile.ads.find(item => item.id === adId)
+        if (!ad) return
+        void onUpdateAdStatus(adId, ad.status === 'Active' ? 'Paused' : 'Active')
+            .catch(error => window.alert(error instanceof Error ? error.message : 'The ad status could not be updated.'))
     }
 
     return (
@@ -137,7 +128,7 @@ export function BusinessHubPage({ businessProfile, myListings, onSave, onBack }:
                         </div>
                         <div>
                             <span>Active Ads</span>
-                            <h3>{businessProfile.ads.filter(a => a.status === 'Active').length}</h3>
+                            <h3>{businessProfile.ads.filter(a => a.status === 'Active' && a.moderation_status === 'approved').length}</h3>
                         </div>
                         <div>
                             <span>Store Views (7d)</span>
@@ -299,10 +290,15 @@ export function BusinessHubPage({ businessProfile, myListings, onSave, onBack }:
                                                 <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                                                     Listing: <strong>{matchedListing?.title || 'Listing'}</strong> | Budget: {ad.budget} | Duration: {ad.duration}
                                                 </p>
+                                                {ad.moderation_status === 'rejected' && ad.moderation_reason && (
+                                                    <p style={{ margin: '5px 0 0', color: '#b91c1c', fontSize: '.78rem' }}>Reason: {ad.moderation_reason}</p>
+                                                )}
                                             </div>
                                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                                <span className={`ad-status-pill ${ad.status === 'Active' ? 'active' : 'paused'}`}>{ad.status}</span>
-                                                <button className="secondary-btn compact-btn" onClick={() => handleToggleAdStatus(ad.id)}>
+                                                <span className={`ad-status-pill ${ad.moderation_status === 'approved' && ad.status === 'Active' ? 'active' : 'paused'}`}>
+                                                    {ad.moderation_status === 'pending' ? 'Pending review' : ad.moderation_status === 'rejected' ? 'Rejected' : ad.moderation_status === 'removed' ? 'Removed' : ad.status}
+                                                </span>
+                                                <button className="secondary-btn compact-btn" disabled={ad.moderation_status === 'rejected' || ad.moderation_status === 'removed'} onClick={() => handleToggleAdStatus(ad.id)}>
                                                     {ad.status === 'Active' ? 'Pause' : 'Resume'}
                                                 </button>
                                             </div>

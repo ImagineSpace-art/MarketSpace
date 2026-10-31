@@ -1,6 +1,6 @@
 import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import type { Listing, Profile, BusinessProfile, PaymentMethodItem, NotificationConfig } from '../types'
+import type { Listing, Profile, BusinessProfile, BusinessAd, PaymentMethodItem, NotificationConfig } from '../types'
 import { SavedItemsPage, NotificationsPage } from './SavedNotificationsPage'
 import { ListingFormPage } from './ListingPage'
 import { StoreSetupPage } from './StoreSetupPage'
@@ -45,6 +45,8 @@ type ProfilePageProps = {
     onMarkNotificationRead: (notificationId: string | number, unread: boolean) => void
     onToggleNotificationPin: (notificationId: string | number) => void
     onDeleteNotification: (notificationId: string | number) => void
+    onSaveAd: (ad: BusinessAd) => Promise<void>
+    onUpdateAdStatus: (adId: string, status: BusinessAd['status']) => Promise<void>
 
     // ListingFormPage props
     createListingProps: {
@@ -54,6 +56,10 @@ type ProfilePageProps = {
         category: string
         status: string
         listingType: string
+        servicePriceUnit: 'fixed' | 'from' | 'per_hour' | 'per_day'
+        onServicePriceUnitChange: (value: 'fixed' | 'from' | 'per_hour' | 'per_day') => void
+        serviceAreaId: string
+        onServiceAreaIdChange: (value: string) => void
         condition: string
         deliveryOption: string
         uploadedImages: string[]
@@ -117,6 +123,8 @@ export function ProfilePage({
     onMarkNotificationRead,
     onToggleNotificationPin,
     onDeleteNotification,
+    onSaveAd,
+    onUpdateAdStatus,
     createListingProps,
     storeSetupProps,
     allBusinesses = {},
@@ -201,18 +209,10 @@ export function ProfilePage({
 
     const handleToggleAdStatus = (adId: string) => {
         if (!businessProfile) return
-        void storeSetupProps.onSave({
-            ...businessProfile,
-            ads: (businessProfile.ads || []).map(ad => {
-                if (ad.id === adId) {
-                    return {
-                        ...ad,
-                        status: ad.status === 'Active' ? 'Paused' as const : 'Active' as const
-                    }
-                }
-                return ad
-            })
-        })
+        const ad = businessProfile.ads.find(item => item.id === adId)
+        if (!ad) return
+        void onUpdateAdStatus(adId, ad.status === 'Active' ? 'Paused' : 'Active')
+            .catch(error => window.alert(error instanceof Error ? error.message : 'The ad status could not be updated.'))
     }
 
     return (
@@ -237,14 +237,7 @@ export function ProfilePage({
                         businessProfile={businessProfile}
                         myListings={myListings}
                         profile={profile}
-                        onSaveAd={async (newAd) => {
-                            if (businessProfile) {
-                                await storeSetupProps.onSave({
-                                    ...businessProfile,
-                                    ads: [...(businessProfile.ads || []), newAd]
-                                })
-                            }
-                        }}
+                        onSaveAd={onSaveAd}
                         onBack={() => navigate('/profile')}
                     />
                 ) : activeSection === 'store-insights' ? (
@@ -307,7 +300,7 @@ export function ProfilePage({
 
                             {/* ANALYTICS TAB */}
                             {storeTab === 'analytics' && (() => {
-                                const activeAds = (businessProfile.ads || []).filter(a => a.status === 'Active').length
+                                const activeAds = (businessProfile.ads || []).filter(a => a.status === 'Active' && a.moderation_status === 'approved').length
                                 const perfStoreClicks = perfAnalyticsData?.storeClicks ?? 0
                                 const perfListingClicks = perfAnalyticsData?.listingClicks ?? 0
                                 const perfAdClicks = perfAnalyticsData?.adClicks ?? 0
@@ -432,8 +425,8 @@ export function ProfilePage({
                                                         (businessProfile.ads || []).map(ad => (
                                                             <div key={ad.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', paddingBottom: '6px', borderBottom: '1px solid var(--border)' }}>
                                                                 <span>{ad.adTitle}</span>
-                                                                <span className="badge" style={{ background: ad.status === 'Active' ? '#e2f0d9' : '#fce4d6', color: ad.status === 'Active' ? '#385723' : '#c65911' }}>
-                                                                    {ad.status} ({ad.duration})
+                                                                <span className="badge" style={{ background: ad.moderation_status === 'approved' && ad.status === 'Active' ? '#e2f0d9' : '#fef3c7', color: ad.moderation_status === 'rejected' ? '#b91c1c' : '#92400e' }}>
+                                                                    {ad.moderation_status === 'pending' ? 'Pending review' : ad.moderation_status === 'rejected' ? 'Rejected' : ad.moderation_status === 'removed' ? 'Removed' : ad.status} ({ad.duration})
                                                                 </span>
                                                             </div>
                                                         ))
@@ -519,16 +512,19 @@ export function ProfilePage({
                                         ) : (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                                 {(businessProfile.ads || []).map((ad) => (
-                                                    <div key={ad.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--surface)', border: '1px solid var(--border)', padding: '12px', borderRadius: '8px' }}>
-                                                        <div>
+                                                    <div key={ad.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, background: 'var(--surface)', border: '1px solid var(--border)', padding: '12px', borderRadius: '8px' }}>
+                                                        <div style={{ minWidth: 0 }}>
                                                             <h4 style={{ margin: 0 }}>{ad.adTitle}</h4>
                                                             <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>Duration: {ad.duration} | Budget: {ad.budget}</span>
+                                                            {ad.moderation_status === 'rejected' && ad.moderation_reason && (
+                                                                <p style={{ margin: '5px 0 0', color: '#b91c1c', fontSize: '.78rem' }}>Reason: {ad.moderation_reason}</p>
+                                                            )}
                                                         </div>
                                                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                                             <span className="badge" style={{ background: ad.status === 'Active' ? '#e2f0d9' : '#fce4d6', color: ad.status === 'Active' ? '#385723' : '#c65911' }}>
-                                                                {ad.status}
+                                                                {ad.moderation_status === 'pending' ? 'Pending review' : ad.moderation_status === 'rejected' ? 'Rejected' : ad.moderation_status === 'removed' ? 'Removed' : ad.status}
                                                             </span>
-                                                            <button className="secondary-btn compact-btn" onClick={() => handleToggleAdStatus(ad.id)}>
+                                                            <button className="secondary-btn compact-btn" disabled={ad.moderation_status === 'rejected' || ad.moderation_status === 'removed'} onClick={() => handleToggleAdStatus(ad.id)}>
                                                                 {ad.status === 'Active' ? 'Pause' : 'Resume'}
                                                             </button>
                                                         </div>

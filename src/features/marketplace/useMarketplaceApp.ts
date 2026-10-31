@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { isListingExpired } from './listingExpiry'
 import { CATEGORY_OPTIONS, CONDITION_OPTIONS, DELIVERY_OPTIONS } from './constants'
-import type { Listing, Profile, View, BusinessProfile, StoreCollection, StoreReview, PaymentMethodItem, NotificationConfig, StoreThemeConfig, StoreTemplateContent, StoreTemplateId } from '../../types'
+import type { Listing, Profile, View, BusinessProfile, BusinessAd, StoreCollection, StoreReview, PaymentMethodItem, NotificationConfig, StoreThemeConfig, StoreTemplateContent, StoreTemplateId } from '../../types'
 import { logAnalyticsEvent, toggleStoreFollowInDb } from '../../services/analytics'
 import { getFunctionErrorMessage } from '../../utils/functionError'
 
@@ -106,6 +106,10 @@ export interface MarketplaceAppModel {
   setStatus: Dispatch<SetStateAction<string>>
   listingType: string
   setListingType: Dispatch<SetStateAction<string>>
+  servicePriceUnit: 'fixed' | 'from' | 'per_hour' | 'per_day'
+  setServicePriceUnit: Dispatch<SetStateAction<'fixed' | 'from' | 'per_hour' | 'per_day'>>
+  serviceAreaId: string
+  setServiceAreaId: Dispatch<SetStateAction<string>>
   condition: string
   setCondition: Dispatch<SetStateAction<string>>
   deliveryOption: string
@@ -162,6 +166,8 @@ export interface MarketplaceAppModel {
   uploadedImages: string[]
   setUploadedImages: Dispatch<SetStateAction<string[]>>
   handleCreateOrUpdateBusiness: (profile: BusinessProfile) => void
+  saveAd: (ad: BusinessAd) => Promise<void>
+  updateAdStatus: (adId: string, status: BusinessAd['status']) => Promise<void>
   handleSaveStoreTheme: (config: StoreThemeConfig, storeUserId?: string) => Promise<void>
   handleSaveStoreTemplate: (templateId: StoreTemplateId, content: Record<string, unknown>, departments?: Array<{ name: string; image?: string }>, storeUserId?: string) => Promise<void>
   handleDeleteListing: (listingId: number) => Promise<void>
@@ -377,6 +383,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   const [category, setCategory] = useState('Electronics')
   const [status, setStatus] = useState('Available')
   const [listingType, setListingType] = useState('single')
+  const [servicePriceUnit, setServicePriceUnit] = useState<'fixed' | 'from' | 'per_hour' | 'per_day'>('fixed')
+  const [serviceAreaId, setServiceAreaId] = useState('')
   const [condition, setCondition] = useState('Used - Good')
   const [deliveryOption, setDeliveryOption] = useState('In-Person Meetup')
   const [uploadedImages, setUploadedImages] = useState<string[]>([])
@@ -1105,6 +1113,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setCategory('Electronics')
     setStatus('Available')
     setListingType('single')
+    setServicePriceUnit('fixed')
+    setServiceAreaId('')
     setCondition('Used - Good')
     setDeliveryOption('Meetup')
     setUploadedImages([])
@@ -1132,6 +1142,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       category,
       status,
       listing_type: listingType,
+      price_unit: listingType === 'service' ? servicePriceUnit : 'fixed',
+      service_area_id: listingType === 'service' ? serviceAreaId || null : null,
       condition,
       delivery_option: deliveryOption,
       images: uploadedImages,
@@ -1169,6 +1181,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       category,
       status,
       listing_type: listingType,
+      price_unit: listingType === 'service' ? servicePriceUnit : 'fixed',
+      service_area_id: listingType === 'service' ? serviceAreaId || null : null,
       condition,
       delivery_option: deliveryOption,
       images: uploadedImages,
@@ -1220,6 +1234,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setCategory(listing.category)
     setStatus(listing.status ?? 'Available')
     setListingType(listing.listing_type ?? 'single')
+    setServicePriceUnit(listing.price_unit ?? 'fixed')
+    setServiceAreaId(listing.service_area_id ?? '')
     setCondition(listing.condition ?? 'Used - Good')
     setDeliveryOption(listing.delivery_option ?? 'Meetup')
     setUploadedImages(listing.images ?? [])
@@ -1534,7 +1550,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         const listingSellerId = listing.user_id || ''
         const sellerBusiness = allBusinesses[listingSellerId]
         const isAdActive = sellerBusiness?.ads?.some(
-          (ad) => ad.listingId === listing.id && ad.status === 'Active'
+          (ad) => ad.listingId === listing.id && ad.status === 'Active' && ad.moderation_status === 'approved'
         )
         return {
           ...listing,
@@ -1646,7 +1662,11 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       throw new Error('You can only save your own store.')
     }
 
-    const nextAll = { ...allBusinesses, [updated.userId]: updated }
+    const savedBusiness = {
+      ...updated,
+      ads: allBusinesses[updated.userId]?.ads || businessProfile?.ads || [],
+    }
+    const nextAll = { ...allBusinesses, [updated.userId]: savedBusiness }
 
     if (session?.user?.id) {
       const { error } = await supabase.from('stores').upsert({
@@ -1665,17 +1685,49 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         collections: updated.collections || [],
         customer_care: updated.customerCare || {},
         catalog: updated.catalog,
-        ads: updated.ads,
         theme_config: updated.themeConfig || {},
       }, { onConflict: 'user_id' })
       if (error) throw error
     }
 
     setAllBusinesses(nextAll)
-    setBusinessProfile(updated)
+    setBusinessProfile(savedBusiness)
     window.localStorage.setItem('marketspace-all-businesses', JSON.stringify(nextAll))
     setMessage('Business profile updated successfully')
     navigate('/profile/store-dashboard')
+  }
+
+  const saveAd = async (ad: BusinessAd) => {
+    if (!session?.user?.id) throw new Error('Sign in to create an ad.')
+    const ownerStore = allBusinesses[session.user.id] || businessProfile
+    if (!ownerStore?.storeId) throw new Error('Your approved store could not be found.')
+
+    const adData = Object.fromEntries(
+      Object.entries(ad).filter(([key]) => !['id', 'status', 'moderation_status', 'moderation_reason'].includes(key))
+    )
+    const { error } = await supabase.from('store_ads').insert({
+      id: ad.id,
+      store_id: ownerStore.storeId,
+      user_id: session.user.id,
+      status: ad.status,
+      ad_data: adData,
+    })
+    if (error) throw new Error(`The ad could not be submitted: ${error.message}`)
+    await loadBusinesses()
+    setMessage('Ad submitted for moderation')
+  }
+
+  const updateAdStatus = async (adId: string, nextStatus: BusinessAd['status']) => {
+    if (!session?.user?.id) throw new Error('Sign in to update this ad.')
+    const { data, error } = await supabase.from('store_ads')
+      .update({ status: nextStatus, updated_at: new Date().toISOString() })
+      .eq('id', adId)
+      .eq('user_id', session.user.id)
+      .select('id')
+      .maybeSingle()
+    if (error) throw new Error(`The ad status could not be updated: ${error.message}`)
+    if (!data) throw new Error('This ad could not be found in your store.')
+    await loadBusinesses()
   }
 
   const handleSaveStoreTheme = async (themeConfig: StoreThemeConfig, storeUserId?: string) => {
@@ -1786,16 +1838,21 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       try {
         baseStores = JSON.parse(stored) as Record<string, BusinessProfile>
       } catch {
-        // ignore
+        setMessage('Cached store data could not be loaded.')
       }
     }
+    Object.values(baseStores).forEach((store) => { store.ads = [] })
     setAllBusinesses(baseStores)
 
-    const { data } = await supabase.from('stores').select('*')
-    if (data && data.length > 0) {
-      const dbStores: Record<string, BusinessProfile> = {}
-      const nonPublicStoreOwners = new Set<string>()
-      data.forEach((s: any) => {
+    const { data, error: storesError } = await supabase.from('stores').select('*')
+    if (storesError) {
+      setMessage(`Stores could not be loaded: ${storesError.message}`)
+      return
+    }
+
+    const dbStores: Record<string, BusinessProfile> = {}
+    const nonPublicStoreOwners = new Set<string>()
+    ;(data || []).forEach((s: any) => {
         if (s.status && s.status !== 'approved') {
           nonPublicStoreOwners.add(s.user_id)
           return
@@ -1825,7 +1882,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
           collections: s.collections || [],
           customerCare: s.customer_care || s.customerCare || {},
           catalog: s.catalog || [],
-          ads: s.ads || [],
+          ads: [],
           verifiedId: s.verified_id === true,
           verifiedLocation: s.verified_location === true,
           registeredBusiness: s.registered_business === true,
@@ -1836,13 +1893,41 @@ export function useMarketplaceApp(): MarketplaceAppModel {
           templateId: s.template_id || undefined,
           templateContent: s.template_content || {},
         }
-      })
+    })
+    const { data: adRows, error: adsError } = await supabase
+      .from('store_ads')
+      .select('id,user_id,status,ad_data,moderation_status,moderation_reason,created_at')
+    if (adsError) {
       setAllBusinesses(prev => {
         const next = { ...prev, ...dbStores }
         nonPublicStoreOwners.forEach((ownerId) => delete next[ownerId])
         return next
       })
+      setMessage(`Store ads could not be loaded: ${adsError.message}`)
+      return
     }
+    const adsByUser = new Map<string, BusinessAd[]>()
+    ;(adRows || []).forEach((row) => {
+      const ad: BusinessAd = {
+        ...(row.ad_data as Omit<BusinessAd, 'id' | 'status'>),
+        id: row.id,
+        status: row.status,
+        moderation_status: row.moderation_status,
+        moderation_reason: row.moderation_reason,
+        createdAt: row.created_at,
+      }
+      const userAds = adsByUser.get(row.user_id) || []
+      userAds.push(ad)
+      adsByUser.set(row.user_id, userAds)
+    })
+    Object.entries(dbStores).forEach(([userId, store]) => {
+      store.ads = adsByUser.get(userId) || []
+    })
+    setAllBusinesses(prev => {
+      const next = { ...prev, ...dbStores }
+      nonPublicStoreOwners.forEach((ownerId) => delete next[ownerId])
+      return next
+    })
   }
 
   useEffect(() => {
@@ -1919,6 +2004,10 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setStatus,
     listingType,
     setListingType,
+    servicePriceUnit,
+    setServicePriceUnit,
+    serviceAreaId,
+    setServiceAreaId,
     condition,
     setCondition,
     deliveryOption,
@@ -1956,6 +2045,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     uploadedImages,
     setUploadedImages,
     handleCreateOrUpdateBusiness,
+    saveAd,
+    updateAdStatus,
     handleSaveStoreTheme,
     handleSaveStoreTemplate,
     handleDeleteListing,

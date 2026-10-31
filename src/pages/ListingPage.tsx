@@ -6,6 +6,9 @@ import type { Listing } from '../types'
 import { formatZMWPrice } from '../utils/formatPrice'
 import { uploadImageToSupabase } from '../features/marketplace/ImageUploader'
 import { logAnalyticsEvent } from '../services/analytics'
+import { supabase } from '../lib/supabaseClient'
+import { formatServicePriceUnit, SERVICE_PRICE_UNITS, type ServicePriceUnit } from '../features/marketplace/serviceListings'
+import { getMarketplaceLocationName } from '../features/marketplace/storeLocations'
 
 type ListingDetailPageProps = {
   selectedListing: Listing | null
@@ -89,6 +92,21 @@ export function ListingDetailPage({
     }
     setFormError('')
 
+    if (isService) {
+      const payload = {
+        listingId: selectedListing.id,
+        title: selectedListing.title,
+        price: selectedListing.price,
+        priceUnit: selectedListing.price_unit ?? 'fixed',
+        serviceArea: getMarketplaceLocationName(selectedListing.service_area_id) || null,
+        image: selectedListing.images?.[0] || '',
+        message: freeFormMessage.trim() || null,
+        isService: true,
+      }
+      onMessageSeller(`[INQUIRY_CARD]${JSON.stringify(payload)}`)
+      return
+    }
+
     // Mandatory validations
     if (hasColors && selectedColors.length === 0) {
       setFormError('Please select at least one color.')
@@ -130,7 +148,7 @@ export function ListingDetailPage({
       phone: phone.trim(),
       message: freeFormMessage.trim() || null,
       offer: (acceptsOffers && numOffer && numOffer > 0) ? numOffer : null,
-      isService
+      isService: false
     }
 
     const inquiryCard = `[INQUIRY_CARD]${JSON.stringify(payload)}`
@@ -349,7 +367,7 @@ export function ListingDetailPage({
               </div>
               <div>
                 <span style={{ display: 'block', fontSize: '0.74rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Price</span>
-                <strong style={{ display: 'block', fontSize: '0.98rem', color: 'var(--text)', marginTop: '2px' }}>{formatZMWPrice(selectedListing.price)}</strong>
+                <strong style={{ display: 'block', fontSize: '0.98rem', color: 'var(--text)', marginTop: '2px' }}>{formatZMWPrice(selectedListing.price)} {isService && formatServicePriceUnit(selectedListing.price_unit)}</strong>
               </div>
             </div>
 
@@ -368,7 +386,8 @@ export function ListingDetailPage({
                 <span className="material-icons" style={{ fontSize: '20px' }}>place</span>
               </div>
               <div>
-                <span style={{ display: 'block', fontSize: '0.74rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Location</span>
+                <span style={{ display: 'block', fontSize: '0.74rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{isService ? 'Service area' : 'Location'}</span>
+                {isService && selectedListing.service_area_id && <strong style={{ display: 'block', fontSize: '0.98rem', color: 'var(--text)', marginTop: '2px' }}>{getMarketplaceLocationName(selectedListing.service_area_id) || selectedListing.service_area_id}</strong>}
               </div>
             </div>
 
@@ -387,8 +406,8 @@ export function ListingDetailPage({
         {/* Right Column: Sticky Buy Box Card with Inquiry Form */}
         <div className="buy-box-panel" style={isXtraPreset ? { background: '#111827', borderColor: '#1F2937', color: '#F9FAFB' } : undefined}>
           <div>
-            <span style={{ fontSize: '0.86rem', color: isXtraPreset ? '#9CA3AF' : 'var(--text-secondary)', fontWeight: 600 }}>Total Price</span>
-            <h3 style={{ color: isXtraPreset ? '#FACC15' : '#2563eb', marginTop: '4px' }}>{formatZMWPrice(selectedListing.price)}</h3>
+            <span style={{ fontSize: '0.86rem', color: isXtraPreset ? '#9CA3AF' : 'var(--text-secondary)', fontWeight: 600 }}>{isService ? 'Service price' : 'Total Price'}</span>
+            <h3 style={{ color: isXtraPreset ? '#FACC15' : '#2563eb', marginTop: '4px' }}>{isService && selectedListing.price_unit === 'from' ? 'From ' : ''}{formatZMWPrice(selectedListing.price)} {isService && formatServicePriceUnit(selectedListing.price_unit)}</h3>
           </div>
 
           <div style={{ borderTop: `1px solid ${isXtraPreset ? '#1F2937' : 'var(--border)'}`, paddingTop: '12px' }}>
@@ -407,7 +426,7 @@ export function ListingDetailPage({
           )}
 
           {/* Color Selection (Mandatory if listing has available_colors) */}
-          {hasColors && (
+          {hasColors && !isService && (
             <label style={{ display: 'block' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.86rem', fontWeight: 600, color: isXtraPreset ? '#F9FAFB' : 'var(--text)' }}>
@@ -533,50 +552,52 @@ export function ListingDetailPage({
           </label>
 
           {/* Offer Input (Inactive/disabled if seller does not accept offers) */}
-          <div style={{ padding: '12px', background: isXtraPreset ? '#1F2937' : 'var(--panel)', borderRadius: '10px', border: `1px solid ${isXtraPreset ? '#374151' : 'var(--border)'}` }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <span style={{ fontSize: '0.86rem', fontWeight: 600, color: isXtraPreset ? '#F9FAFB' : 'var(--text)' }}>
-                Make an Offer (ZMW)
-              </span>
-              {!acceptsOffers && (
-                <span style={{ fontSize: '0.72rem', color: isXtraPreset ? '#9CA3AF' : 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                  <span className="material-icons" style={{ fontSize: '13px' }}>lock</span> Not accepted
+          {!isService && (
+            <div style={{ padding: '12px', background: isXtraPreset ? '#1F2937' : 'var(--panel)', borderRadius: '10px', border: `1px solid ${isXtraPreset ? '#374151' : 'var(--border)'}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <span style={{ fontSize: '0.86rem', fontWeight: 600, color: isXtraPreset ? '#F9FAFB' : 'var(--text)' }}>
+                  Make an Offer (ZMW)
                 </span>
+                {!acceptsOffers && (
+                  <span style={{ fontSize: '0.72rem', color: isXtraPreset ? '#9CA3AF' : 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                    <span className="material-icons" style={{ fontSize: '13px' }}>lock</span> Not accepted
+                  </span>
+                )}
+              </div>
+
+              <input
+                type="number"
+                disabled={!acceptsOffers}
+                placeholder={acceptsOffers ? `Optional (Min: ZMW ${selectedListing.lowest_acceptable_price})` : "Offers disabled for this item"}
+                value={offerAmount}
+                onChange={(e) => {
+                  setOfferAmount(e.target.value)
+                  setFormError('')
+                }}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  border: `1px solid ${isXtraPreset ? '#374151' : 'var(--border)'}`,
+                  background: !acceptsOffers ? (isXtraPreset ? '#111827' : 'rgba(0,0,0,0.04)') : (isXtraPreset ? '#0B0F19' : 'var(--surface)'),
+                  color: !acceptsOffers ? (isXtraPreset ? '#6B7280' : 'var(--text-secondary)') : (isXtraPreset ? '#F9FAFB' : 'var(--text)'),
+                  cursor: !acceptsOffers ? 'not-allowed' : 'text',
+                  fontSize: '0.9rem',
+                  opacity: !acceptsOffers ? 0.75 : 1
+                }}
+              />
+              {!acceptsOffers ? (
+                <p style={{ margin: '6px 0 0', fontSize: '0.76rem', color: isXtraPreset ? '#9CA3AF' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span className="material-icons" style={{ fontSize: '14px' }}>info</span>
+                  Seller is not accepting offers on this item.
+                </p>
+              ) : (
+                <p style={{ margin: '6px 0 0', fontSize: '0.76rem', color: isXtraPreset ? '#9CA3AF' : 'var(--text-secondary)' }}>
+                  Accepts counter-offers at or above ZMW {selectedListing.lowest_acceptable_price}.
+                </p>
               )}
             </div>
-
-            <input
-              type="number"
-              disabled={!acceptsOffers}
-              placeholder={acceptsOffers ? `Optional (Min: ZMW ${selectedListing.lowest_acceptable_price})` : "Offers disabled for this item"}
-              value={offerAmount}
-              onChange={(e) => {
-                setOfferAmount(e.target.value)
-                setFormError('')
-              }}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                borderRadius: '8px',
-                border: `1px solid ${isXtraPreset ? '#374151' : 'var(--border)'}`,
-                background: !acceptsOffers ? (isXtraPreset ? '#111827' : 'rgba(0,0,0,0.04)') : (isXtraPreset ? '#0B0F19' : 'var(--surface)'),
-                color: !acceptsOffers ? (isXtraPreset ? '#6B7280' : 'var(--text-secondary)') : (isXtraPreset ? '#F9FAFB' : 'var(--text)'),
-                cursor: !acceptsOffers ? 'not-allowed' : 'text',
-                fontSize: '0.9rem',
-                opacity: !acceptsOffers ? 0.75 : 1
-              }}
-            />
-            {!acceptsOffers ? (
-              <p style={{ margin: '6px 0 0', fontSize: '0.76rem', color: isXtraPreset ? '#9CA3AF' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span className="material-icons" style={{ fontSize: '14px' }}>info</span>
-                Seller is not accepting offers on this item.
-              </p>
-            ) : (
-              <p style={{ margin: '6px 0 0', fontSize: '0.76rem', color: isXtraPreset ? '#9CA3AF' : 'var(--text-secondary)' }}>
-                Accepts counter-offers at or above ZMW {selectedListing.lowest_acceptable_price}.
-              </p>
-            )}
-          </div>
+          )}
 
           {/* Free-form Message Input (Optional) */}
           <label style={{ display: 'block' }}>
@@ -584,7 +605,7 @@ export function ListingDetailPage({
               Message for Seller <span style={{ fontSize: '0.76rem', fontWeight: 400, color: isXtraPreset ? '#9CA3AF' : 'var(--text-secondary)' }}>(Optional)</span>
             </span>
             <textarea
-              placeholder="Ask questions or specify delivery preferences..."
+              placeholder={isService ? 'Ask the provider about this service...' : 'Ask questions or specify delivery preferences...'}
               value={freeFormMessage}
               onChange={(e) => setFreeFormMessage(e.target.value)}
               rows={2}
@@ -622,10 +643,10 @@ export function ListingDetailPage({
               title={isOwner ? 'You cannot message yourself' : undefined}
             >
               <span className="material-icons" style={{ fontSize: '20px' }}>chat</span>
-              Chat with Seller / Send Inquiry
+              {isService ? 'Message provider' : 'Chat with Seller / Send Inquiry'}
             </button>
 
-            <button
+            {!isService && <button
               type="button"
               className="secondary-btn"
               style={{ width: '100%', padding: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
@@ -634,7 +655,20 @@ export function ListingDetailPage({
             >
               <span className="material-icons" style={{ fontSize: '18px' }}>shopping_bag</span>
               Instant Buy
-            </button>
+            </button>}
+
+            {isService && selectedListing.user_id && allBusinesses[selectedListing.user_id]?.whatsapp && (
+              <a
+                className="secondary-btn"
+                href={`https://wa.me/${allBusinesses[selectedListing.user_id].whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello, I'm interested in ${selectedListing.title}.`)}`}
+                target="_blank"
+                rel="noreferrer"
+                style={{ width: '100%', padding: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', textDecoration: 'none' }}
+              >
+                <span className="material-icons" style={{ fontSize: '18px' }}>chat</span>
+                WhatsApp provider
+              </a>
+            )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               <button type="button" className="secondary-btn" onClick={() => onToggleSave(Number(selectedListing.id))} style={{ padding: '10px' }}>
@@ -867,6 +901,10 @@ type ListingFormPageProps = {
   category: string
   status: string
   listingType: string
+  servicePriceUnit: ServicePriceUnit
+  onServicePriceUnitChange: (value: ServicePriceUnit) => void
+  serviceAreaId: string
+  onServiceAreaIdChange: (value: string) => void
   condition: string
   deliveryOption: string
   uploadedImages: string[]
@@ -906,6 +944,10 @@ export function ListingFormPage({
   category,
   status,
   listingType,
+  servicePriceUnit,
+  onServicePriceUnitChange,
+  serviceAreaId,
+  onServiceAreaIdChange,
   condition,
   deliveryOption,
   uploadedImages,
@@ -937,6 +979,7 @@ export function ListingFormPage({
   onUseGlobalRenewalChange,
 }: ListingFormPageProps) {
   const [errorText, setErrorText] = useState('')
+  const [serviceLocations, setServiceLocations] = useState<Array<{ id: string; name: string }>>([])
   const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit')
   const [customColor, setCustomColor] = useState('#2563eb')
 
@@ -958,6 +1001,19 @@ export function ListingFormPage({
   const [selectedDeliveryMethods, setSelectedDeliveryMethods] = useState<string[]>(() => {
     return deliveryOption ? deliveryOption.split(', ') : ['Meetup']
   })
+
+  useEffect(() => {
+    let active = true
+    void supabase.from('marketplace_locations').select('id,name').order('name').then(({ data, error }) => {
+      if (!active) return
+      if (error) {
+        setErrorText(`Service areas could not be loaded: ${error.message}`)
+        return
+      }
+      setServiceLocations(data || [])
+    })
+    return () => { active = false }
+  }, [])
 
   const toggleDeliveryMethod = (method: string) => {
     let updated: string[]
@@ -1351,19 +1407,39 @@ export function ListingFormPage({
           {/* PRICE INPUT */}
           <div>
             <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text)' }}>
-              Price (ZMW) <span style={{ color: '#ef4444' }}>*</span>
+              {listingKind === 'service' ? 'Service price (ZMW)' : 'Price (ZMW)'} <span style={{ color: '#ef4444' }}>*</span>
             </label>
             <input
               value={price}
               onChange={(event) => onPriceChange(event.target.value)}
               placeholder={listingKind === 'service' ? "Price (e.g. 150 or 50/hour)" : "e.g. 4500"}
               required
+              type="number"
+              min="0"
+              step="0.01"
               style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.92rem' }}
             />
+            {listingKind === 'service' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '10px' }}>
+                <label style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text)' }}>
+                  Pricing unit
+                  <select value={servicePriceUnit} onChange={(event) => onServicePriceUnitChange(event.target.value as ServicePriceUnit)} style={{ display: 'block', width: '100%', marginTop: '5px', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }}>
+                    {SERVICE_PRICE_UNITS.map((unit) => <option key={unit} value={unit}>{unit === 'fixed' ? 'Fixed price' : unit === 'from' ? 'From' : unit === 'per_hour' ? 'Per hour' : 'Per day'}</option>)}
+                  </select>
+                </label>
+                <label style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text)' }}>
+                  Service area <span style={{ fontWeight: 400 }}>(optional)</span>
+                  <select value={serviceAreaId} onChange={(event) => onServiceAreaIdChange(event.target.value)} style={{ display: 'block', width: '100%', marginTop: '5px', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }}>
+                    <option value="">Not specified</option>
+                    {serviceLocations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+                  </select>
+                </label>
+              </div>
+            )}
           </div>
 
           {/* LOWEST ACCEPTABLE PRICE (LOWBALL SHIELD) */}
-          <div>
+          {listingKind !== 'service' && <div>
             <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '4px', color: 'var(--text)' }}>
               Lowest Acceptable Price (ZMW) — Optional Hidden Threshold
             </label>
@@ -1377,10 +1453,10 @@ export function ListingFormPage({
               placeholder="e.g. 400 (Asking price is 500)"
               style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.92rem' }}
             />
-          </div>
+          </div>}
 
           {/* DELIVERY PAID BY SELECTION */}
-          <div>
+          {listingKind !== 'service' && <div>
             <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text)' }}>
               Delivery Fee Paid By
             </label>
@@ -1393,10 +1469,10 @@ export function ListingFormPage({
               <option value="seller">Paid by Seller (Free Delivery)</option>
               <option value="split">Split (50/50)</option>
             </select>
-          </div>
+          </div>}
 
           {/* SELLER PHONE NUMBER INPUT */}
-          <div>
+          {listingKind !== 'service' && <div>
             <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text)' }}>
               Seller Contact / WhatsApp Number <span style={{ color: '#ef4444' }}>*</span>
             </label>
@@ -1408,7 +1484,7 @@ export function ListingFormPage({
               required
               style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.92rem' }}
             />
-          </div>
+          </div>}
 
           {/* STOCK vs SINGLE ITEM TOGGLE (ITEMS ONLY) */}
           {listingKind !== 'service' && (

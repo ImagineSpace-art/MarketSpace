@@ -58,7 +58,7 @@ export function StoreInsightsView({
     }, [daysCount])
 
     // Active ads count
-    const activeAdsCount = (businessProfile?.ads || []).filter(a => a.status === 'Active').length
+    const activeAdsCount = (businessProfile?.ads || []).filter(a => a.status === 'Active' && a.moderation_status === 'approved').length
 
     // Real database metrics (Views)
     const viewsCount = analyticsData?.viewsCount ?? 0

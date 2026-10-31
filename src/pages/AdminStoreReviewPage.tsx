@@ -1,12 +1,19 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { getFunctionErrorMessage } from '../utils/functionError'
-import type { Listing } from '../types'
+import type { BusinessAd, Listing } from '../types'
 
 type PendingListing = Listing & {
   moderation_status: 'pending'
   moderation_reason: string | null
   store_name: string | null
+}
+
+type PendingAd = BusinessAd & {
+  moderation_status: 'pending'
+  moderation_reason: string | null
+  store_name: string
+  seller_name: string
 }
 
 type ReviewApplication = {
@@ -61,15 +68,18 @@ export function AdminStoreReviewPage() {
   const [applications, setApplications] = useState<ReviewApplication[]>([])
   const [reportGroups, setReportGroups] = useState<StoreReportGroup[]>([])
   const [pendingListings, setPendingListings] = useState<PendingListing[]>([])
-  const [activeQueue, setActiveQueue] = useState<'applications' | 'reports' | 'listings' | 'notifications'>('applications')
+  const [pendingAds, setPendingAds] = useState<PendingAd[]>([])
+  const [activeQueue, setActiveQueue] = useState<'applications' | 'reports' | 'listings' | 'ads' | 'notifications'>('applications')
   const [loading, setLoading] = useState(true)
   const [reportsLoading, setReportsLoading] = useState(false)
   const [listingsLoading, setListingsLoading] = useState(false)
+  const [adsLoading, setAdsLoading] = useState(false)
   const [workingId, setWorkingId] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [reasons, setReasons] = useState<Record<string, string>>({})
   const [listingReasons, setListingReasons] = useState<Record<number, string>>({})
+  const [adReasons, setAdReasons] = useState<Record<string, string>>({})
   const [badges, setBadges] = useState<Record<string, { verifiedId: boolean; verifiedLocation: boolean; registeredBusiness: boolean }>>({})
   const [recipientMode, setRecipientMode] = useState<'all' | 'selected'>('all')
   const [recipientSearch, setRecipientSearch] = useState('')
@@ -143,6 +153,22 @@ export function AdminStoreReviewPage() {
       setError(loadError instanceof Error ? loadError.message : 'Pending listings could not be loaded.')
     } finally {
       setListingsLoading(false)
+    }
+  }, [])
+
+  const loadPendingAds = useCallback(async () => {
+    setError('')
+    setAdsLoading(true)
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke<{ ads: PendingAd[] }>('listing-review', {
+        body: { action: 'pending_ads' },
+      })
+      if (invokeError) setError(await getFunctionErrorMessage(invokeError))
+      else setPendingAds(data?.ads || [])
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Pending ads could not be loaded.')
+    } finally {
+      setAdsLoading(false)
     }
   }, [])
 
@@ -220,6 +246,7 @@ export function AdminStoreReviewPage() {
       <button type="button" className={currentQueue === 'applications' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'applications' ? 'page' : undefined} onClick={() => setActiveQueue('applications')}>Store applications</button>
       <button type="button" className={currentQueue === 'reports' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'reports' ? 'page' : undefined} onClick={() => { setActiveQueue('reports'); void loadReports() }}>Reports</button>
       <button type="button" className={currentQueue === 'listings' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'listings' ? 'page' : undefined} onClick={() => { setActiveQueue('listings'); void loadPendingListings() }}>Listings ({pendingListings.length})</button>
+      <button type="button" className={currentQueue === 'ads' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'ads' ? 'page' : undefined} onClick={() => { setActiveQueue('ads'); void loadPendingAds() }}>Ads ({pendingAds.length})</button>
       {notificationAdminStatus === 'allowed' && (
         <button type="button" className={currentQueue === 'notifications' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'notifications' ? 'page' : undefined} onClick={() => setActiveQueue('notifications')}>Notifications</button>
       )}
@@ -299,6 +326,32 @@ export function AdminStoreReviewPage() {
       }
     } catch (reviewError) {
       setError(reviewError instanceof Error ? reviewError.message : 'The listing decision could not be saved.')
+    } finally {
+      setWorkingId('')
+    }
+  }
+
+  const reviewAd = async (ad: PendingAd, decision: 'approve' | 'reject') => {
+    setError('')
+    setNotice('')
+    setWorkingId(ad.id)
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke<{ success?: boolean }>('listing-review', {
+        body: {
+          action: 'review_ad',
+          adId: ad.id,
+          decision,
+          reason: adReasons[ad.id] || '',
+        },
+      })
+      if (invokeError) setError(await getFunctionErrorMessage(invokeError))
+      else if (!data?.success) setError('The ad decision could not be saved.')
+      else {
+        setNotice(`Ad ${decision === 'approve' ? 'approved' : 'rejected'}.`)
+        await loadPendingAds()
+      }
+    } catch (reviewError) {
+      setError(reviewError instanceof Error ? reviewError.message : 'The ad decision could not be saved.')
     } finally {
       setWorkingId('')
     }
@@ -403,7 +456,7 @@ export function AdminStoreReviewPage() {
 
   if (activeQueue === 'listings') {
     return (
-      <section style={{ width: 'min(100%, 1100px)', margin: '0 auto', padding: 20 }}>
+      <section style={{ width: 'min(100%, 1100px)', boxSizing: 'border-box', margin: '0 auto', padding: 20 }}>
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
           <div>
             <p style={{ margin: 0, color: '#2563eb', fontSize: '.75rem', fontWeight: 800, letterSpacing: '.1em' }}>MARKETSPACE MODERATION</p>
@@ -467,6 +520,80 @@ export function AdminStoreReviewPage() {
                     onClick={() => void reviewListing(listing, 'approve')}
                   >
                     {workingId === String(listing.id) ? 'Saving…' : 'Approve'}
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+    )
+  }
+
+  if (activeQueue === 'ads') {
+    return (
+      <section style={{ width: 'min(100%, 1100px)', boxSizing: 'border-box', margin: '0 auto', padding: 20 }}>
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+          <div>
+            <p style={{ margin: 0, color: '#2563eb', fontSize: '.75rem', fontWeight: 800, letterSpacing: '.1em' }}>MARKETSPACE MODERATION</p>
+            <h2 style={{ margin: '4px 0' }}>Ad review</h2>
+            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>{pendingAds.length} ads awaiting review</p>
+          </div>
+          <button type="button" className="secondary-btn" disabled={adsLoading} onClick={() => void loadPendingAds()}>
+            {adsLoading ? 'Refreshing…' : 'Refresh ads'}
+          </button>
+        </header>
+        {renderQueueNavigation('ads')}
+        {error && <p role="alert" className="store-wizard-alert error">{error}</p>}
+        {notice && <p role="status" className="store-wizard-alert notice">{notice}</p>}
+        {adsLoading ? (
+          <section className="section-card"><p>Loading pending ads…</p></section>
+        ) : pendingAds.length === 0 ? (
+          <section className="section-card"><p>No ads are waiting for review.</p></section>
+        ) : (
+          <div style={{ display: 'grid', gap: 16 }}>
+            {pendingAds.map(ad => (
+              <article key={ad.id} className="section-card" style={{ padding: 20, minWidth: 0 }}>
+                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14, flexWrap: 'wrap' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <h3 style={{ margin: '0 0 4px', overflowWrap: 'anywhere' }}>{ad.headline || ad.adTitle || 'Untitled ad'}</h3>
+                    <p style={{ margin: 0, color: 'var(--text-secondary)' }}>{ad.seller_name} · {ad.store_name}</p>
+                  </div>
+                  <strong>{ad.status} · {ad.budget}</strong>
+                </header>
+                {ad.adText && <p style={{ whiteSpace: 'pre-wrap', margin: '14px 0' }}>{ad.adText}</p>}
+                {ad.media?.length ? (
+                  <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 14 }}>
+                    {ad.media.map((source, index) => ad.mediaTypes?.[index] === 'video'
+                      ? <video key={`${ad.id}-${index}`} src={source} controls preload="metadata" style={{ width: 180, height: 120, objectFit: 'cover', borderRadius: 8, flex: '0 0 auto' }} />
+                      : <img key={`${ad.id}-${index}`} src={source} alt={`${ad.headline || ad.adTitle || 'Ad'} ${index + 1}`} style={{ width: 180, height: 120, objectFit: 'cover', borderRadius: 8, flex: '0 0 auto' }} />)}
+                  </div>
+                ) : null}
+                <label style={{ display: 'grid', gap: 6, marginBottom: 12 }}>
+                  <span>Review reason (required to reject)</span>
+                  <textarea
+                    value={adReasons[ad.id] || ''}
+                    maxLength={500}
+                    rows={2}
+                    onChange={event => setAdReasons(current => ({ ...current, [ad.id]: event.target.value }))}
+                  />
+                </label>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="secondary-btn"
+                    disabled={workingId === ad.id || !adReasons[ad.id]?.trim()}
+                    onClick={() => void reviewAd(ad, 'reject')}
+                  >
+                    Reject
+                  </button>
+                  <button
+                    type="button"
+                    className="primary-btn"
+                    disabled={workingId === ad.id}
+                    onClick={() => void reviewAd(ad, 'approve')}
+                  >
+                    {workingId === ad.id ? 'Saving…' : 'Approve'}
                   </button>
                 </div>
               </article>

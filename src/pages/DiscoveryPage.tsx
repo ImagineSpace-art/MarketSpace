@@ -308,7 +308,7 @@ export function DiscoveryPage({
           <h2>Products to Discover</h2>
           <Link to="/browse">Browse all products <span className="material-icons">arrow_forward</span></Link>
         </div>
-        <div className="marketplace-listing-grid">
+        <div className="discovery-product-rail discovery-listing-rail">
           {availableListings.map((listing) => {
             return <ListingView
               key={listing.id}
@@ -319,6 +319,25 @@ export function DiscoveryPage({
           })}
         </div>
       </section>}
+
+      {listings.some((listing) => listing.listing_type === 'service' && (!listing.status || listing.status.toLowerCase() === 'available')) && (
+        <section className="discovery-content-section discovery-services-section" style={{ maxWidth: '1240px', margin: '60px auto 40px', padding: '0 24px' }}>
+          <div className="discovery-section-heading">
+            <h2>Services to Discover</h2>
+            <Link to="/browse?category=Services">Browse all services <span className="material-icons">arrow_forward</span></Link>
+          </div>
+          <div className="discovery-product-rail discovery-listing-rail">
+            {listings.filter((listing) => listing.listing_type === 'service' && (!listing.status || listing.status.toLowerCase() === 'available')).map((listing) => (
+              <ListingView
+                key={listing.id}
+                listing={listing}
+                onOpen={() => navigate(`/listings/${listing.id}`)}
+                allBusinesses={allBusinesses}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ----------------- 3. MERCHANT STORIES & GUIDES ----------------- */}
       <section className="discovery-content-section" style={{ maxWidth: '1240px', margin: '60px auto 40px', padding: '0 24px' }}>

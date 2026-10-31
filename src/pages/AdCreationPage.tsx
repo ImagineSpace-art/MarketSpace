@@ -263,7 +263,7 @@ export function AdCreationPage({
             {publishSuccess && (
                 <div style={{ backgroundColor: '#10b981', color: '#ffffff', padding: '14px 20px', borderRadius: '10px', marginBottom: '20px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span className="material-icons">check_circle</span>
-                    <span>Your ad campaign has been published successfully! Redirecting to dashboard...</span>
+                    <span>Your ad campaign was submitted for moderation. It will appear after approval.</span>
                 </div>
             )}
 
