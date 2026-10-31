@@ -558,7 +558,13 @@
 
 .template-department-add {
   display: flex;
-  gap: 8px;
+ width: 100%;
+ min-width: 0;
+ gap: 8px;
+}
+
+.template-department-add > * {
+ min-width: 0;
 }
 
 .template-department-add input {
@@ -748,21 +754,21 @@
 
 .template-editor-form {
   display: grid;
+  min-width: 0;
   gap: 14px;
 }
 
 .template-editor-group {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   gap: 12px;
   padding: 18px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
-}
-
-.template-editor-group h2 {
-  margin: 0;
-  font-size: 1rem;
 }
 
 .template-text-field,
@@ -981,12 +987,41 @@
   }
 
   .template-editor-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .template-editor-layout > *,
+  .template-editor-form {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
   }
 
   .template-editor-preview {
     position: static;
     max-height: 650px;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .landing-store-preview {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .landing-store-preview > main,
+  .landing-store-preview .landing-products,
+  .landing-store-preview .landing-categories,
+  .landing-store-preview .landing-product-row,
+  .landing-store-preview .landing-category-row {
+    min-width: 0;
+    max-width: 100%;
   }
 
   .boutique-store-preview {

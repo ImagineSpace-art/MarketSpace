@@ -26,8 +26,7 @@ const categoryIcons: Record<string, string> = {
   Toys: 'smart_toy',
 }
 
-export function Listing({ listing, saved = false, onOpen, onToggleSave, onAddToCart, onQuickPeek, allBusinesses, onVisitStore }: ListingCardProps) {
-  const hasImage = Boolean(listing.images && listing.images.length > 0)
+export function Listing({ listing, saved = false, onOpen, onToggleSave, onQuickPeek, allBusinesses, onVisitStore }: ListingCardProps) {  const hasImage = Boolean(listing.images && listing.images.length > 0)
   const mainImage = hasImage ? listing.images![0] : null
 
   // Check if seller owns a registered business store
@@ -102,7 +101,12 @@ export function Listing({ listing, saved = false, onOpen, onToggleSave, onAddToC
               -{discountPercent}%
             </span>
           )}
+          
         </div>
+
+        <span className="modern-pill-badge muted-pill" style={{ position: 'absolute', zIndex: '2', bottom: '8px', left: '8px' }}>
+          {listing.category || 'General'}
+        </span>
 
         {/* Top-Right Bookmark Button */}
         <div className="modern-card-actions">
@@ -146,63 +150,12 @@ export function Listing({ listing, saved = false, onOpen, onToggleSave, onAddToC
             </span>
           </div>
         )}
+
+        
       </div>
 
       {/* 2. BOTTOM INFO PANEL */}
       <div className="modern-card-info">
-        {/* Category & Seller Identity Distinction */}
-        {sellerStore ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-            <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px',
-              fontSize: '0.72rem',
-              fontWeight: 700,
-              color: '#2563eb',
-              backgroundColor: 'rgba(37, 99, 235, 0.08)',
-              padding: '2px 8px',
-              borderRadius: '4px',
-              border: '1px solid rgba(37, 99, 235, 0.2)'
-            }}>
-              <span className="material-icons" style={{ fontSize: '13px', color: '#2563eb' }}>storefront</span>
-              <span style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {sellerStore.shopName}
-              </span>
-              {sellerStore.verifiedId && <span className="material-icons" style={{ fontSize: '12px', color: '#3b82f6' }} title="Verified ID">verified</span>}
-            </span>
-            <span className="modern-card-category" style={{ margin: 0 }}>
-              {listing.category || 'General'}
-            </span>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-            <span style={{
-              fontSize: '0.7rem',
-              fontWeight: 600,
-              color: 'var(--text-muted, #71717a)',
-              backgroundColor: 'var(--surface, rgba(0,0,0,0.04))',
-              padding: '2px 6px',
-              borderRadius: '4px'
-            }}>
-              Individual Seller
-            </span>
-            <span className="modern-card-category" style={{ margin: 0 }}>
-              {listing.category || 'General'}
-            </span>
-          </div>
-        )}
-
-        {listing.user_id && (
-          <Link
-            to={`/seller/${listing.user_id}`}
-            className="listing-seller-profile-link"
-            onClick={(event) => event.stopPropagation()}
-          >
-            View seller profile
-          </Link>
-        )}
-
         {/* Product Title (Refined lightweight font) */}
         <h3 className="modern-card-title" title={listing.title}>
           {listing.title}
@@ -234,9 +187,50 @@ export function Listing({ listing, saved = false, onOpen, onToggleSave, onAddToC
           </div>
         ) : null}
 
+        {/* Category & Seller Identity Distinction */}
+        {sellerStore ? (
+          <div style={{ display: 'flex', paddingBottom: '4px', flexDirection: 'column', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              color: '#2563eb',
+              backgroundColor: 'rgba(37, 99, 235, 0.08)',
+              padding: '2px 8px',
+              borderRadius: '4px',
+              border: '1px solid rgba(37, 99, 235, 0.2)'
+            }}>
+              <span className="material-icons" style={{ fontSize: '13px', color: '#2563eb' }}>storefront</span>
+              <span style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {sellerStore.shopName}
+              </span>
+              {sellerStore.verifiedId && <span className="material-icons" style={{ fontSize: '12px', color: '#3b82f6' }} title="Verified ID">verified</span>}
+            </span>
+            {/* <span className="modern-card-category" style={{ margin: 0 }}>
+              {listing.category || 'General'}
+            </span> */}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+            <span style={{
+              fontSize: '0.7rem',
+              fontWeight: 600,
+              color: 'var(--text-muted, #71717a)',
+              backgroundColor: 'var(--surface, rgba(0,0,0,0.04))',
+              padding: '2px 6px',
+              borderRadius: '4px'
+            }}>
+              Individual Seller
+            </span>
+            
+          </div>
+        )}
+
         {/* Add to Cart, Visit Store & Quick Peek Actions Row */}
         <div className="modern-card-actions-group" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px' }}>
-          <button
+          {/* <button
             type="button"
             className="modern-card-cart-btn"
             onClick={(e) => {
@@ -253,7 +247,45 @@ export function Listing({ listing, saved = false, onOpen, onToggleSave, onAddToC
           >
             <span className="material-icons" style={{ fontSize: '13.5px' }}>shopping_bag</span>
             <span>Add to Cart</span>
-          </button>
+          </button> */}
+
+          {listing.user_id && (
+          <Link
+            to={`/seller/${listing.user_id}`}
+            className="listing-seller-profile-link"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px',
+              padding: '6px 10px',
+              borderRadius: '9999px',
+              border: '1px solid rgba(37, 99, 235, 0.35)',
+              background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(59, 130, 246, 0.15))',
+              color: '#2563eb',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              textDecoration: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.18s ease',
+              flex: '0 0 auto',
+              whiteSpace: 'nowrap'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#2563eb'
+              e.currentTarget.style.color = '#ffffff'
+              e.currentTarget.style.borderColor = '#2563eb'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(59, 130, 246, 0.15))'
+              e.currentTarget.style.color = '#2563eb'
+              e.currentTarget.style.borderColor = 'rgba(37, 99, 235, 0.35)'
+            }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            View Profile
+          </Link>
+        )}
 
           {sellerStore && (
             <button
@@ -283,7 +315,7 @@ export function Listing({ listing, saved = false, onOpen, onToggleSave, onAddToC
                 fontWeight: 700,
                 cursor: 'pointer',
                 transition: 'all 0.18s ease',
-                flex: '1 1 auto',
+                flex: '0 0 auto',
                 whiteSpace: 'nowrap'
               }}
               onMouseEnter={(e) => {

@@ -187,6 +187,7 @@ export function Shell({
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
+                  border: location.pathname === '/' || location.pathname === '/discovery' ? '1px solid #111827' : '1px solid transparent',
                   color: location.pathname === '/' || location.pathname === '/discovery' ? '#111827' : '#4b5563',
                   background: location.pathname === '/' || location.pathname === '/discovery' ? '#f3f4f6' : 'transparent',
                   padding: '5px 12px',
@@ -205,6 +206,7 @@ export function Shell({
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
+                  border: location.pathname === '/browse' ? '1px solid #111827' : '1px solid transparent',
                   color: location.pathname === '/browse' ? '#111827' : '#4b5563',
                   background: location.pathname === '/browse' ? '#f3f4f6' : 'transparent',
                   padding: '5px 12px',
@@ -224,6 +226,7 @@ export function Shell({
                   display: 'inline-flex',
                   alignItems: 'center',
                   color: location.pathname === '/stores' ? '#111827' : '#4b5563',
+                  border: location.pathname === '/stores' ? '1px solid #111827' : '1px solid transparent',
                   background: location.pathname === '/stores' ? '#f3f4f6' : 'transparent',
                   padding: '5px 12px',
                   borderRadius: '20px',

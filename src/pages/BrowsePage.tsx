@@ -276,14 +276,15 @@ export function BrowsePage({
         backgroundColor: 'var(--bg)',
         color: 'var(--text)',
         minHeight: '100vh',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+        fontFamily: 'inherit, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
       }}
     >
       {/* ---------------- 1. HERO SECTION (NovaTrend Style) ---------------- */}
       <section
         style={{
           maxWidth: '1280px',
-          margin: '24px auto 48px',
+          // margin: '24px auto 48px',
+          margin: '2px auto',
           padding: '0 24px',
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
@@ -330,7 +331,7 @@ export function BrowsePage({
             }}
           >
             Shop the latest trending products curated for modern lifestyles. Direct from verified independent merchants
-            and boutique stores.
+            and stores.
           </p>
 
           <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginBottom: '36px' }}>
@@ -410,7 +411,7 @@ export function BrowsePage({
 
         {/* Right Hero Visual */}
         <div style={{ position: 'relative', minHeight: '440px', display: 'flex', justifyContent: 'center' }}>
-          {/* Main Lifestyle Model Image */}
+          {/* Image */}
           <div
             style={{
               width: '100%',
@@ -434,7 +435,7 @@ export function BrowsePage({
       </section>
 
       {/* ---------------- 2. VALUE PROPOSITIONS BAR ---------------- */}
-      <section style={{ borderTop: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', backgroundColor: '#fcfcfd', padding: '24px 0' }}>
+      {/* <section style={{ borderTop: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', backgroundColor: '#fcfcfd', padding: '24px 0' }}>
         <div
           style={{
             maxWidth: '1280px',
@@ -477,7 +478,7 @@ export function BrowsePage({
             </div>
           </div>
         </div>
-      </section>
+      </section> */}
 
       <section id="browse-store-listings" style={{ maxWidth: '1280px', margin: '48px auto 40px', padding: '0 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '18px' }}>

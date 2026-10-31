@@ -84,7 +84,7 @@ export function DiscoveryPage({
         backgroundColor: '#ffffff',
         color: '#111827',
         minHeight: '100vh',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+        fontFamily: 'inherit ,-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
       }}
     >
       {/* ----------------- 1. HERO SECTION ----------------- */}

@@ -84,7 +84,7 @@ export function StoresPage({
         boxSizing: 'border-box',
         backgroundColor: 'var(--bg)',
         color: 'var(--text)',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+        fontFamily: 'inherit, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
       }}
     >
       <section
