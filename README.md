@@ -84,6 +84,12 @@ departments or the uncategorized catalog. Department management is saved through
 `store-template-save`, while listing assignment fields are written by the listing
 form.
 
+Store template changes are limited to one every six months. Apply
+`202611010001_profile_covers_and_template_cooldown.sql` before deploying the
+updated `store-template-save` function. The database trigger enforces the limit
+for every write path; the editor also disables the alternate template while the
+cooldown is active.
+
 Store reports use `202610290002_store_reports.sql` and the `store-report` Edge
 Function. Apply the migration and deploy the function before enabling the
 storefront report action or moderator queue. Reports require a confirmed email,
@@ -147,8 +153,10 @@ WHERE lower(email) = lower('owner@example.com')
   AND email_confirmed_at IS NOT NULL;
 ```
 
-Moderators open `/admin/login` to establish the isolated moderator session; the
-shopper Shell only displays the moderator workspace shortcut while that
+Moderators open `/admin/login` to establish the isolated moderator session.
+If a moderator or admin signs in through the regular marketplace login, MarketSpace
+signs out that shopper session and redirects them to `/admin/login`. The shopper
+Shell only displays the moderator workspace shortcut while the isolated
 moderator session is active.
 
 For a confirmed account already in `auth.users`, grant temporary moderator

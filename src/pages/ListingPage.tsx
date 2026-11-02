@@ -9,6 +9,7 @@ import { logAnalyticsEvent } from '../services/analytics'
 import { supabase } from '../lib/supabaseClient'
 import { formatServicePriceUnit, SERVICE_PRICE_UNITS, type ServicePriceUnit } from '../features/marketplace/serviceListings'
 import { getMarketplaceLocationName } from '../features/marketplace/storeLocations'
+import { DestructiveActionDialog } from '../components/DestructiveActionDialog'
 
 type ListingDetailPageProps = {
   selectedListing: Listing | null
@@ -20,7 +21,7 @@ type ListingDetailPageProps = {
   allBusinesses: Record<string, any>
   onVisitStore: (userId: string) => void
   onRenewListing?: (listingId: number) => void
-  onDeleteListing?: (listingId: number) => void
+  onDeleteListing?: (listingId: number) => Promise<void>
 }
 
 export function ListingDetailPage({
@@ -50,6 +51,7 @@ export function ListingDetailPage({
   const [formError, setFormError] = useState('')
   const [copied, setCopied] = useState(false)
   const [activeImageIdx, setActiveImageIdx] = useState(0)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const isOwner = session?.user?.id === selectedListing?.user_id
 
   useEffect(() => {
@@ -754,12 +756,7 @@ export function ListingDetailPage({
                     type="button"
                     className="secondary-btn"
                     style={{ borderColor: '#ef4444', color: '#ef4444', padding: '8px', fontSize: '0.85rem' }}
-                    onClick={() => {
-                      if (window.confirm('Are you sure you want to delete this listing permanently?')) {
-                        onDeleteListing?.(selectedListing.id)
-                        onBack()
-                      }
-                    }}
+                    onClick={() => setIsDeleteDialogOpen(true)}
                   >
                     Delete
                   </button>
@@ -776,6 +773,20 @@ export function ListingDetailPage({
         </h3>
         <ListingRatingReviewBox listingId={selectedListing.id} currentUserName={session?.user?.user_metadata?.username || session?.user?.email?.split('@')[0] || 'Buyer'} />
       </div>
+      {isDeleteDialogOpen && onDeleteListing && (
+        <DestructiveActionDialog
+          title="Delete this listing?"
+          description="This permanently removes the listing from MarketSpace. This cannot be undone."
+          confirmationText={selectedListing.title}
+          confirmLabel="Delete listing"
+          onCancel={() => setIsDeleteDialogOpen(false)}
+          onConfirm={async () => {
+            await onDeleteListing(selectedListing.id)
+            setIsDeleteDialogOpen(false)
+            onBack()
+          }}
+        />
+      )}
     </section>
   )
 }
@@ -1075,6 +1086,7 @@ export function ListingFormPage({
             onClick={() => {
               setListingKind('item')
               onListingTypeChange('item')
+              onCategoryChange('Electronics')
               onDeliveryOptionChange('Meetup')
             }}
             className="card-option-btn"
@@ -1109,6 +1121,7 @@ export function ListingFormPage({
             onClick={() => {
               setListingKind('service')
               onListingTypeChange('service')
+              onCategoryChange('Services')
               onDeliveryOptionChange('Online/Remote')
             }}
             className="card-option-btn"
@@ -1624,7 +1637,7 @@ export function ListingFormPage({
               onChange={(event) => onCategoryChange(event.target.value)}
               style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.92rem' }}
             >
-              {CATEGORY_OPTIONS.filter((item) => item !== 'All').map((item) => <option key={item}>{item}</option>)}
+              {CATEGORY_OPTIONS.filter((item) => item !== 'All' && (listingKind === 'service' || item !== 'Services')).map((item) => <option key={item}>{item}</option>)}
             </select>
           </div>
 

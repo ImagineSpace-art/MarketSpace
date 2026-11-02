@@ -12,6 +12,7 @@ import type { NotificationItem } from '../features/marketplace/useMarketplaceApp
 import { uploadImageToSupabase } from '../features/marketplace/ImageUploader'
 import { fetchStoreAnalytics, type StoreAnalyticsData } from '../services/analytics'
 import { getListingTimeRemainingMs, isListingExpired } from '../features/marketplace/listingExpiry'
+import { DestructiveActionDialog } from '../components/DestructiveActionDialog'
 
 // ---------------- PROFILE PAGE ----------------
 type ProfilePageProps = {
@@ -24,7 +25,7 @@ type ProfilePageProps = {
     onSaveStoreTemplate?: (content: Record<string, string>, departments?: Array<{ name: string; image?: string }>, templateId?: 'boutique-grid' | 'storefront-landing') => Promise<void>
     onEditListing: (listing: Listing) => void
     onRenewListing: (listingId: number) => void
-    onDeleteListing: (listingId: number) => void
+    onDeleteListing: (listingId: number) => Promise<void>
     onUpdateStatus: (listingId: number, status: string) => void
     onOpenListing: (listing: Listing) => void
     onToggleSave: (listingId: number) => void
@@ -47,6 +48,7 @@ type ProfilePageProps = {
     onDeleteNotification: (notificationId: string | number) => void
     onSaveAd: (ad: BusinessAd) => Promise<void>
     onUpdateAdStatus: (adId: string, status: BusinessAd['status']) => Promise<void>
+    onDeleteAd: (adId: string) => Promise<void>
 
     // ListingFormPage props
     createListingProps: {
@@ -125,6 +127,7 @@ export function ProfilePage({
     onDeleteNotification,
     onSaveAd,
     onUpdateAdStatus,
+    onDeleteAd,
     createListingProps,
     storeSetupProps,
     allBusinesses = {},
@@ -144,6 +147,8 @@ export function ProfilePage({
     }, [])
 
     const [sellerTab, setSellerTab] = useState<'active' | 'sold' | 'drafts'>('active')
+    const [listingToDelete, setListingToDelete] = useState<Listing | null>(null)
+    const [adToDelete, setAdToDelete] = useState<BusinessAd | null>(null)
 
     // Store Performance time filter & database data
     const [perfTimeFilter, setPerfTimeFilter] = useState<'7d' | '14d' | '30d'>('7d')
@@ -213,6 +218,11 @@ export function ProfilePage({
         if (!ad) return
         void onUpdateAdStatus(adId, ad.status === 'Active' ? 'Paused' : 'Active')
             .catch(error => window.alert(error instanceof Error ? error.message : 'The ad status could not be updated.'))
+    }
+
+    const handleDeleteAd = (adId: string) => {
+        const ad = businessProfile?.ads.find((item) => item.id === adId)
+        if (ad) setAdToDelete(ad)
     }
 
     return (
@@ -285,6 +295,7 @@ export function ProfilePage({
                                     </button>
                                 </div>
                             </div>
+
 
                             {/* Tab controls */}
                             <div style={{ display: 'flex', overflowX: 'auto', gap: '8px', paddingBottom: '8px', marginBottom: '16px', borderBottom: '1px solid var(--border)', WebkitOverflowScrolling: 'touch' }}>
@@ -526,6 +537,10 @@ export function ProfilePage({
                                                             </span>
                                                             <button className="secondary-btn compact-btn" disabled={ad.moderation_status === 'rejected' || ad.moderation_status === 'removed'} onClick={() => handleToggleAdStatus(ad.id)}>
                                                                 {ad.status === 'Active' ? 'Pause' : 'Resume'}
+                                                            </button>
+                                                            <button className="secondary-btn compact-btn" aria-label={`Delete ad campaign ${ad.adTitle}`} onClick={() => handleDeleteAd(ad.id)}>
+                                                                <span className="material-icons" aria-hidden="true">delete</span>
+                                                                Delete
                                                             </button>
                                                         </div>
                                                     </div>
@@ -826,7 +841,7 @@ export function ProfilePage({
                                                         {listing.status === 'Sold' ? 'Restock' : 'Mark Sold'}
                                                     </button>
                                                     <button className="primary-btn compact-btn" onClick={() => onRenewListing(listing.id)}>Renew Listing</button>
-                                                    <button className="ghost-btn compact-btn delete-btn" onClick={() => onDeleteListing(listing.id)}>
+                                                    <button className="ghost-btn compact-btn delete-btn" onClick={() => setListingToDelete(listing)}>
                                                         <span className="material-icons">delete</span>
                                                     </button>
                                                 </div>
@@ -838,6 +853,32 @@ export function ProfilePage({
                     </>
                 )}
             </main>
+            {listingToDelete && (
+                <DestructiveActionDialog
+                    title="Delete this listing?"
+                    description="This permanently removes the listing from MarketSpace. This cannot be undone."
+                    confirmationText={listingToDelete.title}
+                    confirmLabel="Delete listing"
+                    onCancel={() => setListingToDelete(null)}
+                    onConfirm={async () => {
+                        await onDeleteListing(listingToDelete.id)
+                        setListingToDelete(null)
+                    }}
+                />
+            )}
+            {adToDelete && (
+                <DestructiveActionDialog
+                    title="Delete this ad campaign?"
+                    description="This permanently removes the ad campaign. This cannot be undone."
+                    confirmationText={adToDelete.adTitle}
+                    confirmLabel="Delete ad"
+                    onCancel={() => setAdToDelete(null)}
+                    onConfirm={async () => {
+                        await onDeleteAd(adToDelete.id)
+                        setAdToDelete(null)
+                    }}
+                />
+            )}
         </div>
     )
 }

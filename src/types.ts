@@ -42,6 +42,7 @@ export type Profile = {
   email?: string
   phone_number?: string
   avatar_url?: string
+  cover_url?: string
   created_at?: string
   onboarding_choice?: string
   phone_verified?: boolean
@@ -241,7 +242,9 @@ export type BusinessProfile = {
   probationState?: 'probation' | 'trusted'
   themeConfig?: StoreThemeConfig
   templateId?: StoreTemplateId
+  templateChangedAt?: string
   templateContent?: StoreTemplateContent
+  archivedAt?: string
 }
 
 export type MessageRecord = {

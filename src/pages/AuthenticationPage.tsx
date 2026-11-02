@@ -218,13 +218,14 @@ export function AuthPage({
 
         .golden-auth-canvas {
           width: 100%;
+          min-width: 0;
           max-width: 1120px;
           min-height: 620px;
           background-color: #ffffff;
           border-radius: 32px;
           box-shadow: 0 20px 50px rgba(15, 23, 42, 0.1);
           display: grid;
-          grid-template-columns: 1.15fr 0.85fr;
+          grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
           overflow: hidden;
           position: relative;
         }
@@ -270,14 +271,17 @@ export function AuthPage({
         /* Right Side: Golden Card Column */
         .golden-auth-form-col {
           display: flex;
+          min-width: 0;
           align-items: center;
           justify-content: center;
           padding: 32px 28px;
           background-color: #f8fafc;
+          box-sizing: border-box;
         }
 
         .golden-amber-card {
           width: 100%;
+          min-width: 0;
           max-width: 410px;
           background: #fab829;
           border-radius: 28px;

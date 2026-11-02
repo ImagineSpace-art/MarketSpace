@@ -168,12 +168,16 @@ export interface MarketplaceAppModel {
   handleCreateOrUpdateBusiness: (profile: BusinessProfile) => void
   saveAd: (ad: BusinessAd) => Promise<void>
   updateAdStatus: (adId: string, status: BusinessAd['status']) => Promise<void>
+  deleteAd: (adId: string) => Promise<void>
+  archiveStore: (storeId: string, archived: boolean) => Promise<void>
+  deleteStore: (storeId: string) => Promise<void>
   handleSaveStoreTheme: (config: StoreThemeConfig, storeUserId?: string) => Promise<void>
   handleSaveStoreTemplate: (templateId: StoreTemplateId, content: Record<string, unknown>, departments?: Array<{ name: string; image?: string }>, storeUserId?: string) => Promise<void>
   handleDeleteListing: (listingId: number) => Promise<void>
   handleRenewListing: (listingId: number) => Promise<void>
   handleUpdateListingStatus: (listingId: number, status: string) => Promise<void>
   handleUploadAvatar: (base64: string) => Promise<void>
+  handleUploadCover: (url: string) => Promise<void>
   handleStartChat: (listing: Listing, customMessage?: string, stayInCurrentPage?: boolean) => Promise<void>
   availableColors: string[]
   setAvailableColors: Dispatch<SetStateAction<string[]>>
@@ -243,6 +247,12 @@ function isDatabaseNotificationId(id: string | number): id is string {
 function isMissingSchemaObject(error: { code?: string; message: string }): boolean {
   return ['PGRST204', 'PGRST205', '42P01', '42703'].includes(error.code || '')
     || /schema cache|does not exist/i.test(error.message)
+}
+
+async function isModeratorAccount() {
+  const { data, error } = await supabase.rpc('is_moderator')
+  if (error) throw new Error(`Account access could not be verified: ${error.message}`)
+  return data === true
 }
 
 export function useMarketplaceApp(): MarketplaceAppModel {
@@ -743,6 +753,19 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       setMessage(`Your listings could not be loaded: ${sellerResult.error.message}`)
     }
 
+    const { data: archivedStores, error: archivedStoresError } = await supabase
+      .from('stores')
+      .select('id')
+      .not('archived_at', 'is', null)
+    if (archivedStoresError) {
+      setMessage(`Archived-store listings could not be filtered: ${archivedStoresError.message}`)
+      return
+    }
+    const archivedStoreIds = new Set((archivedStores ?? []).map((store) => store.id))
+    const publicRows = (publicResult.rows ?? []).filter((listing) =>
+      !listing.store_id || !archivedStoreIds.has(listing.store_id)
+    )
+
     const { data: profilesData } = await supabase.from('public_profiles').select('user_id, username')
     const sellerMap = new Map<string, string>()
       ; ((profilesData ?? []) as ProfileSummary[]).forEach((profileRow) => {
@@ -756,7 +779,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       seller_name: sellerMap.get(item.user_id ?? '') ?? 'Seller',
     }))
 
-    setListings(enrichListings(publicResult.rows ?? []))
+    setListings(enrichListings(publicRows))
     if (!sellerResult.error) {
       setMyListings(enrichListings(sellerResult.rows ?? []))
     }
@@ -945,21 +968,41 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       const {
         data: { session: currentSession },
       } = await supabase.auth.getSession()
-      setSession(currentSession)
+      let marketplaceSession = currentSession
+      if (currentSession) {
+        try {
+          if (await isModeratorAccount()) {
+            const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' })
+            setMessage(signOutError
+              ? `Moderator account detected, but regular sign-out failed: ${signOutError.message}`
+              : 'Moderator account detected. Sign in through the admin portal.')
+            navigate('/admin/login', { replace: true })
+            marketplaceSession = null
+          }
+        } catch (error) {
+          const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' })
+          setMessage(signOutError
+            ? `Account access could not be verified and sign-out failed: ${signOutError.message}`
+            : error instanceof Error ? error.message : 'Account access could not be verified.')
+          navigate('/login', { replace: true })
+          marketplaceSession = null
+        }
+      }
+      setSession(marketplaceSession)
 
       let loadedProfile: Profile | null = null
-      if (currentSession) {
-        loadedProfile = await loadProfile(currentSession.user.id, currentSession.user)
-        const { data: followRows } = await supabase.from('store_followers').select('store_id').eq('user_id', currentSession.user.id)
+      if (marketplaceSession) {
+        loadedProfile = await loadProfile(marketplaceSession.user.id, marketplaceSession.user)
+        const { data: followRows } = await supabase.from('store_followers').select('store_id').eq('user_id', marketplaceSession.user.id)
         if (followRows) {
           setFollowingIds(followRows.map((r: any) => r.store_id))
         }
       }
 
-      await Promise.all([fetchListings(currentSession?.user.id), fetchStores(), fetchStoreReviews()])
+      await Promise.all([fetchListings(marketplaceSession?.user.id), fetchStores(), fetchStoreReviews()])
       setLoading(false)
 
-      const needsOnboarding = currentSession && (
+      const needsOnboarding = marketplaceSession && (
         !loadedProfile?.onboarding_choice
       )
 
@@ -979,22 +1022,49 @@ export function useMarketplaceApp(): MarketplaceAppModel {
 
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, currentSession) => {
-      setSession(currentSession)
-      if (currentSession) {
-        const loadedProfile = await loadProfile(currentSession.user.id, currentSession.user)
-        void fetchListings(currentSession.user.id)
+      window.setTimeout(() => {
+        void (async () => {
+          if (!currentSession) {
+            setSession(null)
+            setProfile(null)
+            setMyListings([])
+            setChatThreads([])
+            setNotifications(current => current.filter(item => !item.user_id || item.user_id === 'all'))
+            return
+          }
 
-        const needsOnboarding = !loadedProfile?.onboarding_choice
+          try {
+            if (await isModeratorAccount()) {
+              const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' })
+              setSession(null)
+              setProfile(null)
+              setMessage(signOutError
+                ? `Moderator account detected, but regular sign-out failed: ${signOutError.message}`
+                : 'Moderator account detected. Sign in through the admin portal.')
+              navigate('/admin/login', { replace: true })
+              return
+            }
+          } catch (error) {
+            const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' })
+            setSession(null)
+            setProfile(null)
+            setMessage(signOutError
+              ? `Account access could not be verified and sign-out failed: ${signOutError.message}`
+              : error instanceof Error ? error.message : 'Account access could not be verified.')
+            navigate('/login', { replace: true })
+            return
+          }
 
-        if (needsOnboarding && (window.location.pathname === '/' || window.location.pathname === '/profile')) {
-          navigate('/onboarding')
-        }
-      } else {
-        setProfile(null)
-        setMyListings([])
-        setChatThreads([])
-        setNotifications(current => current.filter(item => !item.user_id || item.user_id === 'all'))
-      }
+          setSession(currentSession)
+          const loadedProfile = await loadProfile(currentSession.user.id, currentSession.user)
+          void fetchListings(currentSession.user.id)
+
+          const needsOnboarding = !loadedProfile?.onboarding_choice
+          if (needsOnboarding && (window.location.pathname === '/' || window.location.pathname === '/profile')) {
+            navigate('/onboarding')
+          }
+        })()
+      }, 0)
     })
 
     return () => {
@@ -1018,6 +1088,29 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       setMessage(error.message)
       return
     }
+    try {
+      if (await isModeratorAccount()) {
+        const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' })
+        setSession(null)
+        setAuthEmail('')
+        setAuthPassword('')
+        setMessage(signOutError
+          ? `Moderator account detected, but regular sign-out failed: ${signOutError.message}`
+          : 'Moderator account detected. Sign in through the admin portal.')
+        navigate('/admin/login', { replace: true })
+        return
+      }
+    } catch (roleError) {
+      const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' })
+      setSession(null)
+      setAuthEmail('')
+      setAuthPassword('')
+      setMessage(signOutError
+        ? `Account access could not be verified and sign-out failed: ${signOutError.message}`
+        : roleError instanceof Error ? roleError.message : 'Account access could not be verified.')
+      return
+    }
+
     setSession(data.session)
     setMessage('Welcome back to MarketSpace')
     setAuthEmail('')
@@ -1102,7 +1195,9 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       setMessage('Your account and associated data have been permanently deleted.')
       navigate('/')
     } catch (err) {
-      setMessage(err instanceof Error ? `Account deletion failed: ${err.message}` : 'Account deletion could not be completed.')
+      const message = err instanceof Error ? err.message : 'Account deletion could not be completed.'
+      setMessage(`Account deletion failed: ${message}`)
+      throw new Error(message)
     }
   }
 
@@ -1612,11 +1707,10 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   ], [listings.length, savedIds.length, chatThreads])
 
   const handleDeleteListing = async (listingId: number) => {
-    const { error } = await supabase.from('listings').delete().eq('id', listingId)
-    if (error) {
-      setMessage(error.message)
-      return
-    }
+    const { error } = await supabase.rpc('delete_owned_listing', {
+      p_listing_id: listingId,
+    })
+    if (error) throw new Error(`The listing could not be deleted: ${error.message}`)
     setMessage('Listing deleted successfully')
     await fetchListings()
   }
@@ -1646,15 +1740,26 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     await fetchListings()
   }
 
-  const handleUploadAvatar = async (base64: string) => {
-    if (!session?.user?.id) return
-    const { error } = await supabase.from('profiles').update({ avatar_url: base64 }).eq('user_id', session.user.id)
-    if (!error) {
-      setProfile((current) => current ? { ...current, avatar_url: base64 } : null)
-      setMessage('Avatar updated successfully')
-    } else {
+  const handleUploadAvatar = async (url: string) => {
+    if (!session?.user?.id) throw new Error('Sign in to update your profile photo.')
+    const { error } = await supabase.from('profiles').update({ avatar_url: url }).eq('user_id', session.user.id)
+    if (error) {
       setMessage(error.message)
+      throw new Error(error.message)
     }
+    setProfile((current) => current ? { ...current, avatar_url: url } : null)
+    setMessage('Profile photo updated successfully.')
+  }
+
+  const handleUploadCover = async (url: string) => {
+    if (!session?.user?.id) throw new Error('Sign in to update your cover photo.')
+    const { error } = await supabase.from('profiles').update({ cover_url: url }).eq('user_id', session.user.id)
+    if (error) {
+      setMessage(error.message)
+      throw new Error(error.message)
+    }
+    setProfile((current) => current ? { ...current, cover_url: url } : null)
+    setMessage('Cover photo updated successfully.')
   }
 
   const handleCreateOrUpdateBusiness = async (updated: BusinessProfile) => {
@@ -1730,6 +1835,55 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     await loadBusinesses()
   }
 
+  const deleteAd = async (adId: string) => {
+    if (!session?.user?.id) throw new Error('Sign in to delete this ad.')
+    const { data, error } = await supabase.from('store_ads')
+      .delete()
+      .eq('id', adId)
+      .eq('user_id', session.user.id)
+      .select('id')
+      .maybeSingle()
+    if (error) throw new Error(`The ad could not be deleted: ${error.message}`)
+    if (!data) throw new Error('This ad could not be found in your store.')
+    await loadBusinesses()
+  }
+
+  const removeOwnedStoreFromCache = (userId: string) => {
+    try {
+      const cached = window.localStorage.getItem('marketspace-all-businesses')
+      if (!cached) return
+      const businesses = JSON.parse(cached) as Record<string, BusinessProfile>
+      delete businesses[userId]
+      window.localStorage.setItem('marketspace-all-businesses', JSON.stringify(businesses))
+    } catch (cacheError) {
+      console.error('Failed to update cached store data:', cacheError)
+    }
+  }
+
+  const archiveStore = async (storeId: string, archived: boolean) => {
+    if (!session?.user?.id) throw new Error('Sign in to update this store.')
+    const { error } = await supabase.rpc('archive_owned_store', {
+      p_store_id: storeId,
+      p_archived: archived,
+    })
+    if (error) throw new Error(`The store could not be ${archived ? 'disabled' : 'restored'}: ${error.message}`)
+    if (archived) removeOwnedStoreFromCache(session.user.id)
+    setMessage(archived ? 'Store disabled. It is hidden from shoppers.' : 'Store restored successfully.')
+    await Promise.all([loadBusinesses(), fetchListings(session.user.id)])
+  }
+
+  const deleteStore = async (storeId: string) => {
+    if (!session?.user?.id) throw new Error('Sign in to permanently delete this store.')
+    const { error } = await supabase.rpc('delete_archived_owned_store', {
+      p_store_id: storeId,
+    })
+    if (error) throw new Error(`The store could not be permanently deleted: ${error.message}`)
+    removeOwnedStoreFromCache(session.user.id)
+    setBusinessProfile(null)
+    setMessage('Store and its store-owned listings and reviews were permanently deleted.')
+    await Promise.all([loadBusinesses(), fetchListings(session.user.id)])
+  }
+
   const handleSaveStoreTheme = async (themeConfig: StoreThemeConfig, storeUserId?: string) => {
     const targetUserId = storeUserId || businessProfile?.userId || session?.user?.id
     if (!targetUserId) return
@@ -1800,6 +1954,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       templateId?: StoreTemplateId
       content?: Record<string, string>
       departments?: StoreCollection[]
+      templateChangedAt?: string
       error?: string
     }>('store-template-save', {
       body: { templateId, content, ...(departments ? { departments } : {}) },
@@ -1818,6 +1973,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     const updated: BusinessProfile = {
       ...existing,
       templateId: data.templateId,
+      templateChangedAt: data.templateChangedAt || existing.templateChangedAt,
       templateContent,
       ...(data.departments ? { collections: data.departments } : {}),
     }
@@ -1841,7 +1997,10 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         setMessage('Cached store data could not be loaded.')
       }
     }
-    Object.values(baseStores).forEach((store) => { store.ads = [] })
+    Object.entries(baseStores).forEach(([ownerId, store]) => {
+      store.ads = []
+      if (store.archivedAt) delete baseStores[ownerId]
+    })
     setAllBusinesses(baseStores)
 
     const { data, error: storesError } = await supabase.from('stores').select('*')
@@ -1852,6 +2011,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
 
     const dbStores: Record<string, BusinessProfile> = {}
     const nonPublicStoreOwners = new Set<string>()
+    const archivedStoreOwners = new Set<string>()
+    const archivedOwnerStores: BusinessProfile[] = []
     ;(data || []).forEach((s: any) => {
         if (s.status && s.status !== 'approved') {
           nonPublicStoreOwners.add(s.user_id)
@@ -1863,9 +2024,10 @@ export function useMarketplaceApp(): MarketplaceAppModel {
           if (localStr) localTheme = JSON.parse(localStr)
         } catch { }
 
-        dbStores[s.user_id] = {
+        const storeProfile: BusinessProfile = {
           userId: s.user_id,
           storeId: s.id,
+          archivedAt: s.archived_at || undefined,
           subdomain: s.subdomain || undefined,
           shopName: s.shop_name,
           description: s.description,
@@ -1891,9 +2053,19 @@ export function useMarketplaceApp(): MarketplaceAppModel {
             ? s.theme_config
             : (localTheme || s.themeConfig || undefined),
           templateId: s.template_id || undefined,
+          templateChangedAt: s.template_changed_at || undefined,
           templateContent: s.template_content || {},
         }
+        if (s.archived_at) {
+          if (s.user_id === session?.user?.id) {
+            archivedOwnerStores.push(storeProfile)
+          }
+          archivedStoreOwners.add(s.user_id)
+          return
+        }
+        dbStores[s.user_id] = storeProfile
     })
+    const archivedOwnerStore = archivedOwnerStores[0] || null
     const { data: adRows, error: adsError } = await supabase
       .from('store_ads')
       .select('id,user_id,status,ad_data,moderation_status,moderation_reason,created_at')
@@ -1901,6 +2073,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       setAllBusinesses(prev => {
         const next = { ...prev, ...dbStores }
         nonPublicStoreOwners.forEach((ownerId) => delete next[ownerId])
+        archivedStoreOwners.forEach((ownerId) => delete next[ownerId])
         return next
       })
       setMessage(`Store ads could not be loaded: ${adsError.message}`)
@@ -1923,24 +2096,39 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     Object.entries(dbStores).forEach(([userId, store]) => {
       store.ads = adsByUser.get(userId) || []
     })
+    if (archivedOwnerStore) {
+      archivedOwnerStore.ads = adsByUser.get(archivedOwnerStore.userId) || []
+    }
+    const storeOwnerIds = new Set((data || []).map((store: any) => store.user_id))
     setAllBusinesses(prev => {
       const next = { ...prev, ...dbStores }
       nonPublicStoreOwners.forEach((ownerId) => delete next[ownerId])
+      archivedStoreOwners.forEach((ownerId) => delete next[ownerId])
+      if (session?.user?.id && !storeOwnerIds.has(session.user.id)) {
+        delete next[session.user.id]
+      }
       return next
     })
+    if (session?.user?.id) {
+      setBusinessProfile(archivedOwnerStore || dbStores[session.user.id] || null)
+    }
   }
 
   useEffect(() => {
     void loadBusinesses()
-  }, [])
+  }, [session?.user?.id])
 
   useEffect(() => {
-    if (session?.user?.id && allBusinesses[session.user.id]) {
+    if (!session?.user?.id) {
+      setBusinessProfile(null)
+      return
+    }
+    if (allBusinesses[session.user.id]) {
       setBusinessProfile(allBusinesses[session.user.id])
-    } else {
+    } else if (businessProfile?.userId !== session.user.id || !businessProfile?.archivedAt) {
       setBusinessProfile(null)
     }
-  }, [session, allBusinesses])
+  }, [session, allBusinesses, businessProfile])
 
   return {
     view,
@@ -2047,12 +2235,16 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     handleCreateOrUpdateBusiness,
     saveAd,
     updateAdStatus,
+    deleteAd,
+    archiveStore,
+    deleteStore,
     handleSaveStoreTheme,
     handleSaveStoreTemplate,
     handleDeleteListing,
     handleRenewListing,
     handleUpdateListingStatus,
     handleUploadAvatar,
+    handleUploadCover,
     handleStartChat,
     availableColors,
     setAvailableColors,

@@ -1,7 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import type { PaymentMethodItem, NotificationConfig } from '../types'
+import type { Listing, BusinessProfile } from '../types'
 import { SettingsNavigation } from '../components/SettingsNavigation'
+import { DestructiveActionDialog } from '../components/DestructiveActionDialog'
 
 type SettingsPageProps = {
     theme: 'light' | 'dark'
@@ -20,7 +22,12 @@ type SettingsPageProps = {
     searchHistory: string[]
     clearSearchHistory: () => void
     userEmail?: string
-    onDeleteAccount?: () => void
+    onDeleteAccount?: () => Promise<void>
+    myListings: Listing[]
+    businessProfile: BusinessProfile | null
+    onDeleteListing: (listingId: number) => Promise<void>
+    onArchiveStore: (storeId: string, archived: boolean) => Promise<void>
+    onDeleteStore: (storeId: string) => Promise<void>
     globalRenewalFrequency?: 'daily' | 'weekly' | 'biweekly' | 'monthly'
     setGlobalRenewalFrequency?: React.Dispatch<React.SetStateAction<'daily' | 'weekly' | 'biweekly' | 'monthly'>>
     globalRenewalDay?: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday'
@@ -47,6 +54,11 @@ export function SettingsPage({
     clearSearchHistory,
     userEmail = 'user@marketspace.zm',
     onDeleteAccount,
+    myListings,
+    businessProfile,
+    onDeleteListing,
+    onArchiveStore,
+    onDeleteStore,
     globalRenewalFrequency = 'weekly',
     setGlobalRenewalFrequency,
     globalRenewalDay = 'Monday',
@@ -57,6 +69,8 @@ export function SettingsPage({
     const { category = 'account' } = useParams<{ category?: string }>()
     const [isMobileNavigationOpen, setIsMobileNavigationOpen] = useState(false)
     const [isDesktopNavigationCollapsed, setIsDesktopNavigationCollapsed] = useState(false)
+    const [destructiveAction, setDestructiveAction] = useState<'disable-store' | 'restore-store' | 'delete-store' | 'delete-account' | null>(null)
+    const [listingToDelete, setListingToDelete] = useState<Listing | null>(null)
 
     // Account View local states
     const [passwordCurrent, setPasswordCurrent] = useState('')
@@ -258,26 +272,62 @@ export function SettingsPage({
                         </div>
                     </div>
 
-                    <div className="setting-box" style={{ background: 'rgba(239, 68, 68, 0.08)', padding: '20px', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
-                        <h3 style={{ marginTop: 0, color: '#ef4444', fontSize: '1.1rem' }}>Danger Zone</h3>
-                        <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>Deactivating hides your listings. Deleting permanently erases your account data.</p>
-                        <div style={{ display: 'flex', gap: '10px', marginTop: '12px', flexWrap: 'wrap' }}>
-                            <button className="secondary-btn compact-btn delete-btn" onClick={() => alert('Account deactivation requested. Your listings have been hidden.')} style={{ color: '#ef4444', borderColor: '#ef4444' }}>
-                                Deactivate Account
-                            </button>
-                            <button
-                                className="primary-btn compact-btn"
-                                onClick={() => {
-                                    if (window.confirm('Are you sure you want to PERMANENTLY delete your account? All your listings, store data, and chat history will be erased. This action cannot be undone.')) {
-                                        if (onDeleteAccount) onDeleteAccount()
-                                    }
-                                }}
-                                style={{ background: '#dc2626', color: 'white', border: 'none' }}
-                            >
-                                Delete Account
-                            </button>
-                        </div>
-                    </div>
+                </div>
+            )}
+
+            {activeTab === 'data' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    {businessProfile && (
+                        <section className="setting-box" style={{ background: 'var(--panel)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                            <h3 style={{ marginTop: 0, fontSize: '1.1rem' }}>Store lifecycle</h3>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                                <strong>{businessProfile.archivedAt ? 'Disabled' : 'Active'}:</strong>{' '}
+                                Disabling hides your storefront and approved store listings and ads. It does not delete anything, and you can restore it later.
+                            </p>
+                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                <button
+                                    type="button"
+                                    className="secondary-btn compact-btn"
+                                    onClick={() => setDestructiveAction(businessProfile.archivedAt ? 'restore-store' : 'disable-store')}
+                                >
+                                    {businessProfile.archivedAt ? 'Restore store' : 'Disable store'}
+                                </button>
+                                {businessProfile.archivedAt && (
+                                    <button type="button" className="danger-btn compact-btn" onClick={() => setDestructiveAction('delete-store')}>
+                                        Delete store permanently
+                                    </button>
+                                )}
+                            </div>
+                            {!businessProfile.archivedAt && (
+                                <p style={{ marginBottom: 0, color: 'var(--text-muted)', fontSize: '0.84rem' }}>Disable the store before permanently deleting it.</p>
+                            )}
+                        </section>
+                    )}
+
+                    <section className="setting-box" style={{ background: 'var(--panel)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                        <h3 style={{ marginTop: 0, fontSize: '1.1rem' }}>Your listings</h3>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Deleting a listing permanently removes it. Listings cannot be deactivated here; use the existing expiry controls when you want one to stop appearing temporarily.</p>
+                        {myListings.length === 0 ? (
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>You have no listings to delete.</p>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {myListings.map((listing) => (
+                                    <div key={listing.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                                        <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{listing.title}</span>
+                                        <button type="button" className="danger-btn compact-btn" onClick={() => setListingToDelete(listing)}>Delete</button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </section>
+
+                    <section className="setting-box" style={{ background: 'rgba(239, 68, 68, 0.08)', padding: '20px', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                        <h3 style={{ marginTop: 0, color: '#ef4444', fontSize: '1.1rem' }}>Delete account</h3>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Permanently deletes your MarketSpace account and associated data. This cannot be undone.</p>
+                        <button type="button" className="danger-btn compact-btn" disabled={!onDeleteAccount} onClick={() => setDestructiveAction('delete-account')}>
+                            Delete account
+                        </button>
+                    </section>
                 </div>
             )}
 
@@ -593,6 +643,67 @@ export function SettingsPage({
                         )}
                     </div>
                 </div>
+            )}
+            {listingToDelete && (
+                <DestructiveActionDialog
+                    title="Delete this listing?"
+                    description="This permanently removes the listing from MarketSpace. This cannot be undone."
+                    confirmationText={listingToDelete.title}
+                    confirmLabel="Delete listing"
+                    onCancel={() => setListingToDelete(null)}
+                    onConfirm={async () => {
+                        await onDeleteListing(listingToDelete.id)
+                        setListingToDelete(null)
+                    }}
+                />
+            )}
+            {destructiveAction && (
+                <DestructiveActionDialog
+                    title={
+                        destructiveAction === 'disable-store' ? 'Disable this store?'
+                            : destructiveAction === 'restore-store' ? 'Restore this store?'
+                                : destructiveAction === 'delete-store' ? 'Delete this store permanently?'
+                                    : 'Delete your account permanently?'
+                    }
+                    description={
+                        destructiveAction === 'disable-store'
+                            ? 'Your storefront and approved store listings and ads will be hidden from shoppers. Nothing is deleted, and you can restore the store later.'
+                            : destructiveAction === 'restore-store'
+                                ? 'Your storefront and approved content will become visible again. Pending or rejected listings and ads keep their current moderation status.'
+                                : destructiveAction === 'delete-store'
+                                    ? 'This permanently deletes the store and its store-owned listings, reviews, catalog, and ad campaigns. Your account and profile remain. This cannot be undone.'
+                                    : 'This permanently deletes your account and associated data. This cannot be undone.'
+                    }
+                    confirmationText={
+                        destructiveAction === 'delete-store'
+                            ? businessProfile?.shopName
+                            : destructiveAction === 'delete-account'
+                                ? userEmail
+                                : undefined
+                    }
+                    confirmLabel={
+                        destructiveAction === 'disable-store' ? 'Disable store'
+                            : destructiveAction === 'restore-store' ? 'Restore store'
+                                : destructiveAction === 'delete-store' ? 'Delete permanently'
+                                    : 'Delete account'
+                    }
+                    onCancel={() => setDestructiveAction(null)}
+                    onConfirm={async () => {
+                        if (destructiveAction === 'delete-account') {
+                            if (!onDeleteAccount) throw new Error('Account deletion is unavailable.')
+                            await onDeleteAccount()
+                        } else {
+                            const storeId = businessProfile?.storeId
+                            if (!storeId) throw new Error('The store could not be found.')
+                            if (destructiveAction === 'delete-store') {
+                                await onDeleteStore(storeId)
+                            } else {
+                                await onArchiveStore(storeId, destructiveAction === 'disable-store')
+                            }
+                        }
+                        setDestructiveAction(null)
+                    }}
+                />
             )}
                 </main>
             </div>

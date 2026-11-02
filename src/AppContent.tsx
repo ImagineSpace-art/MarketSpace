@@ -268,6 +268,7 @@ export function AppContent() {
     handleRenewListing,
     handleUpdateListingStatus,
     handleUploadAvatar,
+    handleUploadCover,
     handleStartChat,
     availableColors,
     setAvailableColors,
@@ -627,6 +628,7 @@ export function AppContent() {
                 onToggleSave={toggleSave}
                 onOpenListing={openListing}
                 onUploadAvatar={handleUploadAvatar}
+                onUploadCover={handleUploadCover}
                 onUpdateUsername={async (username: string) => {
                   if (!session) throw new Error('Sign in to edit your profile.')
                   const { error: updateError } = await supabase.from('profiles').update({ username }).eq('user_id', session.user.id)
@@ -652,6 +654,7 @@ export function AppContent() {
                 onToggleSave={toggleSave}
                 onOpenListing={openListing}
                 onUploadAvatar={handleUploadAvatar}
+                onUploadCover={handleUploadCover}
                 onUpdateUsername={async (username) => {
                   const { error: updateError } = await supabase.from('profiles').update({ username }).eq('user_id', session.user.id)
                   if (updateError) throw new Error(updateError.message)
@@ -697,6 +700,7 @@ export function AppContent() {
                 onDeleteNotification={deleteNotification}
                 onSaveAd={saveAd}
                 onUpdateAdStatus={updateAdStatus}
+                onDeleteAd={app.deleteAd}
                 currency={app.currency}
                 setCurrency={app.setCurrency}
                 notificationsConfig={app.notificationsConfig}
@@ -779,6 +783,11 @@ export function AppContent() {
                   clearSearchHistory={app.clearSearchHistory}
                   userEmail={userEmail}
                   onDeleteAccount={app.handleDeleteAccount}
+                  myListings={myListings}
+                  businessProfile={businessProfile}
+                  onDeleteListing={handleDeleteListing}
+                  onArchiveStore={app.archiveStore}
+                  onDeleteStore={app.deleteStore}
                   globalRenewalFrequency={app.globalRenewalFrequency}
                   setGlobalRenewalFrequency={app.setGlobalRenewalFrequency}
                   globalRenewalDay={app.globalRenewalDay}

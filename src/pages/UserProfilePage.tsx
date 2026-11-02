@@ -18,6 +18,7 @@ type UserProfilePageProps = {
   onToggleSave: (listingId: number) => void
   onOpenListing: (listing: ListingData) => void
   onUploadAvatar: (url: string) => Promise<void>
+  onUploadCover: (url: string) => Promise<void>
   onUpdateUsername: (username: string) => Promise<void>
 }
 
@@ -34,6 +35,7 @@ export function UserProfilePage({
   onToggleSave,
   onOpenListing,
   onUploadAvatar,
+  onUploadCover,
   onUpdateUsername,
 }: UserProfilePageProps) {
   const { userId: routeUserId = '' } = useParams()
@@ -54,7 +56,7 @@ export function UserProfilePage({
     let active = true
     void supabase
       .from('public_profiles')
-      .select('user_id, username, avatar_url, created_at')
+      .select('user_id, username, avatar_url, created_at, cover_url')
       .eq('user_id', userId)
       .maybeSingle()
       .then(({ data, error: profileError }) => {
@@ -117,6 +119,21 @@ export function UserProfilePage({
     }
   }
 
+  const uploadCover = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    setError('')
+    setNotice('')
+    try {
+      const coverUrl = await uploadImageToSupabase(file, 'marketspace-media', 'profile-covers')
+      await onUploadCover(coverUrl)
+      setNotice('Your cover photo was updated.')
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : 'Your cover photo could not be updated.')
+    }
+  }
+
   if (loading) return <section className="section-card">Loading profile…</section>
   if (!profile) {
     return (
@@ -131,7 +148,18 @@ export function UserProfilePage({
   return (
     <div className="user-profile-page">
       <section className="user-profile-hero">
-        <div className="user-profile-cover" />
+        <div className="user-profile-cover">
+          {profile.cover_url && (
+            <img src={profile.cover_url} alt="" className="user-profile-cover-image" />
+          )}
+          {isOwner && (
+            <label className="user-profile-cover-edit" title="Change cover photo">
+              <input type="file" accept="image/*" onChange={(event) => void uploadCover(event)} />
+              <span className="material-icons" aria-hidden="true">photo_camera</span>
+              <span>Change cover photo</span>
+            </label>
+          )}
+        </div>
         <div className="user-profile-identity">
           <div className="user-profile-avatar-wrap">
             {profile.avatar_url ? (

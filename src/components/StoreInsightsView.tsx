@@ -120,9 +120,9 @@ export function StoreInsightsView({
     }, [linePath, pointsCoordinates, graphHeight])
 
     return (
-        <div style={{ display: 'flex', gap: '24px', width: '100%', minHeight: '80vh', color: 'var(--text)' }}>
+        <div className="store-insights-layout" style={{ display: 'flex', gap: '24px', width: '100%', minHeight: '80vh', color: 'var(--text)' }}>
             {/* --- LEFT INSIGHTS SUB-NAVBAR (Matching Screenshot) --- */}
-            <div style={{
+            <div className="store-insights-nav" style={{
                 width: '240px',
                 flexShrink: 0,
                 display: 'flex',

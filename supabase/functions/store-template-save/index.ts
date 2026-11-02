@@ -65,7 +65,7 @@ Deno.serve(async (request: Request) => {
     })
     const { data: store, error: storeError } = await admin
       .from('stores')
-      .select('user_id, shop_name, template_content, collections')
+      .select('user_id, shop_name, template_id, template_content, template_changed_at, collections')
       .eq('user_id', userId)
       .eq('status', 'approved')
       .maybeSingle()
@@ -107,7 +107,7 @@ Deno.serve(async (request: Request) => {
       && !Array.isArray(store.template_content)
       ? store.template_content as Record<string, unknown>
       : {}
-    const { error: updateError } = await admin
+    const { data: updatedStore, error: updateError } = await admin
       .from('stores')
       .update({
         template_id: templateId,
@@ -116,9 +116,22 @@ Deno.serve(async (request: Request) => {
       })
       .eq('user_id', userId)
       .eq('status', 'approved')
-    if (updateError) throw new Error('Your store template could not be saved.')
+      .select('template_changed_at')
+      .single()
+    if (updateError) {
+      if (updateError.message.includes('once every six months')) {
+        return respond({ error: 'You can change your store template once every six months.' }, 409)
+      }
+      throw new Error('Your store template could not be saved.')
+    }
 
-    return respond({ success: true, templateId, content: validated.content, departments: nextCollections })
+    return respond({
+      success: true,
+      templateId,
+      content: validated.content,
+      departments: nextCollections,
+      templateChangedAt: updatedStore.template_changed_at || store.template_changed_at,
+    })
   } catch (error) {
     console.error('Store template save failed:', error)
     return respond({

@@ -284,4 +284,25 @@ describe.skipIf(!enabled)('listing moderation Supabase integration', () => {
     expect(listing.store_id).toBe(trustedStoreId)
     expect(listing.moderation_status).toBe('pending')
   })
+
+  it('allows only the listing owner to delete a listing', async () => {
+    const listing = await createListing(seller, sellerId, 'Owner deletion test', trustedStoreId)
+
+    const { error: otherUserError } = await noStoreSeller.rpc('delete_owned_listing', {
+      p_listing_id: listing.id,
+    })
+    expect(otherUserError).not.toBeNull()
+    expect(otherUserError?.message).toContain('not found for the signed-in user')
+
+    const { error: ownerError } = await seller.rpc('delete_owned_listing', {
+      p_listing_id: listing.id,
+    })
+    expect(ownerError).toBeNull()
+
+    const { data: remainingRows, error: verifyError } = await admin.from('listings')
+      .select('id')
+      .eq('id', listing.id)
+    expect(verifyError).toBeNull()
+    expect(remainingRows).toEqual([])
+  })
 })

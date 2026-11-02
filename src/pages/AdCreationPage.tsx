@@ -248,7 +248,7 @@ export function AdCreationPage({
         : profile?.avatar_url
 
     return (
-        <div style={{ padding: '24px 0', maxWidth: '1240px', margin: '0 auto', color: 'var(--text)' }}>
+        <div className="ad-creation-page" style={{ padding: '24px 0', maxWidth: '1240px', margin: '0 auto', color: 'var(--text)' }}>
             {/* Top Back & Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

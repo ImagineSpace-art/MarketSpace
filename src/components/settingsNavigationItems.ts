@@ -4,5 +4,6 @@ export const SETTINGS_SECTIONS = [
   { id: 'audience', label: 'Audience & Visibility', icon: 'visibility' },
   { id: 'payments', label: 'Payments', icon: 'payment' },
   { id: 'activity', label: 'Your Activity', icon: 'history' },
+  { id: 'data', label: 'Data & Deletion', icon: 'delete_forever' },
   { id: 'legal', label: 'Legal & Policies', icon: 'gavel' },
 ] as const

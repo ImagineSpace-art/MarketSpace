@@ -2,6 +2,7 @@ import { useState, type ChangeEvent, type FormEvent } from 'react'
 import type { BusinessProfile, Listing } from '../types'
 import { getStoreTemplateSlots, STORE_ACCENT_PALETTE, type StoreTemplateContent, type StoreTemplateId } from '../features/store-templates/storeTemplateSchema'
 import { getStoreTemplateImageUrl, uploadStoreTemplateImage } from '../features/store-templates/storeTemplateAssets'
+import { getTemplateChangeAvailableAt } from '../features/store-templates/templateCooldown'
 import { BoutiqueGridTemplate } from './BoutiqueGridTemplate'
 import { StorefrontLandingTemplate } from './StorefrontLandingTemplate'
 import './StoreTemplates.css'
@@ -63,6 +64,8 @@ export function StoreTemplateEditor({ businessProfile, myListings, onSave, onClo
     (businessProfile.collections || []).filter(collection => collection.bannerImage).map(collection => [collection.name, collection.bannerImage as string]),
   ))
   const [departmentName, setDepartmentName] = useState('')
+  const templateChangeAvailableAt = getTemplateChangeAvailableAt(businessProfile.templateChangedAt)
+  const templateChangeLocked = Boolean(templateChangeAvailableAt && templateChangeAvailableAt.getTime() > Date.now())
   const slots = getStoreTemplateSlots(templateId)
   const slotMap = new Map(slots.map(slot => [slot.id, slot]))
   const fieldGroups: Array<{ title: string; slots: string[] }> = templateId === 'storefront-landing'
@@ -202,6 +205,7 @@ export function StoreTemplateEditor({ businessProfile, myListings, onSave, onClo
               name="store-template"
               value="boutique-grid"
               checked={templateId === 'boutique-grid'}
+              disabled={templateChangeLocked && businessProfile.templateId !== 'boutique-grid'}
               onChange={() => selectTemplate('boutique-grid')}
             />
             <strong>Boutique Grid</strong>
@@ -213,12 +217,18 @@ export function StoreTemplateEditor({ businessProfile, myListings, onSave, onClo
               name="store-template"
               value="storefront-landing"
               checked={templateId === 'storefront-landing'}
+              disabled={templateChangeLocked && businessProfile.templateId !== 'storefront-landing'}
               onChange={() => selectTemplate('storefront-landing')}
             />
             <strong>Storefront Landing</strong>
             <span>Fashion-inspired landing page with a promotional story.</span>
           </label>
         </div>
+        {templateChangeLocked && templateChangeAvailableAt && (
+          <p className="template-editor-message" role="status">
+            You can change your store template again on {templateChangeAvailableAt.toLocaleDateString()}.
+          </p>
+        )}
       </fieldset>
       <div className="template-editor-layout">
         <form className="template-editor-form" onSubmit={event => void handleSubmit(event)}>
