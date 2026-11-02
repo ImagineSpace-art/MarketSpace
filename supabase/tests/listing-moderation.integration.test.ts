@@ -19,7 +19,14 @@ describe.skipIf(!enabled)('listing moderation Supabase integration', () => {
   async function createSeller(client: SupabaseClient) {
     const email = `listing-moderation-${crypto.randomUUID()}@example.test`
     const password = `Mm!${crypto.randomUUID()}9a`
-    const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true })
+    const phone = `+26097${crypto.randomUUID().replace(/\D/g, '').padEnd(7, '0').slice(0, 7)}`
+    const { data, error } = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      phone,
+      phone_confirm: true,
+    })
     if (error || !data.user) throw error || new Error('Listing moderation test user could not be created.')
     const { error: profileError } = await admin.from('profiles').upsert({
       user_id: data.user.id,
@@ -45,14 +52,20 @@ describe.skipIf(!enabled)('listing moderation Supabase integration', () => {
     return data.id
   }
 
-  async function createListing(client: SupabaseClient, userId: string, title: string, storeId?: string | null) {
+  async function createListing(
+    client: SupabaseClient,
+    userId: string,
+    title: string,
+    storeId?: string | null,
+    category = 'Test',
+  ) {
     const { data, error } = await client.from('listings').insert({
       user_id: userId,
       store_id: storeId ?? null,
       title,
       description: 'Listing moderation integration test',
       price: 100,
-      category: 'Test',
+      category,
       status: 'Available',
       listing_type: 'item',
     }).select('*').single()
@@ -126,7 +139,12 @@ describe.skipIf(!enabled)('listing moderation Supabase integration', () => {
   it('assigns the caller store server-side and auto-approves trusted store listings', async () => {
     const listing = await createListing(seller, sellerId, 'Trusted listing', null)
     expect(listing.store_id).toBe(trustedStoreId)
+    expect(listing.seller_type).toBe('store')
     expect(listing.moderation_status).toBe('approved')
+
+    const electronicsListing = await createListing(seller, sellerId, 'Store electronics listing', trustedStoreId, 'Electronics')
+    expect(electronicsListing.seller_type).toBe('store')
+    expect(electronicsListing.moderation_status).toBe('approved')
   })
 
   it('keeps listings without an approved store pending and private from anonymous reads', async () => {
@@ -137,7 +155,57 @@ describe.skipIf(!enabled)('listing moderation Supabase integration', () => {
     )
     const listing = await createListing(noStoreSeller, noStoreSellerId, 'Pending listing without store')
     expect(listing.store_id).toBeNull()
+    expect(listing.seller_type).toBe('individual')
     expect(listing.moderation_status).toBe('pending')
+
+    const { error: sellerTypeUpdateError } = await noStoreSeller.from('listings')
+      .update({ seller_type: 'store' })
+      .eq('id', listing.id)
+    expect(sellerTypeUpdateError).toBeNull()
+    const { data: sellerTypeRows } = await noStoreSeller.from('listings')
+      .select('seller_type')
+      .eq('id', listing.id)
+    expect(sellerTypeRows?.[0]?.seller_type).toBe('individual')
+
+    const { error: verificationWriteError } = await noStoreSeller.from('seller_verifications').insert({
+      user_id: noStoreSellerId,
+      status: 'approved',
+    })
+    expect(verificationWriteError).not.toBeNull()
+
+    const verificationHash = crypto.randomUUID().replace(/-/g, '').padEnd(64, '0').slice(0, 64)
+    const { error: seedVerificationError } = await admin.from('seller_verifications').insert({
+      user_id: noStoreSellerId,
+      status: 'pending',
+      id_hash: verificationHash,
+    })
+    expect(seedVerificationError).toBeNull()
+
+    const { data: ownVerificationRows, error: ownVerificationError } = await noStoreSeller
+      .from('seller_verifications')
+      .select('user_id,status')
+    expect(ownVerificationError).toBeNull()
+    expect(ownVerificationRows).toEqual([{ user_id: noStoreSellerId, status: 'pending' }])
+
+    const { error: selfApprovalError } = await noStoreSeller
+      .from('seller_verifications')
+      .update({ status: 'approved' })
+      .eq('user_id', noStoreSellerId)
+    expect(selfApprovalError).not.toBeNull()
+
+    const { data: otherVerificationRows, error: otherVerificationError } = await seller
+      .from('seller_verifications')
+      .select('user_id,status')
+    expect(otherVerificationError).toBeNull()
+    expect(otherVerificationRows).toEqual([])
+
+    const { data: publicSellerRows, error: publicSellerError } = await individual
+      .from('public_seller_status')
+      .select('*')
+      .eq('user_id', noStoreSellerId)
+    expect(publicSellerError).toBeNull()
+    expect(publicSellerRows).toEqual([{ user_id: noStoreSellerId, is_verified: false }])
+    expect(Object.keys(publicSellerRows?.[0] || {}).sort()).toEqual(['is_verified', 'user_id'])
 
     const { data: ownerRows, error: ownerError } = await noStoreSeller.from('listings').select('id,moderation_status').eq('id', listing.id)
     expect(ownerError).toBeNull()

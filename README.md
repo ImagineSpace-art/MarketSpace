@@ -14,6 +14,11 @@ VITE_TURNSTILE_SITE_KEY=your-turnstile-site-key
 VITE_STORE_DOMAIN=your-marketspace-domain.com
 ```
 
+`VITE_STORE_DOMAIN` is the base hostname only, without a store slug. For a local
+subdomain demo, use `localhost`; store links will carry over the Vite port (for
+example, `shop.localhost:5173`). Storefront links use a registered store's
+subdomain when available and fall back to its `/store/<user-id>` route otherwise.
+
 `VITE_PHONE_OTP_REQUIRED` is a browser-side development switch. The matching Edge
 Function secret is `PHONE_OTP_REQUIRED`; set it to `false` locally and `true` in
 production. Never place service-role, Turnstile-secret, encryption, or purge-job
@@ -39,7 +44,44 @@ supabase functions deploy account-deletion
 supabase functions deploy purge-store-identity-images
 supabase functions deploy store-template-save
 supabase functions deploy store-report
+supabase functions deploy seller-verification
 ```
+
+After applying `202611020005_seller_verification_image_retention.sql`, redeploy
+`purge-store-identity-images` so the existing scheduled cleanup also removes
+individual-seller ID and selfie images 30 days after a review decision. Seller
+verification uses the existing private `store-private` bucket and
+`STORE_ID_HASH_SECRET`; no additional Edge Function secret is required. Migration
+`202611020007` records the timestamp when the seller accepts the identity privacy
+notice, and the Edge Function rejects submissions without that consent.
+Individual sellers can submit or check verification from **Settings → Account**
+or the **Create listing** page. Store owners continue to use store verification.
+
+For an existing linked project, inspect pending migrations before deploying:
+
+```bash
+supabase migration list
+supabase db push
+supabase functions deploy seller-verification
+supabase functions deploy purge-store-identity-images
+```
+
+`supabase db push` applies all migrations not yet recorded on the linked project,
+including the individual-seller migrations `202611020004` through `202611020007`
+when they are pending. Do not use it until the CLI is linked to the intended
+project and the migration list has been reviewed.
+
+The individual seller phone-verification requirement is enforced by the
+database policy row, not the Edge Function environment. It defaults to enabled.
+For local development only, disable it with:
+
+```sql
+UPDATE public.individual_seller_policy
+SET phone_otp_required = FALSE
+WHERE singleton = TRUE;
+```
+
+Set it back to `TRUE` before production use.
 
 The application also needs these Supabase Edge Function secrets:
 
@@ -68,10 +110,12 @@ inside the caller's `{user_id}/` folder. Template images are compressed to WebP
 and resized in the browser to a maximum 1600 px longest side. Store only the
 returned storage path in template content, not a base64 data URL. Apply the
 migration with `supabase db push` before deploying `store-template-save`.
-After deploying Phase 1, an approved seller can open **Store dashboard →
-Customize Theme** to edit the original **Boutique Grid** template. The live
-storefront is selected by its saved `template_id`; the legacy theme editor
-remains in place until the planned cleanup phase.
+An approved seller can open **Store dashboard → Customize Theme** to choose
+between **Boutique Grid** and **Storefront Landing**. The live storefront is
+selected by its saved `template_id`; legacy theme presets are no longer rendered
+or editable. Stores with a missing or unsupported template ID render as
+**Boutique Grid** without changing the saved ID or resetting the six-month
+template-change cooldown.
 
 Phase 3 departments reuse the existing `stores.collections` JSON array and
 add `listings.collection_ids` JSONB for multi-department assignments.
@@ -338,3 +382,19 @@ project after applying `202610290002_store_reports.sql` and deploying
 `STORE_REGISTRATION_TEST_*` variables before running `npm test`. It checks
 report-row privacy, reporter identity enforcement, duplicate prevention, and the
 five-per-day function rate limit. Do not use production credentials or data.
+
+The individual seller verification integration test is opt-in. Run it only
+against a disposable local/test project after applying the individual seller
+migrations and serving or deploying `seller-verification`. Configure
+`STORE_ID_HASH_SECRET` for that function, then set
+`SELLER_VERIFICATION_INTEGRATION=1` and
+`SELLER_VERIFICATION_TEST_URL`, `SELLER_VERIFICATION_TEST_ANON_KEY`, and
+`SELLER_VERIFICATION_TEST_SERVICE_ROLE_KEY` before running:
+
+```bash
+npx vitest run supabase/tests/seller-verification.integration.test.ts
+```
+
+It creates and removes a temporary account and verifies submission state,
+owner-only database access, and safe cleanup behavior. Never use production
+credentials or data.

@@ -11,10 +11,12 @@ type AuthPageProps = {
   userEmail: string
   authEmail: string
   authPassword: string
-  authUsername: string
+  authFirstName: string
+  authLastName: string
   onAuthEmailChange: (value: string) => void
   onAuthPasswordChange: (value: string) => void
-  onAuthUsernameChange: (value: string) => void
+  onAuthFirstNameChange: (value: string) => void
+  onAuthLastNameChange: (value: string) => void
   onSubmit: (event: FormEvent<HTMLFormElement>, captchaToken?: string) => Promise<void> | void
   onSwitchMode: () => void
   onLogout: () => void
@@ -35,10 +37,12 @@ export function AuthPage({
   userEmail,
   authEmail,
   authPassword,
-  authUsername,
+  authFirstName,
+  authLastName,
   onAuthEmailChange,
   onAuthPasswordChange,
-  onAuthUsernameChange,
+  onAuthFirstNameChange,
+  onAuthLastNameChange,
   onSubmit,
   onSwitchMode,
   onLogout,
@@ -64,6 +68,14 @@ export function AuthPage({
     setLocalError('')
 
     if (mode === 'signup') {
+      if (!authFirstName.trim() || !authLastName.trim()) {
+        setLocalError('Enter both your first name and last name.')
+        return
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(authEmail.trim())) {
+        setLocalError('Enter a valid email address.')
+        return
+      }
       if (!passwordRules.isValid) {
         setLocalError('Please ensure your password satisfies all security rules below.')
         return
@@ -213,7 +225,7 @@ export function AuthPage({
           box-sizing: border-box;
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
           position: relative;
-          overflow: hidden;
+          overflow-x: hidden;
         }
 
         .golden-auth-canvas {
@@ -309,6 +321,9 @@ export function AuthPage({
 
         .golden-pill-input-wrapper {
           display: flex;
+          width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
           align-items: center;
           background: #ffffff;
           border-radius: 9999px;
@@ -324,6 +339,7 @@ export function AuthPage({
         }
 
         .golden-pill-icon {
+          flex: 0 0 auto;
           color: #1e293b;
           font-size: 19px;
           user-select: none;
@@ -333,6 +349,8 @@ export function AuthPage({
 
         .golden-pill-input {
           flex: 1;
+          width: 0;
+          min-width: 0;
           border: none;
           outline: none;
           background: transparent;
@@ -348,6 +366,7 @@ export function AuthPage({
         }
 
         .golden-pill-toggle-btn {
+          flex: 0 0 auto;
           background: none;
           border: none;
           cursor: pointer;
@@ -375,6 +394,7 @@ export function AuthPage({
 
         .golden-remember-label {
           display: flex;
+          white-space: nowrap;
           align-items: center;
           gap: 7px;
           cursor: pointer;
@@ -406,6 +426,9 @@ export function AuthPage({
         }
 
         .golden-forgot-link {
+          flex: 0 1 auto;
+          text-align: right;
+          line-height: 1.25;
           color: #0f172a;
           text-decoration: none;
           font-weight: 600;
@@ -566,7 +589,62 @@ export function AuthPage({
             display: none;
           }
           .golden-auth-form-col {
-            padding: 36px 20px;
+            padding: 28px 16px;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .golden-auth-page-wrapper {
+            min-height: auto;
+            padding: 16px 10px;
+            align-items: flex-start;
+          }
+
+          .golden-auth-canvas {
+            border-radius: 22px;
+          }
+
+          .golden-auth-form-col {
+            padding: 18px 12px;
+          }
+
+          .golden-amber-card {
+            padding: 28px 18px;
+            border-radius: 22px;
+          }
+
+          .golden-card-title {
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+          }
+
+          .golden-controls-row {
+            gap: 8px;
+            margin: 14px 0 18px;
+            font-size: 0.75rem;
+          }
+
+          .golden-remember-label {
+            gap: 5px;
+          }
+
+          .golden-forgot-link {
+            max-width: 92px;
+          }
+
+          .golden-footer-actions {
+            margin-top: 18px;
+          }
+        }
+
+        @media (max-width: 360px) {
+          .golden-amber-card {
+            padding-right: 14px;
+            padding-left: 14px;
+          }
+
+          .golden-controls-row {
+            font-size: 0.72rem;
           }
         }
       `}</style>
@@ -636,23 +714,41 @@ export function AuthPage({
             )}
 
             <form onSubmit={handleFormSubmit}>
-              {/* Username Input (Sign up mode) */}
+              {/* Name fields (Sign up mode) */}
               {mode === 'signup' && (
+                <>
                 <div className="golden-pill-input-group">
                   <div className="golden-pill-input-wrapper">
                     <span className="material-icons golden-pill-icon">person</span>
                     <input
                       className="golden-pill-input"
-                      placeholder="Username / Full Name"
-                      value={authUsername}
-                      onChange={(e) => onAuthUsernameChange(e.target.value)}
+                      placeholder="First name"
+                      autoComplete="given-name"
+                      value={authFirstName}
+                      onChange={(e) => onAuthFirstNameChange(e.target.value)}
+                      maxLength={80}
                       required
                     />
                   </div>
                 </div>
+                <div className="golden-pill-input-group">
+                  <div className="golden-pill-input-wrapper">
+                    <span className="material-icons golden-pill-icon">person</span>
+                    <input
+                      className="golden-pill-input"
+                      placeholder="Last name"
+                      autoComplete="family-name"
+                      value={authLastName}
+                      onChange={(e) => onAuthLastNameChange(e.target.value)}
+                      maxLength={80}
+                      required
+                    />
+                  </div>
+                </div>
+                </>
               )}
 
-              {/* Username/Email Input (Login mode) or Email Input (Sign up mode) */}
+              {/* Email input */}
               <div className="golden-pill-input-group">
                 <div className="golden-pill-input-wrapper">
                   <span className="material-icons golden-pill-icon">
@@ -660,10 +756,12 @@ export function AuthPage({
                   </span>
                   <input
                     className="golden-pill-input"
-                    type={mode === 'login' ? 'text' : 'email'}
-                    placeholder={mode === 'login' ? 'Username/Email' : 'Email Address'}
+                    type="email"
+                    placeholder="Email address"
+                    autoComplete="email"
                     value={authEmail}
                     onChange={(e) => onAuthEmailChange(e.target.value)}
+                    maxLength={254}
                     required
                   />
                 </div>
@@ -897,6 +995,7 @@ export function AuthPage({
                     placeholder="Enter your email"
                     value={forgotEmail}
                     onChange={(e) => setForgotEmail(e.target.value)}
+                    maxLength={254}
                     required
                   />
                 </div>

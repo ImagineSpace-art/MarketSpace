@@ -15,6 +15,7 @@ export type Listing = {
   seller_name?: string
   user_id?: string
   store_id?: string | null
+  seller_type?: 'store' | 'individual'
   images?: string[]
   sponsored?: boolean
   moderation_status?: 'pending' | 'approved' | 'rejected' | 'removed'
@@ -124,92 +125,10 @@ export type ListingReview = {
   createdAt: string
 }
 
-export type StoreSectionType =
-  | 'hero_banner'
-  | 'featured_products'
-  | 'promo_banner'
-  | 'categories_grid'
-  | 'rich_text'
-  | 'testimonials'
-  | 'faq'
-  | 'announcement'
-  | 'countdown_deal'
-  | 'editorial_grid'
-  | 'featured_collection_split'
-  | 'bento_grid'
-
-export type StoreSection = {
-  id: string
-  type: StoreSectionType
-  enabled: boolean
-  settings: Record<string, any>
-}
-
-export type StoreNavLink = {
-  id: string
-  label: string
-  url: string // e.g. '#products', '#departments', '#story', '#faq', '#reviews', 'category:Shoes', 'https://...'
-  type?: 'all' | 'category' | 'section' | 'external'
-}
-
-export type StoreInfoPanelHighlight = {
-  icon: string
-  title: string
-  desc: string
-}
-
-export type StoreInfoPanelConfig = {
-  enabled?: boolean
-  title?: string
-  subtitle?: string
-  badgeText?: string
-  highlights?: StoreInfoPanelHighlight[]
-}
-
 export type StoreCartItem = {
   listing: Listing
   quantity: number
   selectedVariant?: string
-}
-
-export type StoreCartDrawerConfig = {
-  enabled?: boolean
-  headline?: string
-  freeShippingThreshold?: number
-  freeShippingMessage?: string
-  checkoutNote?: string
-  emptyMessage?: string
-}
-
-export type StoreNavConfig = {
-  layout?: 'logo-left' | 'logo-center' | 'minimal'
-  backgroundColor?: string
-  textColor?: string
-  accentColor?: string
-  isSticky?: boolean
-  showSearch?: boolean
-  showContactBtn?: boolean
-  showFollowBtn?: boolean
-  showNotificationsBtn?: boolean
-  showPanelBtn?: boolean
-  showCartBtn?: boolean
-  showCategorySelector?: boolean
-  logoStyle?: 'both' | 'logo-only' | 'name-only'
-  links: StoreNavLink[]
-  subnavLinks?: StoreNavLink[]
-  panel?: StoreInfoPanelConfig
-  cartDrawer?: StoreCartDrawerConfig
-}
-
-export type StoreThemeConfig = {
-  presetName?: 'arctos' | 'hyper' | 'xtra' | 'modern' | 'boutique' | 'bold' | 'minimal'
-  primaryColor?: string
-  fontFamily?: string
-  bannerStyle?: 'full-bleed' | 'contained' | 'minimal'
-  navigation?: StoreNavConfig
-  panel?: StoreInfoPanelConfig
-  cartDrawer?: StoreCartDrawerConfig
-  sections: StoreSection[]
 }
 
 export type StoreTemplateId = 'boutique-grid' | 'storefront-landing'
@@ -240,7 +159,6 @@ export type BusinessProfile = {
   verifiedLocation?: boolean
   registeredBusiness?: boolean
   probationState?: 'probation' | 'trusted'
-  themeConfig?: StoreThemeConfig
   templateId?: StoreTemplateId
   templateChangedAt?: string
   templateContent?: StoreTemplateContent

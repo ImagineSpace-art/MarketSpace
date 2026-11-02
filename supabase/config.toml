@@ -18,5 +18,8 @@ verify_jwt = true
 [functions.listing-review]
 verify_jwt = true
 
+[functions.seller-verification]
+verify_jwt = true
+
 [functions.admin-auth]
 verify_jwt = false

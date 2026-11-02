@@ -101,7 +101,10 @@ export function AdCreationPage({
     // Additional Contact Method
     const [enableWhatsApp, setEnableWhatsApp] = useState(true)
     const [contactMethod, setContactMethod] = useState<'WhatsApp' | 'Direct Chat'>('WhatsApp')
-    const [contactPhone, setContactPhone] = useState(businessProfile?.whatsapp || (profile as any)?.phone || '975102312')
+    const [contactPhone, setContactPhone] = useState(() => {
+        const digits = (businessProfile?.whatsapp || (profile as any)?.phone || '975102312').replace(/\D/g, '')
+        return digits.startsWith('260') ? digits.slice(3, 12) : digits.slice(0, 9)
+    })
 
     // Advantage+ Creative & Special Category
     const [advantageCreative, setAdvantageCreative] = useState(true)
@@ -180,8 +183,47 @@ export function AdCreationPage({
     const [publishSuccess, setPublishSuccess] = useState(false)
 
     const handlePublish = async () => {
-        if (!destinationUrl.trim()) {
-            alert('Please enter a valid destination URL.')
+        const validDestination = destinationUrl.startsWith('/')
+            ? !destinationUrl.startsWith('//') && !destinationUrl.includes('\\')
+            : (() => {
+                try {
+                    return new URL(destinationUrl).protocol === 'https:'
+                } catch {
+                    return false
+                }
+            })()
+        const numericBudget = Number(budget)
+        if (!headline.trim() || headline.trim().length > 25) {
+            alert('Enter an ad headline between 1 and 25 characters.')
+            return
+        }
+        if (!adText.trim() || adText.length > 2000) {
+            alert('Enter ad text of no more than 2,000 characters.')
+            return
+        }
+        if (!mediaList.length || mediaList.length > 5) {
+            alert('Add between 1 and 5 media items.')
+            return
+        }
+        if (!validDestination) {
+            alert('Enter a relative MarketSpace path or a valid HTTPS destination URL.')
+            return
+        }
+        if (!Number.isFinite(numericBudget) || numericBudget < 1 || numericBudget > 100) {
+            alert('Set a daily budget between 1 and 100.')
+            return
+        }
+        if (!startDate || Number.isNaN(Date.parse(startDate)) || startDate < new Date().toISOString().slice(0, 10)) {
+            alert('Choose a valid start date that is today or later.')
+            return
+        }
+        if (scheduleType === 'end_date' &&
+            (!endDate || Number.isNaN(Date.parse(endDate)) || endDate <= startDate)) {
+            alert('Choose an end date later than the start date.')
+            return
+        }
+        if (enableWhatsApp && contactMethod === 'WhatsApp' && !/^\d{9}$/.test(contactPhone)) {
+            alert('Enter the 9-digit Zambian phone number after +260.')
             return
         }
 
@@ -363,6 +405,7 @@ export function AdCreationPage({
                                 rows={3}
                                 value={adText}
                                 onChange={(e) => setAdText(e.target.value)}
+                                maxLength={2000}
                                 placeholder="How do you want your ad to look?"
                                 style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.9rem', resize: 'vertical' }}
                             />
@@ -437,7 +480,7 @@ export function AdCreationPage({
                             </div>
                             <input
                                 type="text"
-                                maxLength={30}
+                                maxLength={25}
                                 value={headline}
                                 onChange={(e) => setHeadline(e.target.value)}
                                 placeholder="Enter a catchy headline"
@@ -468,7 +511,8 @@ export function AdCreationPage({
                             <input
                                 type="text"
                                 value={destinationUrl}
-                                onChange={(e) => setDestinationUrl(e.target.value)}
+                                onChange={(e) => setDestinationUrl(e.target.value.slice(0, 2048))}
+                                maxLength={2048}
                                 placeholder="/store/123 or https://..."
                                 style={{
                                     width: '100%',
@@ -529,8 +573,10 @@ export function AdCreationPage({
                                             <input
                                                 type="text"
                                                 value={contactPhone}
-                                                onChange={(e) => setContactPhone(e.target.value)}
+                                                onChange={(e) => setContactPhone(e.target.value.replace(/\D/g, '').slice(0, 9))}
                                                 placeholder="975102312"
+                                                inputMode="numeric"
+                                                maxLength={9}
                                                 style={{ flexGrow: 1, padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
                                             />
                                         </div>
@@ -608,6 +654,7 @@ export function AdCreationPage({
                                     type="date"
                                     value={startDate}
                                     onChange={(e) => setStartDate(e.target.value)}
+                                    min={new Date().toISOString().slice(0, 10)}
                                     style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }}
                                 />
                             </div>
@@ -650,6 +697,7 @@ export function AdCreationPage({
                                     type="date"
                                     value={endDate}
                                     onChange={(e) => setEndDate(e.target.value)}
+                                    min={startDate}
                                     style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }}
                                 />
                             </div>
@@ -674,7 +722,7 @@ export function AdCreationPage({
                                     min="1"
                                     max="100"
                                     value={budget}
-                                    onChange={(e) => setBudget(Number(e.target.value))}
+                                    onChange={(e) => setBudget(e.target.value === '' ? 0 : Number(e.target.value))}
                                     style={{ width: '110px', fontSize: '1.5rem', fontWeight: 800, textAlign: 'center', padding: '4px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }}
                                 />
                             </div>

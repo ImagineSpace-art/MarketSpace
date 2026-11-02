@@ -3,6 +3,7 @@ import {
   fuzzyNameSimilarity,
   isAtLeast18,
   isDisposableEmailDomain,
+  isValidZambianNrc,
   validateStoreSubdomain,
 } from '../../supabase/functions/_shared/storeRegistrationValidation'
 
@@ -29,6 +30,14 @@ describe('store registration validation', () => {
   it('blocks configured disposable-email domains', () => {
     expect(isDisposableEmailDomain('seller@mailinator.com')).toBe(true)
     expect(isDisposableEmailDomain('seller@example.com')).toBe(false)
+  })
+
+  it('accepts only a 9-digit numeric Zambian NRC', () => {
+    expect(isValidZambianNrc('123456789')).toBe(true)
+    expect(isValidZambianNrc('012345678')).toBe(true)
+    expect(isValidZambianNrc('12345678')).toBe(false)
+    expect(isValidZambianNrc('1234567890')).toBe(false)
+    expect(isValidZambianNrc('12345A789')).toBe(false)
   })
 
   it('returns a normalized fuzzy similarity score for payout-name review', () => {

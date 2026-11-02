@@ -1,11 +1,10 @@
 import { useState } from 'react'
-import type { BusinessProfile, StoreThemeConfig } from '../../types'
+import type { BusinessProfile } from '../../types'
 
 export interface StoreInfoPanelProps {
   isOpen: boolean
   onClose: () => void
   shop: BusinessProfile
-  themeConfig?: StoreThemeConfig
   isFollowing?: boolean
   followerCount?: number
   onToggleFollow?: () => void
@@ -18,7 +17,6 @@ export function StoreInfoPanel({
   isOpen,
   onClose,
   shop,
-  themeConfig,
   isFollowing = false,
   followerCount = 0,
   onToggleFollow,
@@ -30,9 +28,8 @@ export function StoreInfoPanel({
 
   if (!isOpen) return null
 
-  const brandColor = themeConfig?.primaryColor || shop.accentColor || '#2563eb'
-  const panelConfig = themeConfig?.panel || themeConfig?.navigation?.panel || {
-    enabled: true,
+  const brandColor = shop.accentColor || '#2563eb'
+  const panelConfig = {
     title: 'Store Information & Guidelines',
     subtitle: 'Verified merchant standards, customer support, and delivery commitments.',
     badgeText: 'Verified MarketSpace Store',

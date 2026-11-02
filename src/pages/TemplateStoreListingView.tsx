@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useMemo, useState, type CSSProperties } from 'react'
 import type { BusinessProfile, Listing } from '../types'
 import { formatZMWPrice } from '../utils/formatPrice'
+import { formatServicePriceUnit } from '../features/marketplace/serviceListings'
+import { getMarketplaceLocationName } from '../features/marketplace/storeLocations'
 
 interface Props {
   templateId: 'boutique-grid' | 'storefront-landing'
@@ -23,15 +25,12 @@ export function TemplateStoreListingView({ templateId, listing, shop, storeListi
   const [quantity, setQuantity] = useState(1)
   const [selectedColor, setSelectedColor] = useState(listing.available_colors?.[0] || '')
   const [copied, setCopied] = useState(false)
+  const isService = listing.listing_type === 'service'
+  const whatsappNumber = shop.whatsapp.replace(/\D/g, '')
   const images = listing.images?.length ? listing.images : ['/illustrations/store_banner_electronics.png']
-  const related = useMemo(() => storeListings.filter(item => item.id !== listing.id).slice(0, 6), [listing.id, storeListings])
-
-  useEffect(() => {
-    setActiveImage(0)
-    setQuantity(1)
-    setSelectedColor(listing.available_colors?.[0] || '')
-    window.scrollTo({ top: 0 })
-  }, [listing.id])
+  const related = useMemo(() => storeListings
+    .filter(item => item.id !== listing.id && (item.listing_type === 'service') === isService)
+    .slice(0, 6), [isService, listing.id, storeListings])
 
   const share = async () => {
     try {
@@ -56,47 +55,70 @@ export function TemplateStoreListingView({ templateId, listing, shop, storeListi
           </div>}
         </section>
         <section className="template-product-info">
-          <div className="template-product-kicker">{listing.category || shop.category || 'Store collection'}</div>
+          <div className="template-product-kicker">{isService ? 'Service · ' : ''}{listing.category || shop.category || 'Store collection'}</div>
           <h1>{listing.title}</h1>
-          <div className="template-product-price">{formatZMWPrice(listing.price)}</div>
+          <div className="template-product-price">
+            {isService && listing.price_unit === 'from' ? 'From ' : ''}
+            {formatZMWPrice(listing.price)} {isService && listing.price_unit !== 'from' ? formatServicePriceUnit(listing.price_unit) : ''}
+          </div>
           {listing.description && <p className="template-product-description">{listing.description}</p>}
-          {(listing.available_colors?.length || 0) > 0 && <div className="template-product-colors">
+          {isService && listing.how_it_works && <p className="template-product-description">{listing.how_it_works}</p>}
+          {isService && listing.service_area_id && <p className="template-product-description">
+            Service area: {getMarketplaceLocationName(listing.service_area_id) || listing.service_area_id}
+          </p>}
+          {!isService && (listing.available_colors?.length || 0) > 0 && <div className="template-product-colors">
             <span>Colour</span>
             <div>{listing.available_colors?.map(color => <button key={color} type="button" className={selectedColor === color ? 'active' : ''} style={{ '--swatch-color': color } as CSSProperties} onClick={() => setSelectedColor(color)} aria-label={`Select ${color}`} />)}</div>
           </div>}
           {isOwner ? (
             <div className="template-owner-actions">
-              <p>This is your listing. Customer purchase and messaging controls are hidden.</p>
+              <p>{isService ? 'This is your service. Customer messaging controls are hidden.' : 'This is your listing. Customer purchase and messaging controls are hidden.'}</p>
               <button type="button" onClick={() => onEditListing?.(listing)}>Edit listing</button>
               <button type="button" onClick={() => onRenewListing?.(listing.id)}>Renew listing</button>
               <span>{listing.status || 'Available'}</span>
             </div>
           ) : (
             <>
-              <div className="template-product-actions-row">
-                <div className="template-product-quantity" aria-label="Quantity">
-                  <button type="button" onClick={() => setQuantity(value => Math.max(1, value - 1))} aria-label="Decrease quantity">−</button>
-                  <span>{quantity}</span>
-                  <button type="button" onClick={() => setQuantity(value => value + 1)} aria-label="Increase quantity">+</button>
+              {isService ? (
+                <div className="template-product-secondary-actions">
+                  <button className="template-product-primary-contact" type="button" onClick={inquiry}><span className="material-icons">chat_bubble_outline</span>Message provider</button>
+                  {whatsappNumber && <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noreferrer">
+                    <span className="material-icons">phone</span>WhatsApp provider
+                  </a>}
+                  <button type="button" onClick={() => onToggleSave(listing.id)}><span className="material-icons">{isSaved ? 'favorite' : 'favorite_border'}</span>{isSaved ? 'Saved' : 'Save'}</button>
+                  <button type="button" onClick={share}><span className="material-icons">{copied ? 'check' : 'share'}</span>{copied ? 'Copied' : 'Share'}</button>
                 </div>
-                <button className="template-product-cart" type="button" onClick={() => onAddToCart(listing, quantity)}>Add to cart</button>
-              </div>
-              <div className="template-product-secondary-actions">
-                <button type="button" onClick={() => onToggleSave(listing.id)}><span className="material-icons">{isSaved ? 'favorite' : 'favorite_border'}</span>{isSaved ? 'Saved' : 'Save'}</button>
-                <button type="button" onClick={share}><span className="material-icons">{copied ? 'check' : 'share'}</span>{copied ? 'Copied' : 'Share'}</button>
-                <button type="button" onClick={inquiry}><span className="material-icons">chat_bubble_outline</span>Message seller</button>
-              </div>
+              ) : (
+                <>
+                  <div className="template-product-actions-row">
+                    <div className="template-product-quantity" aria-label="Quantity">
+                      <button type="button" onClick={() => setQuantity(value => Math.max(1, value - 1))} aria-label="Decrease quantity">−</button>
+                      <span>{quantity}</span>
+                      <button type="button" onClick={() => setQuantity(value => value + 1)} aria-label="Increase quantity">+</button>
+                    </div>
+                    <button className="template-product-cart" type="button" onClick={() => onAddToCart(listing, quantity)}>Add to cart</button>
+                  </div>
+                  <div className="template-product-secondary-actions">
+                    <button type="button" onClick={() => onToggleSave(listing.id)}><span className="material-icons">{isSaved ? 'favorite' : 'favorite_border'}</span>{isSaved ? 'Saved' : 'Save'}</button>
+                    <button type="button" onClick={share}><span className="material-icons">{copied ? 'check' : 'share'}</span>{copied ? 'Copied' : 'Share'}</button>
+                    <button type="button" onClick={inquiry}><span className="material-icons">chat_bubble_outline</span>Message seller</button>
+                  </div>
+                </>
+              )}
             </>
           )}
         </section>
       </div>
       {related.length > 0 && <section className="template-related-products">
-        <div><span>Continue shopping</span><h2>Related items</h2></div>
+        <div><span>Continue browsing</span><h2>{isService ? 'More services' : 'Related items'}</h2></div>
         <div className="template-related-grid">
           {related.map(item => <button key={item.id} type="button" onClick={() => onSelectListing(item)}>
             <img src={item.images?.[0] || '/illustrations/store_banner_electronics.png'} alt={item.title} />
             <strong>{item.title}</strong>
-            <span>{formatZMWPrice(item.price)}</span>
+            <span>
+              {isService && item.price_unit === 'from' ? 'From ' : ''}
+              {formatZMWPrice(item.price)} {isService && item.price_unit !== 'from' ? formatServicePriceUnit(item.price_unit) : ''}
+            </span>
           </button>)}
         </div>
       </section>}

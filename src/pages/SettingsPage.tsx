@@ -4,6 +4,7 @@ import type { PaymentMethodItem, NotificationConfig } from '../types'
 import type { Listing, BusinessProfile } from '../types'
 import { SettingsNavigation } from '../components/SettingsNavigation'
 import { DestructiveActionDialog } from '../components/DestructiveActionDialog'
+import { SellerVerificationSubmission } from '../components/SellerVerificationSubmission'
 
 type SettingsPageProps = {
     theme: 'light' | 'dark'
@@ -78,13 +79,13 @@ export function SettingsPage({
     const [passwordConfirm, setPasswordConfirm] = useState('')
     const [twoFactorEnabled, setTwoFactorEnabled] = useState(false)
     const [accountMsg, setAccountMsg] = useState('')
-    const [verificationRequested, setVerificationRequested] = useState(false)
 
     // Payment Form state
     const [payType, setPayType] = useState<'mobile_money' | 'card' | 'bank'>('mobile_money')
     const [payTitle, setPayTitle] = useState('')
     const [payAcc, setPayAcc] = useState('')
     const [payProvider, setPayProvider] = useState('Airtel Zambia')
+    const [paymentFormError, setPaymentFormError] = useState('')
 
     // Audience Visibility toggles
     const [publicProfile, setPublicProfile] = useState(true)
@@ -111,11 +112,29 @@ export function SettingsPage({
 
     const handleAddPaymentSubmit = (e: FormEvent) => {
         e.preventDefault()
-        if (!payTitle || !payAcc) return
+        setPaymentFormError('')
+        const account = payAcc.replace(/[\s-]/g, '')
+        const accountValid = payType === 'mobile_money'
+            ? /^(?:\+?260)?[0-9]{9}$/.test(account)
+            : payType === 'card'
+                ? /^[0-9]{12,19}$/.test(account)
+                : /^[0-9]{5,30}$/.test(account)
+        if (!payTitle.trim() || payTitle.trim().length > 100 || !payProvider.trim() || payProvider.trim().length > 80) {
+            setPaymentFormError('Enter an account title and provider within the allowed length.')
+            return
+        }
+        if (!accountValid) {
+            setPaymentFormError(payType === 'mobile_money'
+                ? 'Enter a 9-digit Zambian mobile money number, optionally prefixed by +260.'
+                : payType === 'card'
+                    ? 'Enter a card number containing 12 to 19 digits.'
+                    : 'Enter a bank account number containing 5 to 30 digits.')
+            return
+        }
         addPaymentMethod({
             type: payType,
             title: payTitle,
-            accountNumber: payAcc,
+            accountNumber: account,
             provider: payProvider,
         })
         setPayTitle('')
@@ -197,19 +216,10 @@ export function SettingsPage({
                                 <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Registered Email</span>
                                 <p style={{ margin: '2px 0 0 0', fontWeight: 600 }}>{userEmail}</p>
                             </div>
-                            <div>
-                                <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Account Verification Status</span>
-                                <p style={{ margin: '2px 0 0 0', color: verificationRequested ? '#10b981' : 'var(--text)', fontWeight: 600 }}>
-                                    {verificationRequested ? 'Verification Pending Review' : 'Unverified (Standard Buyer/Seller)'}
-                                </p>
-                            </div>
-                            {!verificationRequested && (
-                                <button className="secondary-btn compact-btn" onClick={() => setVerificationRequested(true)} style={{ alignSelf: 'flex-start', marginTop: '4px' }}>
-                                    Request Verified Merchant Badge
-                                </button>
-                            )}
                         </div>
                     </div>
+
+                    {!businessProfile && <SellerVerificationSubmission />}
 
                     <div className="setting-box" style={{ background: 'var(--panel)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border)' }}>
                         <h3 style={{ marginTop: 0, fontSize: '1.1rem' }}>Password & Security</h3>
@@ -553,10 +563,11 @@ export function SettingsPage({
                                     <option value="card">Debit / Credit Card</option>
                                     <option value="bank">Bank Account</option>
                                 </select>
-                                <input value={payProvider} onChange={(e) => setPayProvider(e.target.value)} placeholder="Provider (e.g. Airtel, MTN, Zanaco)" required style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
+                                <input value={payProvider} onChange={(e) => setPayProvider(e.target.value)} placeholder="Provider (e.g. Airtel, MTN, Zanaco)" maxLength={80} required style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
                             </div>
-                            <input value={payTitle} onChange={(e) => setPayTitle(e.target.value)} placeholder="Account Title (e.g. Personal Airtel Wallet)" required style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
-                            <input value={payAcc} onChange={(e) => setPayAcc(e.target.value)} placeholder="Phone Number / Card Number / Account #" required style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
+                            <input value={payTitle} onChange={(e) => setPayTitle(e.target.value)} placeholder="Account Title (e.g. Personal Airtel Wallet)" maxLength={100} required style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
+                            <input value={payAcc} onChange={(e) => setPayAcc(e.target.value)} type="text" inputMode={payType === 'mobile_money' ? 'tel' : 'numeric'} maxLength={30} placeholder={payType === 'mobile_money' ? '9-digit number or +260...' : payType === 'card' ? '12–19 digit card number' : '5–30 digit account number'} required style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
+                            {paymentFormError && <p role="alert" style={{ color: 'var(--danger)', margin: 0 }}>{paymentFormError}</p>}
                             <button className="primary-btn compact-btn" type="submit" style={{ alignSelf: 'flex-start' }}>Save Payment Method</button>
                         </form>
                     </div>

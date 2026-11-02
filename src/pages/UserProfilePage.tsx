@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { Listing } from '../components/Listing'
 import { uploadImageToSupabase } from '../features/marketplace/ImageUploader'
 import { supabase } from '../lib/supabaseClient'
 import type { BusinessProfile, Listing as ListingData, Profile } from '../types'
+import { getStoreUrl } from '../utils/storeUrl'
 
 type UserProfilePageProps = {
   profileUserId?: string
@@ -210,10 +211,10 @@ export function UserProfilePage({
                   {followingIds.includes(userId) ? 'Following' : 'Follow'}
                 </button>
                 {businessProfile && (
-                  <Link className="secondary-btn user-profile-store-link" to={`/store/${userId}`}>
+                  <a className="secondary-btn user-profile-store-link" href={getStoreUrl(userId, businessProfile.subdomain)}>
                     <span className="material-icons" aria-hidden="true">storefront</span>
                     Visit store
-                  </Link>
+                  </a>
                 )}
               </>
             )}

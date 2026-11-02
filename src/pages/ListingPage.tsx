@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabaseClient'
 import { formatServicePriceUnit, SERVICE_PRICE_UNITS, type ServicePriceUnit } from '../features/marketplace/serviceListings'
 import { getMarketplaceLocationName } from '../features/marketplace/storeLocations'
 import { DestructiveActionDialog } from '../components/DestructiveActionDialog'
+import { getStoreUrl } from '../utils/storeUrl'
 
 type ListingDetailPageProps = {
   selectedListing: Listing | null
@@ -38,9 +39,7 @@ export function ListingDetailPage({
 }: ListingDetailPageProps) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const preset = searchParams.get('preset') || ''
   const storeId = searchParams.get('store') || ''
-  const isXtraPreset = preset === 'xtra'
 
   const [selectedColors, setSelectedColors] = useState<string[]>([])
   const [selectedSize, setSelectedSize] = useState<string>('')
@@ -216,7 +215,7 @@ export function ListingDetailPage({
     <section className="section-card detail-card" style={{
       maxWidth: '1100px',
       margin: '0 auto',
-      ...(isXtraPreset ? { background: '#0B0F19', borderColor: '#1F2937', color: '#F9FAFB' } : {})
+      ...({})
     }}>
       {storeId ? (
         <button
@@ -228,9 +227,9 @@ export function ListingDetailPage({
             alignItems: 'center',
             gap: '6px',
             fontWeight: 600,
-            color: isXtraPreset ? '#FACC15' : 'var(--primary)'
+            color: 'var(--primary)'
           }}
-          onClick={() => navigate(`/store/${storeId}`)}
+          onClick={() => window.location.assign(getStoreUrl(storeId, allBusinesses[storeId]?.subdomain))}
         >
           <span className="material-icons">storefront</span>
           Back to Store
@@ -406,13 +405,13 @@ export function ListingDetailPage({
         </div>
 
         {/* Right Column: Sticky Buy Box Card with Inquiry Form */}
-        <div className="buy-box-panel" style={isXtraPreset ? { background: '#111827', borderColor: '#1F2937', color: '#F9FAFB' } : undefined}>
+        <div className="buy-box-panel" style={undefined}>
           <div>
-            <span style={{ fontSize: '0.86rem', color: isXtraPreset ? '#9CA3AF' : 'var(--text-secondary)', fontWeight: 600 }}>{isService ? 'Service price' : 'Total Price'}</span>
-            <h3 style={{ color: isXtraPreset ? '#FACC15' : '#2563eb', marginTop: '4px' }}>{isService && selectedListing.price_unit === 'from' ? 'From ' : ''}{formatZMWPrice(selectedListing.price)} {isService && formatServicePriceUnit(selectedListing.price_unit)}</h3>
+            <span style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{isService ? 'Service price' : 'Total Price'}</span>
+            <h3 style={{ color: '#2563eb', marginTop: '4px' }}>{isService && selectedListing.price_unit === 'from' ? 'From ' : ''}{formatZMWPrice(selectedListing.price)} {isService && formatServicePriceUnit(selectedListing.price_unit)}</h3>
           </div>
 
-          <div style={{ borderTop: `1px solid ${isXtraPreset ? '#1F2937' : 'var(--border)'}`, paddingTop: '12px' }}>
+          <div style={{ borderTop: `1px solid ${'var(--border)'}`, paddingTop: '12px' }}>
             <span style={{ fontSize: '0.84rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
               <span className="material-icons" style={{ fontSize: '16px' }}>check_circle</span>
               {isService ? 'Service Available' : (selectedListing.status === 'Sold' ? 'Sold out' : 'In Stock & Ready')}
@@ -431,11 +430,11 @@ export function ListingDetailPage({
           {hasColors && !isService && (
             <label style={{ display: 'block' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.86rem', fontWeight: 600, color: isXtraPreset ? '#F9FAFB' : 'var(--text)' }}>
+                <span style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text)' }}>
                   Color(s) <span style={{ color: '#ef4444' }}>*</span>
                 </span>
                 {selectedColors.length > 0 && (
-                  <span style={{ fontSize: '0.74rem', color: isXtraPreset ? '#9CA3AF' : 'var(--text-secondary)' }}>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
                     {selectedColors.length} chosen
                   </span>
                 )}
@@ -478,11 +477,11 @@ export function ListingDetailPage({
           {hasSizes && (
             <label style={{ display: 'block' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.86rem', fontWeight: 600, color: isXtraPreset ? '#F9FAFB' : 'var(--text)' }}>
+                <span style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text)' }}>
                   Size <span style={{ color: '#ef4444' }}>*</span>
                 </span>
                 {selectedSize && (
-                  <span style={{ fontSize: '0.74rem', color: isXtraPreset ? '#FACC15' : '#2563eb', fontWeight: 600 }}>
+                  <span style={{ fontSize: '0.74rem', color: '#2563eb', fontWeight: 600 }}>
                     Selected: {selectedSize}
                   </span>
                 )}
@@ -501,9 +500,9 @@ export function ListingDetailPage({
                       style={{
                         padding: '6px 14px',
                         borderRadius: '8px',
-                        border: isChosen ? (isXtraPreset ? '2px solid #FACC15' : '2px solid #2563eb') : `1px solid ${isXtraPreset ? '#374151' : 'var(--border)'}`,
-                        background: isChosen ? (isXtraPreset ? '#FACC15' : '#2563eb') : (isXtraPreset ? '#1F2937' : 'var(--surface)'),
-                        color: isChosen ? (isXtraPreset ? '#0B0F19' : '#ffffff') : (isXtraPreset ? '#F9FAFB' : 'var(--text)'),
+                        border: isChosen ? ('2px solid #2563eb') : `1px solid ${'var(--border)'}`,
+                        background: isChosen ? ('#2563eb') : ('var(--surface)'),
+                        color: isChosen ? ('#ffffff') : ('var(--text)'),
                         fontWeight: isChosen ? 700 : 500,
                         fontSize: '0.86rem',
                         cursor: 'pointer',
@@ -520,13 +519,13 @@ export function ListingDetailPage({
 
           {/* Quantity Selector (Mandatory) */}
           <label style={{ display: 'block' }}>
-            <span style={{ fontSize: '0.86rem', fontWeight: 600, color: isXtraPreset ? '#F9FAFB' : 'var(--text)' }}>
+            <span style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text)' }}>
               Quantity <span style={{ color: '#ef4444' }}>*</span>
             </span>
             <select
               value={quantity}
               onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
-              style={isXtraPreset ? { background: '#1F2937', color: '#F9FAFB', borderColor: '#374151' } : undefined}
+              style={undefined}
             >
               {[...Array(10)].map((_, i) => (
                 <option key={i + 1} value={i + 1}>
@@ -538,7 +537,7 @@ export function ListingDetailPage({
 
           {/* Customer Mobile Phone Input (Mandatory) */}
           <label style={{ display: 'block' }}>
-            <span style={{ fontSize: '0.86rem', fontWeight: 600, color: isXtraPreset ? '#F9FAFB' : 'var(--text)' }}>
+            <span style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text)' }}>
               Your Phone Number <span style={{ color: '#ef4444' }}>*</span>
             </span>
             <input
@@ -549,19 +548,19 @@ export function ListingDetailPage({
                 setPhone(e.target.value)
                 setFormError('')
               }}
-              style={isXtraPreset ? { background: '#1F2937', color: '#F9FAFB', borderColor: '#374151' } : undefined}
+              style={undefined}
             />
           </label>
 
           {/* Offer Input (Inactive/disabled if seller does not accept offers) */}
           {!isService && (
-            <div style={{ padding: '12px', background: isXtraPreset ? '#1F2937' : 'var(--panel)', borderRadius: '10px', border: `1px solid ${isXtraPreset ? '#374151' : 'var(--border)'}` }}>
+            <div style={{ padding: '12px', background: 'var(--panel)', borderRadius: '10px', border: `1px solid ${'var(--border)'}` }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <span style={{ fontSize: '0.86rem', fontWeight: 600, color: isXtraPreset ? '#F9FAFB' : 'var(--text)' }}>
+                <span style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text)' }}>
                   Make an Offer (ZMW)
                 </span>
                 {!acceptsOffers && (
-                  <span style={{ fontSize: '0.72rem', color: isXtraPreset ? '#9CA3AF' : 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                     <span className="material-icons" style={{ fontSize: '13px' }}>lock</span> Not accepted
                   </span>
                 )}
@@ -580,21 +579,21 @@ export function ListingDetailPage({
                   width: '100%',
                   padding: '10px 12px',
                   borderRadius: '8px',
-                  border: `1px solid ${isXtraPreset ? '#374151' : 'var(--border)'}`,
-                  background: !acceptsOffers ? (isXtraPreset ? '#111827' : 'rgba(0,0,0,0.04)') : (isXtraPreset ? '#0B0F19' : 'var(--surface)'),
-                  color: !acceptsOffers ? (isXtraPreset ? '#6B7280' : 'var(--text-secondary)') : (isXtraPreset ? '#F9FAFB' : 'var(--text)'),
+                  border: `1px solid ${'var(--border)'}`,
+                  background: !acceptsOffers ? ('rgba(0,0,0,0.04)') : ('var(--surface)'),
+                  color: !acceptsOffers ? ('var(--text-secondary)') : ('var(--text)'),
                   cursor: !acceptsOffers ? 'not-allowed' : 'text',
                   fontSize: '0.9rem',
                   opacity: !acceptsOffers ? 0.75 : 1
                 }}
               />
               {!acceptsOffers ? (
-                <p style={{ margin: '6px 0 0', fontSize: '0.76rem', color: isXtraPreset ? '#9CA3AF' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <p style={{ margin: '6px 0 0', fontSize: '0.76rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <span className="material-icons" style={{ fontSize: '14px' }}>info</span>
                   Seller is not accepting offers on this item.
                 </p>
               ) : (
-                <p style={{ margin: '6px 0 0', fontSize: '0.76rem', color: isXtraPreset ? '#9CA3AF' : 'var(--text-secondary)' }}>
+                <p style={{ margin: '6px 0 0', fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
                   Accepts counter-offers at or above ZMW {selectedListing.lowest_acceptable_price}.
                 </p>
               )}
@@ -603,8 +602,8 @@ export function ListingDetailPage({
 
           {/* Free-form Message Input (Optional) */}
           <label style={{ display: 'block' }}>
-            <span style={{ fontSize: '0.86rem', fontWeight: 600, color: isXtraPreset ? '#F9FAFB' : 'var(--text)' }}>
-              Message for Seller <span style={{ fontSize: '0.76rem', fontWeight: 400, color: isXtraPreset ? '#9CA3AF' : 'var(--text-secondary)' }}>(Optional)</span>
+            <span style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text)' }}>
+              Message for Seller <span style={{ fontSize: '0.76rem', fontWeight: 400, color: 'var(--text-secondary)' }}>(Optional)</span>
             </span>
             <textarea
               placeholder={isService ? 'Ask the provider about this service...' : 'Ask questions or specify delivery preferences...'}
@@ -615,9 +614,9 @@ export function ListingDetailPage({
                 width: '100%',
                 padding: '10px 12px',
                 borderRadius: '8px',
-                border: `1px solid ${isXtraPreset ? '#374151' : 'var(--border)'}`,
-                background: isXtraPreset ? '#1F2937' : 'var(--surface)',
-                color: isXtraPreset ? '#F9FAFB' : 'var(--text)',
+                border: `1px solid ${'var(--border)'}`,
+                background: 'var(--surface)',
+                color: 'var(--text)',
                 fontSize: '0.88rem',
                 resize: 'vertical'
               }}
@@ -636,8 +635,8 @@ export function ListingDetailPage({
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                background: isXtraPreset ? '#FACC15' : '#2563eb',
-                color: isXtraPreset ? '#0B0F19' : '#ffffff',
+                background: '#2563eb',
+                color: '#ffffff',
                 fontWeight: 700
               }}
               onClick={handleSendInquiry}
@@ -858,6 +857,7 @@ function ListingRatingReviewBox({ listingId: _listingId, currentUserName }: { li
             onChange={(e) => setComment(e.target.value)}
             placeholder="Describe your experience with this item and seller..."
             rows={3}
+            maxLength={5000}
             required
             style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit' }}
           />
@@ -1012,6 +1012,34 @@ export function ListingFormPage({
   const [selectedDeliveryMethods, setSelectedDeliveryMethods] = useState<string[]>(() => {
     return deliveryOption ? deliveryOption.split(', ') : ['Meetup']
   })
+
+  const handleValidatedSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setErrorText('')
+    const numericPrice = Number(price)
+    if (!title.trim() || title.trim().length > 120) {
+      setErrorText('Enter a listing title between 1 and 120 characters.')
+      return
+    }
+    if (!Number.isFinite(numericPrice) || numericPrice <= 0 || numericPrice > 1_000_000_000) {
+      setErrorText('Enter a price greater than zero and no more than ZMW 1,000,000,000.')
+      return
+    }
+    if (description.length > 5000 || (howItWorks || '').length > 5000) {
+      setErrorText('Descriptions must be 5,000 characters or fewer.')
+      return
+    }
+    if (listingKind !== 'service' && sellerPhone.replace(/\D/g, '').length < 8) {
+      setErrorText('Enter a valid contact phone number with at least 8 digits.')
+      return
+    }
+    if (listingKind !== 'service' && stockType === 'in_stock' &&
+      (!Number.isInteger(stockQuantity) || stockQuantity < 1 || stockQuantity > 1_000_000)) {
+      setErrorText('Enter a whole-number stock quantity between 1 and 1,000,000.')
+      return
+    }
+    await onSubmit(event)
+  }
 
   useEffect(() => {
     let active = true
@@ -1251,7 +1279,7 @@ export function ListingFormPage({
           />
         </div>
       ) : (
-        <form onSubmit={onSubmit} className="form-stack" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+        <form onSubmit={event => void handleValidatedSubmit(event)} className="form-stack" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
           {/* IMAGE UPLOAD CONTAINER */}
           <div>
             <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text)' }}>
@@ -1384,6 +1412,7 @@ export function ListingFormPage({
               value={title}
               onChange={(event) => onTitleChange(event.target.value)}
               placeholder="e.g. iPhone 15 Pro Max 256GB - Like New"
+              maxLength={120}
               required
               style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.92rem' }}
             />
@@ -1399,6 +1428,7 @@ export function ListingFormPage({
               onChange={(event) => onDescriptionChange(event.target.value)}
               placeholder="Describe your item or service, key features, condition details, warranty, etc."
               rows={4}
+              maxLength={5000}
               style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.92rem', fontFamily: 'inherit' }}
             />
           </div>
@@ -1428,8 +1458,10 @@ export function ListingFormPage({
               placeholder={listingKind === 'service' ? "Price (e.g. 150 or 50/hour)" : "e.g. 4500"}
               required
               type="number"
-              min="0"
+              min="0.01"
+              max="1000000000"
               step="0.01"
+              inputMode="decimal"
               style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.92rem' }}
             />
             {listingKind === 'service' && (
@@ -1492,8 +1524,10 @@ export function ListingFormPage({
             <input
               type="tel"
               value={sellerPhone}
-              onChange={(e) => setSellerPhone(e.target.value)}
+              onChange={(e) => setSellerPhone(e.target.value.slice(0, 24))}
               placeholder="e.g. +260 97 1234567"
+              maxLength={24}
+              inputMode="tel"
               required
               style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.92rem' }}
             />
@@ -1543,8 +1577,10 @@ export function ListingFormPage({
                   <input
                     type="number"
                     min="1"
+                    max="1000000"
+                    step="1"
                     value={stockQuantity}
-                    onChange={(e) => setStockQuantity(Number(e.target.value))}
+                    onChange={(e) => setStockQuantity(e.target.value === '' ? 0 : Number(e.target.value))}
                     placeholder="Enter stock quantity"
                     style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.9rem' }}
                   />

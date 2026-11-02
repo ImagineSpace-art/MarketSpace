@@ -1,5 +1,6 @@
 import type { Profile, Listing, BusinessProfile } from '../types'
 import { Listing as ListingView } from '../components/Listing'
+import { getStoreUrl } from '../utils/storeUrl'
 
 type SellerProfilePageProps = {
     seller: Profile
@@ -56,7 +57,7 @@ export function SellerProfilePage({
                 {businessProfile && (
                     <button 
                         className="primary-btn" 
-                        onClick={() => window.open(`/store/${businessProfile.userId}`, '_blank')}
+                        onClick={() => window.open(getStoreUrl(businessProfile.userId, businessProfile.subdomain), '_blank', 'noopener,noreferrer')}
                         style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '12px 20px' }}
                     >
                         <span className="material-icons">storefront</span>

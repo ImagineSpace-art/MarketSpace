@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } f
 import { supabase } from '../lib/supabaseClient'
 import { uploadImageToSupabase } from '../features/marketplace/ImageUploader'
 import { TurnstileCaptcha } from '../components/TurnstileCaptcha'
-import { isAtLeast18 } from '../../supabase/functions/_shared/storeRegistrationValidation'
+import { isAtLeast18, isValidZambianNrc } from '../../supabase/functions/_shared/storeRegistrationValidation'
 import { getFunctionErrorMessage } from '../utils/functionError'
+import { makeMetadataFreeImage } from '../features/marketplace/metadataFreeImage'
 import './StoreRegistrationWizard.css'
 import { STORE_MARKET_LOCATIONS } from '../features/marketplace/storeLocations'
 
@@ -122,36 +123,6 @@ function normalizeZambianPhone(value: string) {
   if (digits.startsWith('260')) return `+${digits}`
   if (digits.startsWith('0')) return `+260${digits.slice(1)}`
   return `+260${digits}`
-}
-
-async function makeMetadataFreeImage(file: File) {
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-    throw new Error('Choose a JPEG, PNG, or WebP image.')
-  }
-  if (file.size > 8 * 1024 * 1024) {
-    throw new Error('Images must be 8 MB or smaller.')
-  }
-
-  const bitmap = await createImageBitmap(file)
-  try {
-    const scale = Math.min(1, 1800 / Math.max(bitmap.width, bitmap.height))
-    const canvas = document.createElement('canvas')
-    canvas.width = Math.max(1, Math.round(bitmap.width * scale))
-    canvas.height = Math.max(1, Math.round(bitmap.height * scale))
-    const context = canvas.getContext('2d')
-    if (!context) throw new Error('This browser cannot process the selected image.')
-    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((result) => {
-        if (result) resolve(result)
-        else reject(new Error('The selected image could not be processed.'))
-      }, 'image/jpeg', 0.88)
-    })
-    if (blob.size > 8 * 1024 * 1024) throw new Error('Processed image exceeds the 8 MB limit.')
-    return blob
-  } finally {
-    bitmap.close()
-  }
 }
 
 type StoreRegistrationWizardProps = {
@@ -472,7 +443,7 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
         if (data.identity.legalName.trim().length < 4) throw new Error('Enter your full legal name as shown on your ID.')
         if (!isAtLeast18(data.identity.dateOfBirth)) throw new Error('Store owners must be at least 18 years old.')
         if (data.identity.residentialAddress.trim().length < 8) throw new Error('Enter your complete residential address.')
-        if (!identityNumber.trim()) throw new Error('Enter your government ID number. It is hashed and never stored as plain text.')
+        if (!isValidZambianNrc(identityNumber)) throw new Error('Enter your 9-digit NRC number using numbers only.')
         if (!data.identity.idImagePath || !data.identity.selfiePath) throw new Error('Upload both your government ID and a live selfie.')
         await saveDraft(2, { identityNumber })
       } else if (step === 3) {
@@ -501,7 +472,13 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
         await saveDraft(4)
       } else if (step === 5) {
         if (data.payout.accountHolderName.trim().length < 4) throw new Error('Enter the account holder name.')
-        if (!data.payout.accountNumber.trim()) throw new Error('Enter the bank or mobile money account number.')
+        const accountNumber = data.payout.accountNumber.replace(/\s/g, '')
+        if (data.payout.method === 'mobile_money' && !/^(?:\+?260)?[0-9]{9}$/.test(accountNumber)) {
+          throw new Error('Enter a valid Zambian mobile money number (9 digits, optionally prefixed by +260).')
+        }
+        if (data.payout.method === 'bank' && !/^[0-9]{5,30}$/.test(accountNumber)) {
+          throw new Error('Enter a bank account number containing 5 to 30 digits.')
+        }
         await saveDraft(5)
       } else if (step === 6) {
         if (!data.policies.termsAccepted || !data.policies.returnsAccepted || !data.policies.prohibitedItemsAccepted) {
@@ -651,7 +628,7 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
                   </button>
                   {otpSent && (
                     <div className="store-wizard-inline">
-                      <label>Verification code<input value={otp} onChange={(event) => setOtp(event.target.value)} inputMode="numeric" autoComplete="one-time-code" /></label>
+                      <label>Verification code<input value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" pattern="[0-9]{6}" maxLength={6} autoComplete="one-time-code" /></label>
                       <button type="button" className="primary-btn" disabled={saving || !otp.trim()} onClick={() => void verifyPhoneOtp()}>Verify phone</button>
                     </div>
                   )}
@@ -674,7 +651,7 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
           <label>Full legal name<input value={data.identity.legalName} onChange={(event) => update('identity', { legalName: event.target.value })} autoComplete="name" /></label>
           <label>Date of birth<input type="date" value={data.identity.dateOfBirth} onChange={(event) => update('identity', { dateOfBirth: event.target.value })} /></label>
           <label>Residential address<textarea rows={3} value={data.identity.residentialAddress} onChange={(event) => update('identity', { residentialAddress: event.target.value })} autoComplete="street-address" /></label>
-          <label>Government ID number<input value={identityNumber} onChange={(event) => setIdentityNumber(event.target.value)} autoComplete="off" /></label>
+          <label>NRC number (9 digits)<input value={identityNumber} onChange={(event) => setIdentityNumber(event.target.value.replace(/\D/g, '').slice(0, 9))} inputMode="numeric" pattern="[0-9]{9}" maxLength={9} autoComplete="off" required title="Enter exactly 9 digits." /></label>
           <div className="store-wizard-upload-grid">
             {renderPrivateUpload('Government ID photo', 'idImagePath', data.identity.idImagePath)}
             {renderPrivateUpload('Live selfie', 'selfiePath', data.identity.selfiePath)}
@@ -795,7 +772,7 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
           </label>
           <label>Account holder name<input value={data.payout.accountHolderName} onChange={(event) => update('payout', { accountHolderName: event.target.value })} /></label>
           <label>{data.payout.method === 'bank' ? 'Bank account number' : 'Mobile money number'}
-            <input type="password" value={data.payout.accountNumber} onChange={(event) => update('payout', { accountNumber: event.target.value })} autoComplete="off" />
+            <input type="password" value={data.payout.accountNumber} onChange={(event) => update('payout', { accountNumber: event.target.value.slice(0, 30) })} inputMode="numeric" maxLength={30} autoComplete="off" required />
           </label>
           <small className="store-wizard-help">The account number is not saved in browser storage and is cleared from the form after secure submission.</small>
         </div>

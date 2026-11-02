@@ -2,6 +2,8 @@ import type { Listing, BusinessProfile } from '../types'
 import { Link } from 'react-router-dom'
 import { formatZMWPrice } from '../utils/formatPrice'
 import { isNewArrival } from '../utils/listingSections'
+import { formatServicePriceUnit } from '../features/marketplace/serviceListings'
+import { getStoreUrl } from '../utils/storeUrl'
 
 type ListingCardProps = {
   listing: Listing
@@ -49,12 +51,14 @@ export function Listing({ listing, saved = false, onOpen, onToggleSave, onQuickP
   })()
 
   // Determine badges to display
-  const isSold = listing.status?.toLowerCase() === 'sold' || listing.status?.toLowerCase() === 'out of stock'
-  const isNew = listing.condition?.toLowerCase().includes('new') || isNewArrival(listing)
+  const isService = listing.listing_type === 'service'
+  const isSold = !isService && (listing.status?.toLowerCase() === 'sold' || listing.status?.toLowerCase() === 'out of stock')
+  const isNew = !isService && (listing.condition?.toLowerCase().includes('new') || isNewArrival(listing))
   const isBestSeller = Boolean(listing.sponsored) || (listing.rating !== undefined && listing.rating >= 4.5)
 
   // Calculate discount percentage if lowest_acceptable_price or original price is available
   const hasDiscount = Boolean(
+    !isService &&
     listing.lowest_acceptable_price &&
     listing.lowest_acceptable_price > listing.price
   )
@@ -63,7 +67,7 @@ export function Listing({ listing, saved = false, onOpen, onToggleSave, onQuickP
     : 0
 
   // Color swatches from available_colors (can be more than one)
-  const swatches = listing.available_colors && listing.available_colors.length > 0
+  const swatches = !isService && listing.available_colors && listing.available_colors.length > 0
     ? listing.available_colors
     : []
 
@@ -79,6 +83,9 @@ export function Listing({ listing, saved = false, onOpen, onToggleSave, onQuickP
       <div className="modern-card-image-box">
         {/* Top-Left Pill Badges */}
         <div className="modern-card-badges">
+          {isService && (
+            <span className="modern-pill-badge black-pill">Service</span>
+          )}
           {isBestSeller && (
             <span className="modern-pill-badge black-pill">
               Best Seller
@@ -164,7 +171,8 @@ export function Listing({ listing, saved = false, onOpen, onToggleSave, onQuickP
         {/* Centered Refined Price Display */}
         <div className="modern-card-price-row">
           <span className="modern-card-price">
-            {formatZMWPrice(listing.price)}
+            {isService && listing.price_unit === 'from' ? 'From ' : ''}
+            {formatZMWPrice(listing.price)} {isService && listing.price_unit !== 'from' ? formatServicePriceUnit(listing.price_unit) : ''}
           </span>
           {hasDiscount && (
             <span className="modern-card-original-price">
@@ -296,7 +304,7 @@ export function Listing({ listing, saved = false, onOpen, onToggleSave, onQuickP
                 if (onVisitStore) {
                   onVisitStore(sellerStore.userId)
                 } else {
-                  window.location.href = `/store/${sellerStore.userId}`
+                  window.location.href = getStoreUrl(sellerStore.userId, sellerStore.subdomain)
                 }
               }}
               title={`Visit ${sellerStore.shopName}'s official storefront`}

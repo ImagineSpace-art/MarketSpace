@@ -62,6 +62,10 @@ export function isDisposableEmailDomain(email: string) {
   return [...DISPOSABLE_EMAIL_DOMAINS].some((blocked) => domain === blocked || domain.endsWith(`.${blocked}`))
 }
 
+export function isValidZambianNrc(value: string) {
+  return /^[0-9]{9}$/.test(value)
+}
+
 export function isAtLeast18(dateOfBirth: string, today = new Date()) {
   const birthDate = new Date(`${dateOfBirth}T00:00:00Z`)
   if (Number.isNaN(birthDate.getTime())) return false

@@ -45,6 +45,7 @@ export function StorefrontLandingTemplate({
 }: LandingProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const departments = getBoutiqueGridDepartments(shop.collections || [], listings)
+  const hasCartableItems = listings.some(listing => listing.listing_type !== 'service')
   const visibleDepartments = departments.slice(0, 1)
   const overflowDepartments = departments.slice(visibleDepartments.length)
   const accent = content.accentColor || STORE_ACCENT_PALETTE[0]
@@ -76,7 +77,7 @@ export function StorefrontLandingTemplate({
         </nav>
         <div className="landing-header-actions">
           <span className="material-icons" aria-hidden="true">search</span>
-          <button className="landing-cart" type="button" onClick={onOpenCart} aria-label="Open cart"><span className="material-icons">shopping_bag</span><span>{cartCount}</span></button>
+          {hasCartableItems && <button className="landing-cart" type="button" onClick={onOpenCart} aria-label="Open cart"><span className="material-icons">shopping_bag</span><span>{cartCount}</span></button>}
         </div>
       </header>
 

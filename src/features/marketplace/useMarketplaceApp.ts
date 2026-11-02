@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { isListingExpired } from './listingExpiry'
 import { CATEGORY_OPTIONS, CONDITION_OPTIONS, DELIVERY_OPTIONS } from './constants'
-import type { Listing, Profile, View, BusinessProfile, BusinessAd, StoreCollection, StoreReview, PaymentMethodItem, NotificationConfig, StoreThemeConfig, StoreTemplateContent, StoreTemplateId } from '../../types'
+import type { Listing, Profile, View, BusinessProfile, BusinessAd, StoreCollection, StoreReview, PaymentMethodItem, NotificationConfig, StoreTemplateContent, StoreTemplateId } from '../../types'
 import { logAnalyticsEvent, toggleStoreFollowInDb } from '../../services/analytics'
 import { getFunctionErrorMessage } from '../../utils/functionError'
 
@@ -65,8 +65,10 @@ export interface MarketplaceAppModel {
   setAuthEmail: Dispatch<SetStateAction<string>>
   authPassword: string
   setAuthPassword: Dispatch<SetStateAction<string>>
-  authUsername: string
-  setAuthUsername: Dispatch<SetStateAction<string>>
+  authFirstName: string
+  setAuthFirstName: Dispatch<SetStateAction<string>>
+  authLastName: string
+  setAuthLastName: Dispatch<SetStateAction<string>>
   searchQuery: string
   setSearchQuery: Dispatch<SetStateAction<string>>
   activeCategories: string[]
@@ -171,7 +173,6 @@ export interface MarketplaceAppModel {
   deleteAd: (adId: string) => Promise<void>
   archiveStore: (storeId: string, archived: boolean) => Promise<void>
   deleteStore: (storeId: string) => Promise<void>
-  handleSaveStoreTheme: (config: StoreThemeConfig, storeUserId?: string) => Promise<void>
   handleSaveStoreTemplate: (templateId: StoreTemplateId, content: Record<string, unknown>, departments?: Array<{ name: string; image?: string }>, storeUserId?: string) => Promise<void>
   handleDeleteListing: (listingId: number) => Promise<void>
   handleRenewListing: (listingId: number) => Promise<void>
@@ -270,7 +271,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   const [message, setMessage] = useState('')
   const [authEmail, setAuthEmail] = useState('')
   const [authPassword, setAuthPassword] = useState('')
-  const [authUsername, setAuthUsername] = useState('')
+  const [authFirstName, setAuthFirstName] = useState('')
+  const [authLastName, setAuthLastName] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [activeCategories, setActiveCategories] = useState<string[]>(['All'])
   const [priceRange, setPriceRange] = useState<number>(3000)
@@ -1083,7 +1085,16 @@ export function useMarketplaceApp(): MarketplaceAppModel {
 
   const handleLogin = async () => {
     setMessage('')
-    const { data, error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword })
+    const email = authEmail.trim()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setMessage('Enter the email address used to create your account.')
+      return
+    }
+    if (!authPassword) {
+      setMessage('Enter your password.')
+      return
+    }
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password: authPassword })
     if (error) {
       setMessage(error.message)
       return
@@ -1127,15 +1138,19 @@ export function useMarketplaceApp(): MarketplaceAppModel {
 
   const handleSignup = async (captchaToken?: string) => {
     setMessage('')
-    if (!authEmail.trim() || !authPassword.trim()) {
+    const email = authEmail.trim()
+    const firstName = authFirstName.trim()
+    const lastName = authLastName.trim()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !authPassword || !firstName || !lastName) {
       setMessage('Please enter a valid email and password.')
       return
     }
+    const username = `${firstName} ${lastName}`
 
     const { data, error } = await supabase.auth.signUp({
-      email: authEmail.trim(),
+      email,
       password: authPassword,
-      options: { data: { username: authUsername }, captchaToken },
+      options: { data: { username, first_name: firstName, last_name: lastName }, captchaToken },
     })
 
     if (error) {
@@ -1146,8 +1161,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     if (data.user) {
       await supabase.from('profiles').upsert({
         user_id: data.user.id,
-        username: authUsername || authEmail.split('@')[0],
-        email: authEmail.trim(),
+        username,
+        email,
       })
     }
 
@@ -1155,7 +1170,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       setMessage('Registration successful! A confirmation email has been sent. Please confirm your email before logging in.')
       setAuthEmail('')
       setAuthPassword('')
-      setAuthUsername('')
+      setAuthFirstName('')
+      setAuthLastName('')
       navigate('/login')
       return
     }
@@ -1164,7 +1180,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setMessage('Account created successfully')
     setAuthEmail('')
     setAuthPassword('')
-    setAuthUsername('')
+    setAuthFirstName('')
+    setAuthLastName('')
     navigate('/onboarding')
   }
 
@@ -1226,6 +1243,12 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       setMessage('Please sign in to create a listing')
       return
     }
+    const listingPrice = Number(price)
+    if (!title.trim() || title.trim().length > 120 || !Number.isFinite(listingPrice) ||
+      listingPrice <= 0 || listingPrice > 1_000_000_000 || description.length > 5000) {
+      setMessage('Enter a valid listing title, description, and price before publishing.')
+      return
+    }
 
     const effectiveRenewal = useGlobalRenewal ? globalRenewalFrequency : renewalFrequency
 
@@ -1233,7 +1256,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       user_id: session.user.id,
       title,
       description,
-      price: Number(price) || 0,
+      price: listingPrice,
       category,
       status,
       listing_type: listingType,
@@ -1266,13 +1289,19 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   const handleUpdateListing = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!editingListing) return
+    const listingPrice = Number(price)
+    if (!title.trim() || title.trim().length > 120 || !Number.isFinite(listingPrice) ||
+      listingPrice <= 0 || listingPrice > 1_000_000_000 || description.length > 5000) {
+      setMessage('Enter a valid listing title, description, and price before saving.')
+      return
+    }
 
     const effectiveRenewal = useGlobalRenewal ? globalRenewalFrequency : renewalFrequency
 
     const { error } = await supabase.from('listings').update({
       title,
       description,
-      price: Number(price) || 0,
+      price: listingPrice,
       category,
       status,
       listing_type: listingType,
@@ -1790,7 +1819,6 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         collections: updated.collections || [],
         customer_care: updated.customerCare || {},
         catalog: updated.catalog,
-        theme_config: updated.themeConfig || {},
       }, { onConflict: 'user_id' })
       if (error) throw error
     }
@@ -1806,6 +1834,15 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     if (!session?.user?.id) throw new Error('Sign in to create an ad.')
     const ownerStore = allBusinesses[session.user.id] || businessProfile
     if (!ownerStore?.storeId) throw new Error('Your approved store could not be found.')
+    const adBudget = Number(ad.budget)
+    const adHeadline = typeof ad.headline === 'string' ? ad.headline.trim() : ''
+    const adText = typeof ad.adText === 'string' ? ad.adText : ''
+    if (!adHeadline || adHeadline.length > 25 ||
+      !adText.trim() || adText.length > 2000 ||
+      !Number.isFinite(adBudget) || adBudget < 1 || adBudget > 100 ||
+      !Array.isArray(ad.media) || ad.media.length < 1 || ad.media.length > 5) {
+      throw new Error('The ad headline, text, media, or budget is invalid.')
+    }
 
     const adData = Object.fromEntries(
       Object.entries(ad).filter(([key]) => !['id', 'status', 'moderation_status', 'moderation_reason'].includes(key))
@@ -1882,61 +1919,6 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setBusinessProfile(null)
     setMessage('Store and its store-owned listings and reviews were permanently deleted.')
     await Promise.all([loadBusinesses(), fetchListings(session.user.id)])
-  }
-
-  const handleSaveStoreTheme = async (themeConfig: StoreThemeConfig, storeUserId?: string) => {
-    const targetUserId = storeUserId || businessProfile?.userId || session?.user?.id
-    if (!targetUserId) return
-
-    const existing: BusinessProfile = allBusinesses[targetUserId] || businessProfile || {
-      userId: targetUserId,
-      shopName: profile?.username ? `${profile.username}'s Store` : 'Official Store',
-      description: 'Official Merchant Storefront',
-      category: 'General Merchant',
-      address: 'Lusaka, Zambia',
-      whatsapp: '',
-      logo: profile?.avatar_url || '',
-      cover: '/banners/store_banner_apparel.png',
-      accentColor: themeConfig.primaryColor || '#2563eb',
-      announcementBar: '',
-      collections: [],
-      customerCare: {},
-      catalog: [],
-      ads: [],
-      themeConfig
-    }
-
-    const updated: BusinessProfile = {
-      ...existing,
-      themeConfig,
-      accentColor: themeConfig.primaryColor || existing.accentColor || '#2563eb'
-    }
-
-    const nextAll = { ...allBusinesses, [targetUserId]: updated }
-    setAllBusinesses(nextAll)
-    if (session?.user?.id === targetUserId || !businessProfile) {
-      setBusinessProfile(updated)
-    }
-
-    try {
-      window.localStorage.setItem('marketspace-all-businesses', JSON.stringify(nextAll))
-      window.localStorage.setItem(`marketspace-store-theme-${targetUserId}`, JSON.stringify(themeConfig))
-    } catch (e) {
-      console.error('Failed to save store theme to localStorage:', e)
-    }
-
-    if (session?.user?.id) {
-      try {
-        await supabase.from('stores').upsert({
-          user_id: targetUserId,
-          shop_name: updated.shopName,
-          theme_config: themeConfig,
-          accent_color: updated.accentColor,
-        }, { onConflict: 'user_id' })
-      } catch (err) {
-        console.error('Error saving store theme to Supabase:', err)
-      }
-    }
   }
 
   const handleSaveStoreTemplate = async (
@@ -2018,12 +2000,6 @@ export function useMarketplaceApp(): MarketplaceAppModel {
           nonPublicStoreOwners.add(s.user_id)
           return
         }
-        let localTheme: StoreThemeConfig | undefined = undefined
-        try {
-          const localStr = window.localStorage.getItem(`marketspace-store-theme-${s.user_id}`)
-          if (localStr) localTheme = JSON.parse(localStr)
-        } catch { }
-
         const storeProfile: BusinessProfile = {
           userId: s.user_id,
           storeId: s.id,
@@ -2049,9 +2025,6 @@ export function useMarketplaceApp(): MarketplaceAppModel {
           verifiedLocation: s.verified_location === true,
           registeredBusiness: s.registered_business === true,
           probationState: s.probation_state === 'probation' ? 'probation' : 'trusted',
-          themeConfig: (s.theme_config && s.theme_config.sections && s.theme_config.sections.length > 0)
-            ? s.theme_config
-            : (localTheme || s.themeConfig || undefined),
           templateId: s.template_id || undefined,
           templateChangedAt: s.template_changed_at || undefined,
           templateContent: s.template_content || {},
@@ -2155,8 +2128,10 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setAuthEmail,
     authPassword,
     setAuthPassword,
-    authUsername,
-    setAuthUsername,
+    authFirstName,
+    setAuthFirstName,
+    authLastName,
+    setAuthLastName,
     searchQuery,
     setSearchQuery,
     activeCategories,
@@ -2238,7 +2213,6 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     deleteAd,
     archiveStore,
     deleteStore,
-    handleSaveStoreTheme,
     handleSaveStoreTemplate,
     handleDeleteListing,
     handleRenewListing,

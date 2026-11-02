@@ -31,6 +31,7 @@ export function StoreSetupPage({ userId, businessProfile, onSave, onCancel }: St
     const [supportEmail, setSupportEmail] = useState(businessProfile?.customerCare?.email || '')
     const [privacyNotice, setPrivacyNotice] = useState('')
     const [privacyBusy, setPrivacyBusy] = useState(false)
+    const [formError, setFormError] = useState('')
     
     // Store Collections / Department state
     const [collections, setCollections] = useState(businessProfile?.collections || [
@@ -71,6 +72,27 @@ export function StoreSetupPage({ userId, businessProfile, onSave, onCancel }: St
 
     const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault()
+        setFormError('')
+        const validPhone = (value: string) => {
+            const digits = value.replace(/\D/g, '')
+            return /^[+0-9 ()-]+$/.test(value) && digits.length >= 8 && digits.length <= 15
+        }
+        if (!validPhone(whatsapp)) {
+            setFormError('Enter a valid business WhatsApp number.')
+            return
+        }
+        if (supportPhone.trim() && !validPhone(supportPhone.trim())) {
+            setFormError('Enter a valid customer care phone number.')
+            return
+        }
+        if (supportEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail.trim())) {
+            setFormError('Enter a valid customer support email address.')
+            return
+        }
+        if (shopName.trim().length < 2 || shopName.length > 120 || description.length > 5000) {
+            setFormError('Enter a store name between 2 and 120 characters and a description no longer than 5,000 characters.')
+            return
+        }
         onSave({
             userId,
             shopName,
@@ -137,8 +159,8 @@ export function StoreSetupPage({ userId, businessProfile, onSave, onCancel }: St
                 <div style={{ padding: '16px', background: 'var(--panel)', borderRadius: '12px', border: '1px solid var(--border)' }}>
                     <h3 style={{ marginTop: 0, fontSize: '1.05rem', color: 'var(--text)' }}>1. Basic Store Information</h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
-                        <input value={shopName} onChange={(e) => setShopName(e.target.value)} placeholder="Shop Name (e.g. Balenciaga Boutique)" required style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
-                        <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Business Description & Tagline" rows={3} required style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit' }} />
+                        <input value={shopName} onChange={(e) => setShopName(e.target.value)} placeholder="Shop Name (e.g. Balenciaga Boutique)" maxLength={120} required style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
+                        <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Business Description & Tagline" rows={3} maxLength={5000} required style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit' }} />
                         
                         <select value={category} onChange={(e) => setCategory(e.target.value)} style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }}>
                             <option>Retail & Boutique</option>
@@ -151,15 +173,15 @@ export function StoreSetupPage({ userId, businessProfile, onSave, onCancel }: St
 
                         <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                             <span style={{ fontSize: '0.86rem', fontWeight: 600 }}>Store Operation Model</span>
-                            <select value={operationType} onChange={(e) => setOperationType(e.target.value as any)} style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }}>
+                            <select value={operationType} onChange={(e) => setOperationType(e.target.value as 'online' | 'physical' | 'omnichannel')} style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }}>
                                 <option value="omnichannel">Omnichannel (Online & Physical Shop)</option>
                                 <option value="online">Online Only (Delivery / Courier Services Only)</option>
                                 <option value="physical">Physical Only (Over-The-Counter Transactions Only)</option>
                             </select>
                         </label>
 
-                        <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Physical Address / Branch Location" required style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
-                        <input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="Business WhatsApp Number (e.g. +260...)" required style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
+                        <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Physical Address / Branch Location" maxLength={500} required style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
+                        <input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value.slice(0, 24))} type="tel" inputMode="tel" maxLength={24} placeholder="Business WhatsApp Number (e.g. +260...)" required style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
                     </div>
                 </div>
 
@@ -273,11 +295,12 @@ export function StoreSetupPage({ userId, businessProfile, onSave, onCancel }: St
                         <input value={workingHours} onChange={(e) => setWorkingHours(e.target.value)} placeholder="Business Working Hours (e.g. Mon-Sat: 08:00 - 18:00)" style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
                         <textarea value={deliveryPolicy} onChange={(e) => setDeliveryPolicy(e.target.value)} placeholder="Delivery Policy (e.g. Same-day delivery in Lusaka)" rows={2} style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit' }} />
                         <textarea value={returnPolicy} onChange={(e) => setReturnPolicy(e.target.value)} placeholder="Return & Refund Policy (e.g. 3-day guarantee)" rows={2} style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit' }} />
-                        <input value={supportPhone} onChange={(e) => setSupportPhone(e.target.value)} placeholder="Customer Care Direct Phone" style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
-                        <input value={supportEmail} onChange={(e) => setSupportEmail(e.target.value)} placeholder="Customer Support Email" style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
+                        <input value={supportPhone} onChange={(e) => setSupportPhone(e.target.value.slice(0, 24))} type="tel" inputMode="tel" maxLength={24} placeholder="Customer Care Direct Phone" style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
+                        <input value={supportEmail} onChange={(e) => setSupportEmail(e.target.value)} type="email" maxLength={254} placeholder="Customer Support Email" style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
                     </div>
                 </div>
 
+                {formError && <p role="alert" style={{ color: 'var(--danger)' }}>{formError}</p>}
                 <button className="primary-btn" type="submit" style={{ padding: '14px', fontSize: '1rem' }}>Save & Publish Storefront Settings</button>
             </form>
         </section>

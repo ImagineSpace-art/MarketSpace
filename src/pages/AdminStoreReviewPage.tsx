@@ -17,6 +17,14 @@ type PendingAd = BusinessAd & {
   seller_name: string
 }
 
+type PendingSellerVerification = {
+  user_id: string
+  seller_name: string
+  submitted_at: string | null
+  id_image_url: string
+  selfie_url: string
+}
+
 type ReviewApplication = {
   id: string
   shop_name: string
@@ -81,17 +89,20 @@ export function AdminStoreReviewPage() {
   const [reportGroups, setReportGroups] = useState<StoreReportGroup[]>([])
   const [pendingListings, setPendingListings] = useState<PendingListing[]>([])
   const [pendingAds, setPendingAds] = useState<PendingAd[]>([])
-  const [activeQueue, setActiveQueue] = useState<'applications' | 'reports' | 'listings' | 'ads' | 'notifications' | 'audit'>('applications')
+  const [pendingSellerVerifications, setPendingSellerVerifications] = useState<PendingSellerVerification[]>([])
+  const [activeQueue, setActiveQueue] = useState<'applications' | 'reports' | 'listings' | 'ads' | 'seller-verifications' | 'notifications' | 'audit'>('applications')
   const [loading, setLoading] = useState(true)
   const [reportsLoading, setReportsLoading] = useState(false)
   const [listingsLoading, setListingsLoading] = useState(false)
   const [adsLoading, setAdsLoading] = useState(false)
+  const [sellerVerificationsLoading, setSellerVerificationsLoading] = useState(false)
   const [workingId, setWorkingId] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [reasons, setReasons] = useState<Record<string, string>>({})
   const [listingReasons, setListingReasons] = useState<Record<number, string>>({})
   const [adReasons, setAdReasons] = useState<Record<string, string>>({})
+  const [sellerVerificationReasons, setSellerVerificationReasons] = useState<Record<string, string>>({})
   const [badges, setBadges] = useState<Record<string, { verifiedId: boolean; verifiedLocation: boolean; registeredBusiness: boolean }>>({})
   const [recipientMode, setRecipientMode] = useState<'all' | 'selected'>('all')
   const [recipientSearch, setRecipientSearch] = useState('')
@@ -188,6 +199,22 @@ export function AdminStoreReviewPage() {
     }
   }, [])
 
+  const loadPendingSellerVerifications = useCallback(async () => {
+    setError('')
+    setSellerVerificationsLoading(true)
+    try {
+      const { data, error: invokeError } = await adminSupabase.functions.invoke<{
+        verifications: PendingSellerVerification[]
+      }>('seller-verification', { body: { action: 'pending_reviews' } })
+      if (invokeError) setError(await getFunctionErrorMessage(invokeError))
+      else setPendingSellerVerifications(data?.verifications || [])
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Identity verification queue could not be loaded.')
+    } finally {
+      setSellerVerificationsLoading(false)
+    }
+  }, [])
+
   const loadAudit = useCallback(async () => {
     setError('')
     setAuditLoading(true)
@@ -203,10 +230,10 @@ export function AdminStoreReviewPage() {
   }, [loadQueue])
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      void Promise.all([loadReports(), loadPendingListings(), loadPendingAds()])
+      void Promise.all([loadReports(), loadPendingListings(), loadPendingAds(), loadPendingSellerVerifications()])
     }, 0)
     return () => window.clearTimeout(timer)
-  }, [loadReports, loadPendingListings, loadPendingAds])
+  }, [loadReports, loadPendingListings, loadPendingAds, loadPendingSellerVerifications])
   const refreshQueue = () => {
     setLoading(true)
     void loadQueue()
@@ -278,6 +305,7 @@ export function AdminStoreReviewPage() {
       <button type="button" className={currentQueue === 'reports' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'reports' ? 'page' : undefined} onClick={() => { setActiveQueue('reports'); void loadReports() }}>Reports <span className="admin-pending-count">{reportGroups.reduce((count, group) => count + group.reports.length, 0)}</span></button>
       <button type="button" className={currentQueue === 'listings' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'listings' ? 'page' : undefined} onClick={() => { setActiveQueue('listings'); void loadPendingListings() }}>Listings <span className="admin-pending-count">{pendingListings.length}</span></button>
       <button type="button" className={currentQueue === 'ads' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'ads' ? 'page' : undefined} onClick={() => { setActiveQueue('ads'); void loadPendingAds() }}>Ads <span className="admin-pending-count">{pendingAds.length}</span></button>
+      <button type="button" className={currentQueue === 'seller-verifications' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'seller-verifications' ? 'page' : undefined} onClick={() => { setActiveQueue('seller-verifications'); void loadPendingSellerVerifications() }}>Identity checks <span className="admin-pending-count">{pendingSellerVerifications.length}</span></button>
       {notificationAdminStatus === 'allowed' && (
         <button type="button" className={currentQueue === 'notifications' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'notifications' ? 'page' : undefined} onClick={() => setActiveQueue('notifications')}>Notifications</button>
       )}
@@ -384,6 +412,40 @@ export function AdminStoreReviewPage() {
       }
     } catch (reviewError) {
       setError(reviewError instanceof Error ? reviewError.message : 'The ad decision could not be saved.')
+    } finally {
+      setWorkingId('')
+    }
+  }
+
+  const reviewSellerVerification = async (verification: PendingSellerVerification, decision: 'approve' | 'reject') => {
+    setError('')
+    setNotice('')
+    setWorkingId(verification.user_id)
+    try {
+      const { data, error: invokeError } = await adminSupabase.functions.invoke<{ success?: boolean }>(
+        'seller-verification',
+        {
+          body: {
+            action: 'review',
+            userId: verification.user_id,
+            decision,
+            reason: sellerVerificationReasons[verification.user_id] || '',
+          },
+        },
+      )
+      if (invokeError) setError(await getFunctionErrorMessage(invokeError))
+      else if (!data?.success) setError('The identity review decision could not be saved.')
+      else {
+        setNotice(`Identity verification ${decision === 'approve' ? 'approved' : 'rejected'}.`)
+        setSellerVerificationReasons(current => {
+          const next = { ...current }
+          delete next[verification.user_id]
+          return next
+        })
+        await loadPendingSellerVerifications()
+      }
+    } catch (reviewError) {
+      setError(reviewError instanceof Error ? reviewError.message : 'The identity review decision could not be saved.')
     } finally {
       setWorkingId('')
     }
@@ -595,6 +657,104 @@ export function AdminStoreReviewPage() {
                 </div>
               </article>
             ))}
+          </div>
+        )}
+      </section>
+    )
+  }
+
+  if (activeQueue === 'seller-verifications') {
+    return (
+      <section style={{ width: 'min(100%, 1100px)', boxSizing: 'border-box', margin: '0 auto', padding: 20 }}>
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+          <div>
+            <p style={{ margin: 0, color: '#2563eb', fontSize: '.75rem', fontWeight: 800, letterSpacing: '.1em' }}>MARKETSPACE MODERATION</p>
+            <h2 style={{ margin: '4px 0' }}>Individual seller identity review</h2>
+            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>{pendingSellerVerifications.length} submissions awaiting review</p>
+          </div>
+          <button type="button" className="secondary-btn" disabled={sellerVerificationsLoading} onClick={() => void loadPendingSellerVerifications()}>
+            {sellerVerificationsLoading ? 'Refreshing…' : 'Refresh identity checks'}
+          </button>
+        </header>
+        {renderQueueNavigation('seller-verifications')}
+        {error && <p role="alert" className="store-wizard-alert error">{error}</p>}
+        {notice && <p role="status" className="store-wizard-alert notice">{notice}</p>}
+        {sellerVerificationsLoading ? (
+          <section className="section-card"><p>Loading identity submissions…</p></section>
+        ) : pendingSellerVerifications.length === 0 ? (
+          <section className="section-card"><p>No individual seller identities are waiting for review.</p></section>
+        ) : (
+          <div style={{ display: 'grid', gap: 16 }}>
+            {pendingSellerVerifications.map(verification => {
+              const isOwnVerification = verification.user_id === moderatorUserId
+              const isWorking = workingId === verification.user_id
+              const reason = sellerVerificationReasons[verification.user_id] || ''
+              return (
+                <article key={verification.user_id} className="section-card" style={{ padding: 20 }}>
+                  <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+                    <div>
+                      <h3 style={{ margin: '0 0 4px' }}>{verification.seller_name}</h3>
+                      <p style={{ margin: 0, color: 'var(--text-secondary)' }}>Individual seller · {verification.user_id}</p>
+                    </div>
+                    <time dateTime={verification.submitted_at || undefined} style={{ color: 'var(--text-secondary)', fontSize: '.82rem' }}>
+                      Submitted {verification.submitted_at ? new Date(verification.submitted_at).toLocaleString() : 'date unavailable'}
+                    </time>
+                  </header>
+                  {isOwnVerification && <p role="note">You cannot review your own identity verification.</p>}
+                  <p style={{ color: 'var(--text-secondary)' }}>Private image links expire after 10 minutes. Refresh this queue to renew them.</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 12 }}>
+                    <figure style={{ margin: 0, minWidth: 0 }}>
+                      <figcaption style={{ marginBottom: 6, fontWeight: 700 }}>ID document</figcaption>
+                      <img
+                        src={verification.id_image_url}
+                        alt={`ID document submitted by ${verification.seller_name}`}
+                        referrerPolicy="no-referrer"
+                        style={{ display: 'block', width: '100%', maxHeight: 360, objectFit: 'contain', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface)' }}
+                      />
+                    </figure>
+                    <figure style={{ margin: 0, minWidth: 0 }}>
+                      <figcaption style={{ marginBottom: 6, fontWeight: 700 }}>Seller selfie</figcaption>
+                      <img
+                        src={verification.selfie_url}
+                        alt={`Seller selfie submitted by ${verification.seller_name}`}
+                        referrerPolicy="no-referrer"
+                        style={{ display: 'block', width: '100%', maxHeight: 360, objectFit: 'contain', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface)' }}
+                      />
+                    </figure>
+                  </div>
+                  <label style={{ display: 'grid', gap: 6, marginTop: 16 }}>
+                    Rejection reason (required to reject; max 500 characters)
+                    <textarea
+                      value={reason}
+                      maxLength={500}
+                      rows={3}
+                      onChange={event => setSellerVerificationReasons(current => ({
+                        ...current,
+                        [verification.user_id]: event.target.value,
+                      }))}
+                    />
+                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      disabled={isOwnVerification || isWorking || !reason.trim()}
+                      onClick={() => void reviewSellerVerification(verification, 'reject')}
+                    >
+                      Reject
+                    </button>
+                    <button
+                      type="button"
+                      className="primary-btn"
+                      disabled={isOwnVerification || isWorking}
+                      onClick={() => void reviewSellerVerification(verification, 'approve')}
+                    >
+                      {isWorking ? 'Saving…' : 'Approve'}
+                    </button>
+                  </div>
+                </article>
+              )
+            })}
           </div>
         )}
       </section>

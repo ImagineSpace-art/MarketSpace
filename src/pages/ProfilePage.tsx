@@ -13,6 +13,8 @@ import { uploadImageToSupabase } from '../features/marketplace/ImageUploader'
 import { fetchStoreAnalytics, type StoreAnalyticsData } from '../services/analytics'
 import { getListingTimeRemainingMs, isListingExpired } from '../features/marketplace/listingExpiry'
 import { DestructiveActionDialog } from '../components/DestructiveActionDialog'
+import { SellerVerificationSubmission } from '../components/SellerVerificationSubmission'
+import { getStoreUrl } from '../utils/storeUrl'
 
 // ---------------- PROFILE PAGE ----------------
 type ProfilePageProps = {
@@ -172,6 +174,7 @@ export function ProfilePage({
     const [catalogPrice, setCatPrice] = useState('')
     const [catalogDescription, setCatDesc] = useState('')
     const [catalogImage, setCatImage] = useState('')
+    const [catalogFormError, setCatalogFormError] = useState('')
 
     const handleCatImageChange = async (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -186,11 +189,25 @@ export function ProfilePage({
 
     const handleAddCatalogItem = (e: FormEvent) => {
         e.preventDefault()
-        if (!businessProfile || !catalogName || !catalogPrice) return
+        const numericPrice = Number(catalogPrice)
+        setCatalogFormError('')
+        if (!businessProfile) return
+        if (!catalogName.trim() || catalogName.trim().length > 120) {
+            setCatalogFormError('Enter a product name between 1 and 120 characters.')
+            return
+        }
+        if (!Number.isFinite(numericPrice) || numericPrice <= 0 || numericPrice > 1_000_000_000) {
+            setCatalogFormError('Enter a price greater than zero and no more than ZMW 1,000,000,000.')
+            return
+        }
+        if (catalogDescription.length > 2000) {
+            setCatalogFormError('The description must be no more than 2,000 characters.')
+            return
+        }
         const newItem = {
             id: String(Date.now()),
-            name: catalogName,
-            price: catalogPrice,
+            name: catalogName.trim(),
+            price: String(numericPrice),
             description: catalogDescription,
             image: catalogImage
         }
@@ -237,11 +254,14 @@ export function ProfilePage({
                         onDelete={onDeleteNotification}
                     />
                 ) : activeSection === 'create' ? (
-                    <ListingFormPage
-                        mode="create"
-                        {...createListingProps}
-                        onCancel={() => navigate('/profile')}
-                    />
+                    <>
+                        {!businessProfile && <SellerVerificationSubmission />}
+                        <ListingFormPage
+                            mode="create"
+                            {...createListingProps}
+                            onCancel={() => navigate('/profile')}
+                        />
+                    </>
                 ) : activeSection === 'create-ad' ? (
                     <AdCreationPage
                         businessProfile={businessProfile}
@@ -287,7 +307,7 @@ export function ProfilePage({
                                     <button
                                         type="button"
                                         className="primary-btn compact-btn"
-                                        onClick={() => window.open(`/store/${businessProfile.userId}`, '_blank')}
+                                        onClick={() => window.open(getStoreUrl(businessProfile.userId, businessProfile.subdomain), '_blank', 'noopener,noreferrer')}
                                         style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px' }}
                                     >
                                         <span className="material-icons" style={{ fontSize: '18px' }}>open_in_new</span>
@@ -472,9 +492,10 @@ export function ProfilePage({
                                                 </div>
                                             </label>
 
-                                            <input value={catalogName} onChange={e => setCatName(e.target.value)} placeholder="Product Name (e.g. Vanilla Wedding Cake)" required style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
-                                            <input value={catalogPrice} onChange={e => setCatPrice(e.target.value)} placeholder="Price (e.g. ZMW 450)" required style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
-                                            <textarea value={catalogDescription} onChange={e => setCatDesc(e.target.value)} placeholder="Description (e.g. Double layered sponge with buttercream)" rows={2} style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit' }} />
+                                            <input value={catalogName} onChange={e => setCatName(e.target.value)} placeholder="Product Name (e.g. Vanilla Wedding Cake)" maxLength={120} required style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
+                                            <input value={catalogPrice} onChange={e => setCatPrice(e.target.value)} type="number" inputMode="decimal" min="0.01" max="1000000000" step="0.01" placeholder="Price (e.g. ZMW 450)" required style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
+                                            <textarea value={catalogDescription} onChange={e => setCatDesc(e.target.value)} placeholder="Description (e.g. Double layered sponge with buttercream)" rows={2} maxLength={2000} style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit' }} />
+                                            {catalogFormError && <p role="alert" style={{ color: 'var(--danger)', margin: 0 }}>{catalogFormError}</p>}
 
                                             <button className="primary-btn" type="submit" style={{ padding: '10px', borderRadius: '8px' }}>Add Product</button>
                                         </form>

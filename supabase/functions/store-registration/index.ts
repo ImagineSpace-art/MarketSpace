@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supa
 import {
   fuzzyNameSimilarity,
   isDisposableEmailDomain,
+  isValidZambianNrc,
   validateStoreSubdomain,
 } from '../_shared/storeRegistrationValidation.ts'
 import { hashSensitiveIdentifier } from '../_shared/storeRegistrationHash.ts'
@@ -111,7 +112,8 @@ function isEmail(value: string) {
 }
 
 function isPhone(value: string) {
-  return /^\+?[0-9 ()-]{8,20}$/.test(value)
+  const digits = value.replace(/\D/g, '')
+  return /^\+?[0-9 ()-]{8,20}$/.test(value) && digits.length >= 8 && digits.length <= 15
 }
 
 function getStepData(data: Json, key: string) {
@@ -127,7 +129,7 @@ async function checkAvailable(admin: SupabaseClient, slug: string, userId: strin
   return data === true
 }
 
-function validateDraftStep(step: number, data: Json) {
+function validateDraftStep(step: number, data: Json, body?: Json) {
   if (step <= 2) {
     const identity = getStepData(data, 'identity')
     if (step === 2) {
@@ -170,6 +172,15 @@ function validateDraftStep(step: number, data: Json) {
     const payout = getStepData(data, 'payout')
     if (!['mobile_money', 'bank'].includes(getString(payout.method))) return 'Select a valid payout method.'
     if (getString(payout.accountHolderName).length < 4) return 'Enter the account holder name.'
+    if (body && step === 5) {
+      const accountNumber = getString(body.payoutAccountNumber).replace(/\s/g, '')
+      if (payout.method === 'mobile_money' && !/^(?:\+?260)?[0-9]{9}$/.test(accountNumber)) {
+        return 'Enter a valid Zambian mobile money number (9 digits, optionally prefixed by +260).'
+      }
+      if (payout.method === 'bank' && !/^[0-9]{5,30}$/.test(accountNumber)) {
+        return 'Enter a bank account number containing 5 to 30 digits.'
+      }
+    }
   }
   if (step >= 6) {
     const policies = getStepData(data, 'policies')
@@ -229,7 +240,10 @@ async function saveDraft(context: HandlerContext, body: Json) {
   }
 
   const data = getObject(body.data)
-  const validationMessage = validateDraftStep(step, data)
+  if (step === 2 && !isValidZambianNrc(getString(body.identityNumber))) {
+    return fail('Enter your 9-digit NRC number using numbers only.')
+  }
+  const validationMessage = validateDraftStep(step, data, body)
   if (validationMessage) return fail(validationMessage)
   const store = getStepData(data, 'store')
   if (step >= 3 && !(await checkAvailable(context.admin, getString(store.subdomain).toLowerCase(), context.userId))) {
@@ -244,7 +258,7 @@ async function saveDraft(context: HandlerContext, body: Json) {
     await verifyPrivateImage(context.admin, idImagePath, context.userId, 'idImagePath')
     await verifyPrivateImage(context.admin, selfiePath, context.userId, 'selfiePath')
     const idNumber = getString(body.identityNumber)
-    if (!idNumber) return fail('Enter your government ID number.')
+    if (!isValidZambianNrc(idNumber)) return fail('Enter your 9-digit NRC number using numbers only.')
     const idHash = await hashSensitiveIdentifier(idNumber, 'id', Deno.env.get('STORE_ID_HASH_SECRET') || '')
     const { data: duplicateIdentity, error: duplicateError } = await context.admin
       .from('store_owner_identity')

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { Listing } from '../components/Listing'
 import type { MarketplaceAppModel } from '../features/marketplace/useMarketplaceApp'
+import { getStoreUrl } from '../utils/storeUrl'
 
 type HomePageProps = Pick<MarketplaceAppModel,
   'loading' |
@@ -31,7 +32,6 @@ export function HomePage({
   allBusinesses = {},
   clearAllFilters: globalClearAllFilters
 }: Omit<HomePageProps, 'setSearchQuery'>) {
-  const navigate = useNavigate()
   const [currentSlide, setCurrentSlide] = useState(0)
 
   // Marketplace Mode Switcher: All | Stores Only | Community Sellers
@@ -748,7 +748,7 @@ export function HomePage({
                     return (
                       <div
                         key={shop.userId}
-                        onClick={() => navigate(`/store/${shop.userId}`)}
+                        onClick={() => window.location.assign(getStoreUrl(shop.userId, shop.subdomain))}
                         style={{
                           borderRadius: '16px',
                           border: '1px solid var(--border)',
@@ -830,7 +830,7 @@ export function HomePage({
 
                           <div style={{ marginTop: 'auto', paddingTop: '8px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
-                              Template: {(shop as any).theme?.preset === 'xtra' ? 'Xtra' : 'Hyper'}
+                              Template: {shop.templateId === 'storefront-landing' ? 'Storefront Landing' : 'Boutique Grid'}
                             </span>
                             <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#2563eb', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
                               Visit Store <span className="material-icons" style={{ fontSize: '14px' }}>arrow_forward</span>
@@ -846,7 +846,7 @@ export function HomePage({
                   <div>
                     <h3 style={{ margin: '0 0 4px', fontSize: '1.1rem', fontWeight: 800 }}>Be the First Store on MarketSpace</h3>
                     <p style={{ margin: 0, fontSize: '0.86rem', color: 'var(--text-secondary)' }}>
-                      Launch your branded online storefront with our curated Hyper and Xtra templates.
+                      Launch your branded online storefront with Boutique Grid or Storefront Landing.
                     </p>
                   </div>
                   <Link to="/onboarding" className="primary-btn" style={{ textDecoration: 'none', padding: '10px 20px', borderRadius: '20px' }}>
@@ -1123,7 +1123,7 @@ export function HomePage({
                   Start Selling on MarketSpace Today
                 </h3>
                 <p style={{ margin: 0, fontSize: '0.92rem', color: '#cbd5e1', lineHeight: 1.5 }}>
-                  Whether you are an established business looking to launch a branded online store with customizable Hyper or Xtra templates, or a standalone seller with pre-owned items, MarketSpace connects you directly to buyers.
+                  Whether you are an established business looking to launch a branded online store with Boutique Grid or Storefront Landing, or a standalone seller with pre-owned items, MarketSpace connects you directly to buyers.
                 </p>
               </div>
 

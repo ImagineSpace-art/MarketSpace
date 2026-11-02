@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import './DiscoveryPage.css'
 import type { BusinessProfile, Listing, StoreReview } from '../types'
 import { Listing as ListingView } from '../components/Listing'
+import { getStoreUrl } from '../utils/storeUrl'
 
 type DiscoveryPageProps = {
   allBusinesses?: Record<string, BusinessProfile>
@@ -207,15 +208,15 @@ export function DiscoveryPage({
             }}
           >
             {featuredStores.map((store, index) => (
-              <Link
+              <a
                 key={store.userId}
-                to={`/store/${store.userId}`}
+                href={getStoreUrl(store.userId, store.subdomain)}
                 className={`discovery-featured-store discovery-featured-store-${index}`}
               >
                 {store.cover || store.logo ? <img src={store.cover || store.logo} alt="" /> : null}
                 <span>{store.category || 'Independent storefront'}</span>
                 <strong>{store.shopName}</strong>
-              </Link>
+              </a>
             ))}
           </div>}
         </div>
@@ -288,7 +289,7 @@ export function DiscoveryPage({
               : null
             const itemCount = availableListings.filter((listing) => listing.user_id === store.userId).length
             return (
-              <Link key={store.userId} to={`/store/${store.userId}`} className="discovery-store-card">
+              <a key={store.userId} href={getStoreUrl(store.userId, store.subdomain)} className="discovery-store-card">
                 <div className="discovery-store-image">
                   {store.cover || store.logo ? <img src={store.cover || store.logo} alt="" /> : <span>{store.shopName}</span>}
                   {rating && <span className="discovery-store-rating">{rating} ★</span>}
@@ -297,7 +298,7 @@ export function DiscoveryPage({
                   <h3>{store.shopName}</h3>
                   <div><span>{store.category || 'Independent store'}</span><span>{itemCount} items</span></div>
                 </div>
-              </Link>
+              </a>
             )
           })}
         </div>
@@ -520,12 +521,12 @@ export function DiscoveryPage({
                 <strong>{listing.title}</strong>
                 <span>K{listing.price.toLocaleString()}</span>
               </Link>
-              <Link to={`/store/${store.userId}`} className="discovery-highlight-store">
+              <a href={getStoreUrl(store.userId, store.subdomain)} className="discovery-highlight-store">
                 {store.cover || store.logo ? <img src={store.cover || store.logo} alt="" /> : <span className="discovery-store-initial">{store.shopName.slice(0, 1)}</span>}
                 <strong>{store.shopName}</strong>
                 <span>{store.category || 'Independent store'}</span>
                 <span>Visit storefront <span className="material-icons">arrow_forward</span></span>
-              </Link>
+              </a>
             </article>
           ))}
         </div>
@@ -671,9 +672,9 @@ export function DiscoveryPage({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {storefronts.length > 0 ? (
                 storefronts.slice(0, 4).map((s) => (
-                  <Link key={s.userId} to={`/store/${s.userId}`} style={{ textDecoration: 'none', color: '#6b7280' }}>
+                  <a key={s.userId} href={getStoreUrl(s.userId, s.subdomain)} style={{ textDecoration: 'none', color: '#6b7280' }}>
                     {s.shopName}
-                  </Link>
+                  </a>
                 ))
               ) : (
                 <>

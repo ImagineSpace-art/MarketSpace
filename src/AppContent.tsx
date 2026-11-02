@@ -21,6 +21,7 @@ import { SettingsPage } from './pages/SettingsPage'
 import { AdminArea } from './pages/AdminArea'
 import type { Listing, Profile, BusinessProfile } from './types'
 import { isBestSeller, isNewArrival } from './utils/listingSections'
+import { getStoreSubdomain, getStoreUrl } from './utils/storeUrl'
 import { supabase } from './lib/supabaseClient'
 
 function SlowlyFlashingMarketSpaceTemplate({ message = 'Loading MarketSpace...' }: { message?: string }) {
@@ -201,7 +202,8 @@ export function AppContent() {
     message,
     authEmail,
     authPassword,
-    authUsername,
+    authFirstName,
+    authLastName,
     activeCategories,
     priceRange,
     distanceFilter,
@@ -225,7 +227,8 @@ export function AppContent() {
     deliveryOption,
     setAuthEmail,
     setAuthPassword,
-    setAuthUsername,
+    setAuthFirstName,
+    setAuthLastName,
     toggleCategory,
     setPriceRange,
     setDistanceFilter,
@@ -313,12 +316,10 @@ export function AppContent() {
     shopName: currentViewStore.shopName,
     collections: currentViewStore.collections || []
   } : null
-  const configuredStoreDomain = (import.meta.env.VITE_STORE_DOMAIN || '').toLowerCase()
-  const hostname = window.location.hostname.toLowerCase()
-  const tenantSlug = configuredStoreDomain && hostname.endsWith(`.${configuredStoreDomain}`)
-    ? hostname.slice(0, -(configuredStoreDomain.length + 1))
-    : ''
-  const tenantStore = tenantSlug ? Object.values(allBusinesses).find((store) => store.subdomain === tenantSlug) : undefined
+  const tenantSlug = getStoreSubdomain(window.location.hostname)
+  const tenantStore = tenantSlug
+    ? Object.values(allBusinesses).find((store) => store.subdomain?.toLowerCase() === tenantSlug)
+    : undefined
 
   if (isStorePage) {
     return (
@@ -333,9 +334,7 @@ export function AppContent() {
                 businessProfile={businessProfile}
                 allBusinesses={allBusinesses}
                 listings={listings}
-                navigate={navigate}
                 handleStartChat={handleStartChat}
-                openListing={openListing}
                 toggleSave={toggleSave}
                 savedIds={savedIds}
                 loading={loading}
@@ -348,7 +347,6 @@ export function AppContent() {
                 storeReviews={app.storeReviews}
                 addStoreReview={app.addStoreReview}
                 replyToStoreReview={app.replyToStoreReview}
-                handleUpdateListingCollection={app.handleUpdateListingCollection}
                 globalRenewalFrequency={app.globalRenewalFrequency}
                 globalRenewalDay={app.globalRenewalDay}
                 onEditListing={openEditListing}
@@ -476,7 +474,7 @@ export function AppContent() {
                 clearSearchHistory={app.clearSearchHistory}
                 savedIds={savedIds}
                 onToggleSave={(id) => toggleSave(id)}
-                onVisitStore={(userId) => window.open(`/store/${userId}`, '_blank')}
+                onVisitStore={(userId) => window.open(getStoreUrl(userId, allBusinesses[userId]?.subdomain), '_blank', 'noopener,noreferrer')}
                 onAddToCart={(listing) => cart.addToCart(listing)}
                 onSearch={(query) => {
                   app.setSearchQuery(query)
@@ -569,7 +567,7 @@ export function AppContent() {
                 allBusinesses={allBusinesses}
                 onVisitShop={(shop) => {
                   setSelectedStore(shop)
-                  window.open(`/store/${shop.userId}`, '_blank')
+                  window.open(getStoreUrl(shop.userId, shop.subdomain), '_blank', 'noopener,noreferrer')
                 }}
                 listingKindFilter={listingKindFilter}
                 listings={listings}
@@ -605,7 +603,6 @@ export function AppContent() {
                 addStoreReview={app.addStoreReview}
                 replyToStoreReview={app.replyToStoreReview}
                 handleUpdateListingCollection={app.handleUpdateListingCollection}
-                onSaveStoreTheme={app.handleSaveStoreTheme}
                 globalRenewalFrequency={app.globalRenewalFrequency}
                 globalRenewalDay={app.globalRenewalDay}
                 onEditListing={openEditListing}
@@ -839,10 +836,12 @@ export function AppContent() {
                 userEmail={userEmail}
                 authEmail={authEmail}
                 authPassword={authPassword}
-                authUsername={authUsername}
+                authFirstName={authFirstName}
+                authLastName={authLastName}
                 onAuthEmailChange={setAuthEmail}
                 onAuthPasswordChange={setAuthPassword}
-                onAuthUsernameChange={setAuthUsername}
+                onAuthFirstNameChange={setAuthFirstName}
+                onAuthLastNameChange={setAuthLastName}
                 onSubmit={handleAuthSubmit}
                 onSwitchMode={() => navigate('/signup')}
                 onLogout={handleLogout}
@@ -859,10 +858,12 @@ export function AppContent() {
                 userEmail={userEmail}
                 authEmail={authEmail}
                 authPassword={authPassword}
-                authUsername={authUsername}
+                authFirstName={authFirstName}
+                authLastName={authLastName}
                 onAuthEmailChange={setAuthEmail}
                 onAuthPasswordChange={setAuthPassword}
-                onAuthUsernameChange={setAuthUsername}
+                onAuthFirstNameChange={setAuthFirstName}
+                onAuthLastNameChange={setAuthLastName}
                 onSubmit={handleAuthSubmit}
                 onSwitchMode={() => navigate('/login')}
                 onLogout={handleLogout}
@@ -986,7 +987,7 @@ function ListingDetailRoute({ listings, loading, session, navigate, handleStartC
       onToggleSave={toggleSave}
       onEditListing={openEditListing}
       allBusinesses={allBusinesses}
-      onVisitStore={(userId) => window.open(`/store/${userId}`, '_blank')}
+      onVisitStore={(userId) => window.open(getStoreUrl(userId, allBusinesses[userId]?.subdomain), '_blank', 'noopener,noreferrer')}
       onRenewListing={handleRenewListing}
       onDeleteListing={handleDeleteListing}
     />
@@ -1130,7 +1131,7 @@ function ListingEditRoute({
   )
 }
 
-function StoreViewRoute({ stores, businessProfile, allBusinesses, listings, navigate, handleStartChat, openListing, toggleSave, savedIds, loading, followingIds, notifyStoreIds, toggleFollowStore, toggleNotifyStore, session, storeReviews, addStoreReview, replyToStoreReview, handleUpdateListingCollection, onSaveStoreTheme, globalRenewalFrequency, globalRenewalDay, onEditListing, onRenewListing }: any) {
+function StoreViewRoute({ stores, businessProfile, allBusinesses, listings, handleStartChat, toggleSave, savedIds, loading, followingIds, notifyStoreIds, toggleFollowStore, toggleNotifyStore, session, storeReviews, addStoreReview, replyToStoreReview, globalRenewalFrequency, globalRenewalDay, onEditListing, onRenewListing }: any) {
   const { userId } = useParams()
 
   const regStore: BusinessProfile | null =
@@ -1174,25 +1175,12 @@ function StoreViewRoute({ stores, businessProfile, allBusinesses, listings, navi
     customerCare: {},
     catalog: [],
     ads: [],
-    themeConfig: undefined
-  }
-
-  let savedLocalTheme: any = undefined
-  try {
-    const localStr = window.localStorage.getItem(`marketspace-store-theme-${effectiveStore.userId}`)
-    if (localStr) savedLocalTheme = JSON.parse(localStr)
-  } catch { }
-
-  const storeWithTheme: BusinessProfile = {
-    ...effectiveStore,
-    themeConfig: effectiveStore.themeConfig || savedLocalTheme || undefined
   }
 
   return (
     <StoreViewPage
-      shop={storeWithTheme}
+      shop={effectiveStore}
       listings={listings}
-      onBack={() => navigate('/stores')}
       onMessageSeller={(customMessage?: string) => {
         if (session?.user?.id === effectiveStore.userId) {
           return
@@ -1213,7 +1201,6 @@ function StoreViewRoute({ stores, businessProfile, allBusinesses, listings, navi
           }, customMessage, true)
         }
       }}
-      onOpenListing={openListing}
       onToggleSave={toggleSave}
       savedIds={savedIds}
       currentUserId={session?.user?.id}
@@ -1224,8 +1211,6 @@ function StoreViewRoute({ stores, businessProfile, allBusinesses, listings, navi
       storeReviews={storeReviews}
       onAddReview={addStoreReview}
       onReplyToReview={replyToStoreReview}
-      onUpdateListingCollection={handleUpdateListingCollection}
-      onSaveStoreTheme={(config) => onSaveStoreTheme?.(config, effectiveStore.userId)}
       globalRenewalFrequency={globalRenewalFrequency}
       globalRenewalDay={globalRenewalDay}
       onEditListing={onEditListing}

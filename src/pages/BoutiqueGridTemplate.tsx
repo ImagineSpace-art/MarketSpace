@@ -119,6 +119,7 @@ export function BoutiqueGridTemplate({
   const [rating, setRating] = useState(0)
   const reviews = storeReviews.filter(review => review.storeId === shop.userId)
   const isOwner = currentUserId === shop.userId && Boolean(currentUserId)
+  const hasCartableItems = listings.some(listing => listing.listing_type !== 'service')
 
   const departments = getBoutiqueGridDepartments(shop.collections || [], listings)
   const visibleDepartments = departments.slice(0, 1)
@@ -179,10 +180,10 @@ export function BoutiqueGridTemplate({
             <button type="button" onClick={onOpenInfo} title="Store information">
               <span className="material-icons">info_outline</span>
             </button>
-            <button type="button" onClick={onOpenCart} title="Open cart">
+            {hasCartableItems && <button type="button" onClick={onOpenCart} title="Open cart">
               <span className="material-icons">shopping_bag</span>
               <span>{cartCount}</span>
-            </button>
+            </button>}
           </div>
         )}
         {preview && <span className="boutique-preview-label">Live preview</span>}
