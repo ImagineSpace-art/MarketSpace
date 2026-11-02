@@ -22,6 +22,7 @@ import { AdminArea } from './pages/AdminArea'
 import type { Listing, Profile, BusinessProfile } from './types'
 import { isBestSeller, isNewArrival } from './utils/listingSections'
 import { getStoreSubdomain, getStoreUrl } from './utils/storeUrl'
+import { recordBoostEvent } from './utils/visibilityBoosts'
 import { supabase } from './lib/supabaseClient'
 
 function SlowlyFlashingMarketSpaceTemplate({ message = 'Loading MarketSpace...' }: { message?: string }) {
@@ -567,6 +568,10 @@ export function AppContent() {
                 allBusinesses={allBusinesses}
                 onVisitShop={(shop) => {
                   setSelectedStore(shop)
+                  if (shop.promoted && shop.boost_id) {
+                    void recordBoostEvent(shop.boost_id, 'click')
+                      .catch(error => console.warn(error instanceof Error ? error.message : 'Store boost click could not be recorded.'))
+                  }
                   window.open(getStoreUrl(shop.userId, shop.subdomain), '_blank', 'noopener,noreferrer')
                 }}
                 listingKindFilter={listingKindFilter}

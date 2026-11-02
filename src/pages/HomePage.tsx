@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Listing } from '../components/Listing'
 import type { MarketplaceAppModel } from '../features/marketplace/useMarketplaceApp'
 import { getStoreUrl } from '../utils/storeUrl'
+import { BoostTrackedLink } from '../components/BoostTrackedLink'
 
 type HomePageProps = Pick<MarketplaceAppModel,
   'loading' |
@@ -130,7 +131,9 @@ export function HomePage({
   const sellersList = Array.from(uniqueSellersMap.entries()).map(([id, name]) => ({ id, name }))
 
   // Registered business stores list
-  const registeredStores = Object.values(allBusinesses || {}).filter(b => Boolean(b && b.shopName))
+  const registeredStores = Object.values(allBusinesses || {})
+    .filter(b => Boolean(b && b.shopName))
+    .sort((a, b) => Number(Boolean(b.promoted)) - Number(Boolean(a.promoted)))
 
   const toggleSellerSelection = (sellerId: string) => {
     setSelectedSellers((prev) =>
@@ -746,9 +749,11 @@ export function HomePage({
                   {registeredStores.slice(0, 4).map((shop) => {
                     const storeProductsCount = filteredListings.filter(l => l.user_id === shop.userId).length
                     return (
-                      <div
+                      <BoostTrackedLink
                         key={shop.userId}
-                        onClick={() => window.location.assign(getStoreUrl(shop.userId, shop.subdomain))}
+                        href={getStoreUrl(shop.userId, shop.subdomain)}
+                        boostId={shop.promoted ? shop.boost_id : undefined}
+                        className="home-store-card"
                         style={{
                           borderRadius: '16px',
                           border: '1px solid var(--border)',
@@ -814,6 +819,7 @@ export function HomePage({
                                 <strong style={{ fontSize: '1.02rem', fontWeight: 800, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                   {shop.shopName}
                                 </strong>
+                                {shop.promoted && <span className="sponsored-badge">Promoted</span>}
                                 {shop.verifiedId && <span className="material-icons" style={{ fontSize: '16px', color: '#2563eb' }} title="Verified ID">verified</span>}
                               </div>
                               <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
@@ -837,7 +843,7 @@ export function HomePage({
                             </span>
                           </div>
                         </div>
-                      </div>
+                      </BoostTrackedLink>
                     )
                   })}
                 </div>

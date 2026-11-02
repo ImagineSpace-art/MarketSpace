@@ -18,6 +18,8 @@ export type Listing = {
   seller_type?: 'store' | 'individual'
   images?: string[]
   sponsored?: boolean
+  promoted?: boolean
+  boost_id?: string
   moderation_status?: 'pending' | 'approved' | 'rejected' | 'removed'
   moderation_reason?: string | null
   reviewed_by?: string | null
@@ -91,7 +93,30 @@ export type BusinessAd = {
   createdAt?: string
   moderation_status?: 'pending' | 'approved' | 'rejected' | 'removed'
   moderation_reason?: string | null
+  promoted?: boolean
+  boost_id?: string
 }
+
+export type VisibilityBoost = {
+  id: string
+  target_type: 'listing' | 'ad' | 'store'
+  target_id: string
+  reach_percent: number
+  starts_at: string
+  ends_at: string
+  location_id: string | null
+  created_by: string
+  status: 'active' | 'ended'
+  end_reason: 'expired' | 'target_unavailable' | null
+  impressions: number
+  clicks: number
+  notification_sent_at: string | null
+}
+
+export type ActiveVisibilityBoost = Pick<
+  VisibilityBoost,
+  'id' | 'target_type' | 'target_id' | 'reach_percent' | 'starts_at' | 'ends_at' | 'location_id' | 'status'
+>
 
 export type StoreCollection = {
   id: string
@@ -138,6 +163,8 @@ export type BusinessProfile = {
   userId: string
   storeId?: string
   subdomain?: string
+  promoted?: boolean
+  boost_id?: string
   shopName: string
   description: string
   category: string

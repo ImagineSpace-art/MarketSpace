@@ -4,9 +4,10 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { isListingExpired } from './listingExpiry'
 import { CATEGORY_OPTIONS, CONDITION_OPTIONS, DELIVERY_OPTIONS } from './constants'
-import type { Listing, Profile, View, BusinessProfile, BusinessAd, StoreCollection, StoreReview, PaymentMethodItem, NotificationConfig, StoreTemplateContent, StoreTemplateId } from '../../types'
+import type { Listing, Profile, View, BusinessProfile, BusinessAd, StoreCollection, StoreReview, PaymentMethodItem, NotificationConfig, StoreTemplateContent, StoreTemplateId, ActiveVisibilityBoost } from '../../types'
 import { logAnalyticsEvent, toggleStoreFollowInDb } from '../../services/analytics'
 import { getFunctionErrorMessage } from '../../utils/functionError'
+import { getBoostViewerKey, getBoostViewerLocation, isBoostAudienceMatch, recordBoostEvent } from '../../utils/visibilityBoosts'
 
 export type NotificationItem = {
   id: number | string
@@ -421,6 +422,39 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null)
   const [allBusinesses, setAllBusinesses] = useState<Record<string, BusinessProfile>>({})
   const [selectedStore, setSelectedStore] = useState<BusinessProfile | null>(null)
+  const [visibilityBoosts, setVisibilityBoosts] = useState<ActiveVisibilityBoost[]>([])
+  const [boostClock, setBoostClock] = useState(0)
+  const [anonymousBoostViewerKey] = useState(() => getBoostViewerKey(null))
+  const [boostViewerLocation, setBoostViewerLocation] = useState<string | null>(() => getBoostViewerLocation())
+
+  useEffect(() => {
+    let active = true
+    const loadVisibilityBoosts = async () => {
+      const { data, error } = await supabase.rpc('get_active_visibility_boosts')
+      if (!active) return
+      if (error) {
+        console.warn(`Visibility boosts could not be loaded: ${error.message}`)
+        return
+      }
+      setVisibilityBoosts((data || []) as ActiveVisibilityBoost[])
+      setBoostClock(Date.now())
+    }
+
+    void loadVisibilityBoosts()
+    const refresh = () => { void loadVisibilityBoosts() }
+    const handleLocationChange = (event: Event) => {
+      setBoostViewerLocation((event as CustomEvent<string | null>).detail)
+    }
+    const timer = window.setInterval(refresh, 30_000)
+    window.addEventListener('marketspace:boost-created', refresh)
+    window.addEventListener('marketspace:boost-location-changed', handleLocationChange)
+    return () => {
+      active = false
+      window.clearInterval(timer)
+      window.removeEventListener('marketspace:boost-created', refresh)
+      window.removeEventListener('marketspace:boost-location-changed', handleLocationChange)
+    }
+  }, [])
 
   const [followingIds, setFollowingIds] = useState<string[]>(() => {
     if (typeof window === 'undefined') return []
@@ -687,6 +721,31 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   }
 
   const userEmail = session?.user?.email ?? profile?.email ?? 'Guest'
+  const boostViewerKey = session?.user?.id || anonymousBoostViewerKey
+
+  const promotedBusinesses = useMemo(() => Object.fromEntries(
+    Object.entries(allBusinesses).map(([userId, store]) => {
+      const storeBoost = store.storeId
+        ? visibilityBoosts.find(boost =>
+          boost.target_type === 'store'
+          && boost.target_id === store.storeId
+          && isBoostAudienceMatch(boost, boostViewerKey, boostViewerLocation, boostClock))
+        : undefined
+      const ads = (store.ads || []).map(ad => {
+        const adBoost = visibilityBoosts.find(boost =>
+          boost.target_type === 'ad'
+          && boost.target_id === ad.id
+          && isBoostAudienceMatch(boost, boostViewerKey, boostViewerLocation, boostClock))
+        return { ...ad, promoted: Boolean(adBoost), boost_id: adBoost?.id }
+      })
+      return [userId, {
+        ...store,
+        promoted: Boolean(storeBoost),
+        boost_id: storeBoost?.id,
+        ads,
+      }]
+    })
+  ), [allBusinesses, visibilityBoosts, boostViewerKey, boostViewerLocation, boostClock])
 
   async function fetchStoreReviews() {
     const { data, error } = await supabase.from('reviews').select('*').order('created_at', { ascending: false })
@@ -1333,6 +1392,10 @@ export function useMarketplaceApp(): MarketplaceAppModel {
 
   const openListing = (listing: Listing) => {
     setSelectedListing(listing)
+    if (listing.boost_id) {
+      void recordBoostEvent(listing.boost_id, 'click', boostViewerKey, boostViewerLocation)
+        .catch(error => console.warn(error instanceof Error ? error.message : 'Boost click could not be recorded.'))
+    }
     void logAnalyticsEvent({
       event_type: 'listing_click',
       seller_id: listing.user_id,
@@ -1666,21 +1729,27 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     }
   }
 
+  const promotedListings = useMemo(() => listings.map(listing => {
+    const sellerBusiness = allBusinesses[listing.user_id || '']
+    const isAdActive = sellerBusiness?.ads?.some(
+      ad => ad.listingId === listing.id && ad.status === 'Active' && ad.moderation_status === 'approved'
+    )
+    const boost = visibilityBoosts.find(item =>
+      item.target_type === 'listing'
+      && item.target_id === String(listing.id)
+      && isBoostAudienceMatch(item, boostViewerKey, boostViewerLocation, boostClock))
+    return {
+      ...listing,
+      sponsored: isAdActive || false,
+      promoted: Boolean(boost),
+      boost_id: boost?.id,
+    }
+  }), [listings, allBusinesses, visibilityBoosts, boostViewerKey, boostViewerLocation, boostClock])
+
   const filteredListings = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase()
 
-    return [...listings]
-      .map((listing) => {
-        const listingSellerId = listing.user_id || ''
-        const sellerBusiness = allBusinesses[listingSellerId]
-        const isAdActive = sellerBusiness?.ads?.some(
-          (ad) => ad.listingId === listing.id && ad.status === 'Active' && ad.moderation_status === 'approved'
-        )
-        return {
-          ...listing,
-          sponsored: isAdActive || false,
-        }
-      })
+    return [...promotedListings]
       .filter((listing) => {
         const listingPrice = Number(String(listing.price).replace(/[^\d.]/g, ''))
 
@@ -1708,8 +1777,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         return matchesQuery && matchesCategory && matchesPrice && matchesAvailability && matchesKind
       })
       .sort((a, b) => {
-        const aSponsored = a.sponsored ? 1 : 0
-        const bSponsored = b.sponsored ? 1 : 0
+        const aSponsored = a.promoted ? 1 : 0
+        const bSponsored = b.promoted ? 1 : 0
         if (aSponsored !== bSponsored) {
           return bSponsored - aSponsored
         }
@@ -1722,12 +1791,12 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         }
         return Number(b.id) - Number(a.id)
       })
-  }, [listings, searchQuery, activeCategories, priceRange, showOnlyAvailable, sortBy, allBusinesses, listingKindFilter, session])
+  }, [promotedListings, searchQuery, activeCategories, priceRange, showOnlyAvailable, sortBy, allBusinesses, listingKindFilter, session])
 
   // --- ADD THESE MISSING VARIABLES ---
   const savedListings = useMemo(() => {
-    return listings.filter((listing) => savedIds.includes(String(listing.id)))
-  }, [listings, savedIds])
+    return promotedListings.filter((listing) => savedIds.includes(String(listing.id)))
+  }, [promotedListings, savedIds])
 
   const heroStats = useMemo(() => [
     { label: 'Total Listings', value: String(listings.length) },
@@ -2112,7 +2181,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setSession,
     profile,
     setProfile,
-    listings,
+    listings: promotedListings,
     setListings,
     stores,
     setStores,
@@ -2201,7 +2270,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     heroStats,
     businessProfile,
     setBusinessProfile,
-    allBusinesses,
+    allBusinesses: promotedBusinesses,
     setAllBusinesses,
     selectedStore,
     setSelectedStore,

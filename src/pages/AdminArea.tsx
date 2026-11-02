@@ -4,7 +4,7 @@ import type { Session } from '@supabase/supabase-js'
 import { TurnstileCaptcha } from '../components/TurnstileCaptcha'
 import { adminSupabase } from '../lib/adminSupabaseClient'
 import { supabase } from '../lib/supabaseClient'
-import { AdminStoreReviewPage } from './AdminStoreReviewPage'
+import { AdminStoreReviewPage, type AdminSection } from './AdminStoreReviewPage'
 import './AdminArea.css'
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
@@ -268,6 +268,7 @@ function AdminLayout({ role }: { role: 'moderator' | 'admin' }) {
   const timer = useRef<number | undefined>(undefined)
   const lastActivity = useRef(0)
   const [signOutError, setSignOutError] = useState('')
+  const [activeSection, setActiveSection] = useState<AdminSection>('overview')
 
   useEffect(() => {
     const signOutForInactivity = async () => {
@@ -304,6 +305,30 @@ function AdminLayout({ role }: { role: 'moderator' | 'admin' }) {
     navigate('/admin/login', { replace: true })
   }
 
+  const navigateToSection = (section: AdminSection) => setActiveSection(section)
+
+  const navigationGroups: Array<{ label: string; items: Array<{ section: AdminSection; title: string; icon: string }> }> = [
+    { label: 'WORKSPACE', items: [{ section: 'overview', title: 'Overview', icon: 'space_dashboard' }] },
+    {
+      label: 'MODERATION',
+      items: [
+        { section: 'applications', title: 'Store applications', icon: 'storefront' },
+        { section: 'listings', title: 'Listings', icon: 'inventory_2' },
+        { section: 'ads', title: 'Store ads', icon: 'campaign' },
+        { section: 'seller-verifications', title: 'Identity checks', icon: 'verified_user' },
+        { section: 'reports', title: 'Reports', icon: 'flag' },
+      ],
+    },
+    {
+      label: 'TOOLS',
+      items: [
+        { section: 'boosts', title: 'Visibility boosts', icon: 'trending_up' },
+        { section: 'notifications', title: 'Notifications', icon: 'notifications' },
+        { section: 'audit', title: 'Audit history', icon: 'history' },
+      ],
+    },
+  ]
+
   return (
     <div className="admin-area">
       <header className="admin-area-header">
@@ -319,7 +344,36 @@ function AdminLayout({ role }: { role: 'moderator' | 'admin' }) {
         </button>
       </header>
       {signOutError && <p className="admin-area-error" role="alert">{signOutError}</p>}
-      <div className="admin-area-content"><Outlet context={{ role }} /></div>
+      <div className="admin-area-layout">
+        <aside className="admin-area-sidebar">
+          <nav aria-label="Admin dashboard navigation">
+            {navigationGroups.map(group => (
+              <div className="admin-area-nav-group" key={group.label}>
+                <p>{group.label}</p>
+                {group.items.map(item => (
+                  <button
+                    type="button"
+                    key={item.section}
+                    className={activeSection === item.section ? 'active' : ''}
+                    aria-current={activeSection === item.section ? 'page' : undefined}
+                    onClick={() => navigateToSection(item.section)}
+                  >
+                    <span className="material-icons" aria-hidden="true">{item.icon}</span>
+                    <span>{item.title}</span>
+                  </button>
+                ))}
+              </div>
+            ))}
+          </nav>
+          <div className="admin-area-sidebar-note">
+            <span className="material-icons" aria-hidden="true">lock</span>
+            <span>Restricted moderator workspace</span>
+          </div>
+        </aside>
+        <div className="admin-area-content">
+          <Outlet context={{ role, activeSection, onNavigate: navigateToSection }} />
+        </div>
+      </div>
     </div>
   )
 }

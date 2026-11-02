@@ -4,6 +4,7 @@ import './DiscoveryPage.css'
 import type { BusinessProfile, Listing, StoreReview } from '../types'
 import { Listing as ListingView } from '../components/Listing'
 import { getStoreUrl } from '../utils/storeUrl'
+import { BoostTrackedLink } from '../components/BoostTrackedLink'
 
 type DiscoveryPageProps = {
   allBusinesses?: Record<string, BusinessProfile>
@@ -27,10 +28,15 @@ export function DiscoveryPage({
   const [reviewDrafts, setReviewDrafts] = useState<Record<string, string>>({})
   const [reviewRatings, setReviewRatings] = useState<Record<string, number>>({})
 
-  const storefronts = Object.values(allBusinesses).filter((business) => Boolean(business?.shopName))
+  const storefronts = Object.values(allBusinesses)
+    .filter((business) => Boolean(business?.shopName))
+    .sort((a, b) => Number(Boolean(b.promoted)) - Number(Boolean(a.promoted)))
   const availableListings = listings.filter((listing) =>
     (!listing.status || listing.status.toLowerCase() === 'available') && listing.listing_type !== 'service'
-  )
+  ).sort((a, b) => Number(Boolean(b.promoted)) - Number(Boolean(a.promoted)))
+  const availableServices = listings
+    .filter((listing) => listing.listing_type === 'service' && (!listing.status || listing.status.toLowerCase() === 'available'))
+    .sort((a, b) => Number(Boolean(b.promoted)) - Number(Boolean(a.promoted)))
   const filterTabs = ['All Stores', ...new Set(storefronts.map((store) => store.category).filter(Boolean))]
   const visibleStorefronts = activeFilter === 'All Stores'
     ? storefronts
@@ -208,15 +214,17 @@ export function DiscoveryPage({
             }}
           >
             {featuredStores.map((store, index) => (
-              <a
+              <BoostTrackedLink
                 key={store.userId}
                 href={getStoreUrl(store.userId, store.subdomain)}
+                boostId={store.promoted ? store.boost_id : undefined}
                 className={`discovery-featured-store discovery-featured-store-${index}`}
               >
                 {store.cover || store.logo ? <img src={store.cover || store.logo} alt="" /> : null}
+                {store.promoted && <span className="sponsored-badge">Promoted</span>}
                 <span>{store.category || 'Independent storefront'}</span>
                 <strong>{store.shopName}</strong>
-              </a>
+              </BoostTrackedLink>
             ))}
           </div>}
         </div>
@@ -289,16 +297,17 @@ export function DiscoveryPage({
               : null
             const itemCount = availableListings.filter((listing) => listing.user_id === store.userId).length
             return (
-              <a key={store.userId} href={getStoreUrl(store.userId, store.subdomain)} className="discovery-store-card">
+              <BoostTrackedLink key={store.userId} href={getStoreUrl(store.userId, store.subdomain)} boostId={store.promoted ? store.boost_id : undefined} className="discovery-store-card">
                 <div className="discovery-store-image">
                   {store.cover || store.logo ? <img src={store.cover || store.logo} alt="" /> : <span>{store.shopName}</span>}
+                  {store.promoted && <span className="sponsored-badge">Promoted</span>}
                   {rating && <span className="discovery-store-rating">{rating} ★</span>}
                 </div>
                 <div className="discovery-store-details">
                   <h3>{store.shopName}</h3>
                   <div><span>{store.category || 'Independent store'}</span><span>{itemCount} items</span></div>
                 </div>
-              </a>
+              </BoostTrackedLink>
             )
           })}
         </div>
@@ -321,14 +330,14 @@ export function DiscoveryPage({
         </div>
       </section>}
 
-      {listings.some((listing) => listing.listing_type === 'service' && (!listing.status || listing.status.toLowerCase() === 'available')) && (
+      {availableServices.length > 0 && (
         <section className="discovery-content-section discovery-services-section" style={{ maxWidth: '1240px', margin: '60px auto 40px', padding: '0 24px' }}>
           <div className="discovery-section-heading">
             <h2>Services to Discover</h2>
             <Link to="/browse?category=Services">Browse all services <span className="material-icons">arrow_forward</span></Link>
           </div>
           <div className="discovery-product-rail discovery-listing-rail">
-            {listings.filter((listing) => listing.listing_type === 'service' && (!listing.status || listing.status.toLowerCase() === 'available')).map((listing) => (
+            {availableServices.map((listing) => (
               <ListingView
                 key={listing.id}
                 listing={listing}
@@ -521,12 +530,13 @@ export function DiscoveryPage({
                 <strong>{listing.title}</strong>
                 <span>K{listing.price.toLocaleString()}</span>
               </Link>
-              <a href={getStoreUrl(store.userId, store.subdomain)} className="discovery-highlight-store">
+              <BoostTrackedLink href={getStoreUrl(store.userId, store.subdomain)} boostId={store.promoted ? store.boost_id : undefined} className="discovery-highlight-store">
                 {store.cover || store.logo ? <img src={store.cover || store.logo} alt="" /> : <span className="discovery-store-initial">{store.shopName.slice(0, 1)}</span>}
+                {store.promoted && <span className="sponsored-badge">Promoted</span>}
                 <strong>{store.shopName}</strong>
                 <span>{store.category || 'Independent store'}</span>
                 <span>Visit storefront <span className="material-icons">arrow_forward</span></span>
-              </a>
+              </BoostTrackedLink>
             </article>
           ))}
         </div>
@@ -672,9 +682,10 @@ export function DiscoveryPage({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {storefronts.length > 0 ? (
                 storefronts.slice(0, 4).map((s) => (
-                  <a key={s.userId} href={getStoreUrl(s.userId, s.subdomain)} style={{ textDecoration: 'none', color: '#6b7280' }}>
+                  <BoostTrackedLink key={s.userId} href={getStoreUrl(s.userId, s.subdomain)} boostId={s.promoted ? s.boost_id : undefined} style={{ textDecoration: 'none', color: '#6b7280' }}>
+                    {s.promoted && <span className="sponsored-badge">Promoted</span>}
                     {s.shopName}
-                  </a>
+                  </BoostTrackedLink>
                 ))
               ) : (
                 <>

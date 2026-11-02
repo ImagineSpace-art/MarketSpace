@@ -1,9 +1,11 @@
 import type { Listing, BusinessProfile } from '../types'
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { formatZMWPrice } from '../utils/formatPrice'
 import { isNewArrival } from '../utils/listingSections'
 import { formatServicePriceUnit } from '../features/marketplace/serviceListings'
 import { getStoreUrl } from '../utils/storeUrl'
+import { recordBoostEvent } from '../utils/visibilityBoosts'
 
 type ListingCardProps = {
   listing: Listing
@@ -28,7 +30,14 @@ const categoryIcons: Record<string, string> = {
   Toys: 'smart_toy',
 }
 
-export function Listing({ listing, saved = false, onOpen, onToggleSave, onQuickPeek, allBusinesses, onVisitStore }: ListingCardProps) {  const hasImage = Boolean(listing.images && listing.images.length > 0)
+export function Listing({ listing, saved = false, onOpen, onToggleSave, onQuickPeek, allBusinesses, onVisitStore }: ListingCardProps) {
+  useEffect(() => {
+    if (!listing.promoted || !listing.boost_id) return
+    void recordBoostEvent(listing.boost_id, 'impression')
+      .catch(error => console.warn(error instanceof Error ? error.message : 'Boost impression could not be recorded.'))
+  }, [listing.promoted, listing.boost_id])
+
+  const hasImage = Boolean(listing.images && listing.images.length > 0)
   const mainImage = hasImage ? listing.images![0] : null
 
   // Check if seller owns a registered business store
@@ -83,6 +92,9 @@ export function Listing({ listing, saved = false, onOpen, onToggleSave, onQuickP
       <div className="modern-card-image-box">
         {/* Top-Left Pill Badges */}
         <div className="modern-card-badges">
+          {listing.promoted && (
+            <span className="modern-pill-badge black-pill">Promoted</span>
+          )}
           {isService && (
             <span className="modern-pill-badge black-pill">Service</span>
           )}

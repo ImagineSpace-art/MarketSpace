@@ -2245,13 +2245,6 @@ select:focus-visible {
     flex: 0 0 32px;
 }
 
-.admin-queue-navigation {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin: 0 0 18px;
-}
-
 .admin-notifications-page {
     width: min(100% - 32px, 1100px);
     margin: 0 auto;

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import type { BusinessProfile, Listing } from '../types'
 import { STORE_MARKET_LOCATIONS, groupStoreLocation } from '../features/marketplace/storeLocations'
+import { recordBoostEvent } from '../utils/visibilityBoosts'
 
 // ---------------- STORES & STORE LISTINGS PAGE ----------------
 type StoresPageProps = {
@@ -21,7 +22,9 @@ export function StoresPage({
   searchQuery,
   onSearchQueryChange,
 }: StoresPageProps) {
-  const activeShops = Object.values(allBusinesses || {}).filter(b => Boolean(b && b.shopName))
+  const activeShops = Object.values(allBusinesses || {})
+    .filter(b => Boolean(b && b.shopName))
+    .sort((a, b) => Number(Boolean(b.promoted)) - Number(Boolean(a.promoted)))
   const [currentSlide, setCurrentSlide] = useState(0)
   const [selectedStoreCategory, setSelectedStoreCategory] = useState('All')
   const [selectedLocation, setSelectedLocation] = useState('All')
@@ -63,7 +66,21 @@ export function StoresPage({
     }
 
     return true
-  }).sort((a, b) => groupStoreLocation(a.address, a.locationName).localeCompare(groupStoreLocation(b.address, b.locationName)))
+  }).sort((a, b) =>
+    Number(Boolean(b.promoted)) - Number(Boolean(a.promoted))
+    || groupStoreLocation(a.address, a.locationName).localeCompare(groupStoreLocation(b.address, b.locationName))
+  )
+
+  const visibleBoostIds = filteredShops
+    .filter(shop => shop.promoted)
+    .flatMap(shop => shop.boost_id ? [shop.boost_id] : [])
+    .join('|')
+  useEffect(() => {
+    visibleBoostIds.split('|').filter(Boolean).forEach(boostId => {
+      void recordBoostEvent(boostId, 'impression')
+        .catch(error => console.warn(error instanceof Error ? error.message : 'Store boost impression could not be recorded.'))
+    })
+  }, [visibleBoostIds])
 
   const storeCategories = [
     { name: 'Electronics', image: slides[2], description: 'Tech and accessories' },
@@ -292,6 +309,7 @@ export function StoresPage({
                                 <strong style={{ fontSize: '1.08rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                   {shop.shopName}
                                 </strong>
+                                {shop.promoted && <span className="sponsored-badge">Promoted</span>}
                                 {shop.verifiedId && <span className="material-icons" style={{ fontSize: '16px', color: '#2563eb' }} title="Verified ID">verified</span>}
                               </div>
                               <span style={{ fontSize: '0.8rem', color: '#64748b' }}>

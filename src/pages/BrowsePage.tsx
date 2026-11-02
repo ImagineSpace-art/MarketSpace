@@ -5,6 +5,7 @@ import type { Listing, BusinessProfile, BusinessAd } from '../types'
 import { Listing as ListingView } from '../components/Listing'
 import { isBestSeller, isNewArrival } from '../utils/listingSections'
 import { supabase } from '../lib/supabaseClient'
+import { recordBoostEvent } from '../utils/visibilityBoosts'
 
 type BrowsePageProps = {
   listings: Listing[]
@@ -31,6 +32,12 @@ function MarketplaceAdCard({ ad, session }: { ad: BusinessAd & { sellerName: str
   const [engagementBusy, setEngagementBusy] = useState(false)
 
   const imagesOnly = media.length > 0 && mediaTypes.every(type => type === 'image')
+
+  useEffect(() => {
+    if (!ad.promoted || !ad.boost_id) return
+    void recordBoostEvent(ad.boost_id, 'impression')
+      .catch(error => console.warn(error instanceof Error ? error.message : 'Ad boost impression could not be recorded.'))
+  }, [ad.promoted, ad.boost_id])
 
   useEffect(() => {
     if (!imagesOnly || userInterrupted || media.length < 2) return
@@ -91,9 +98,20 @@ function MarketplaceAdCard({ ad, session }: { ad: BusinessAd & { sellerName: str
           ? <video key={media[activeMedia]} src={media[activeMedia]} controls muted preload="metadata" playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', background: '#111827' }} />
           : media[activeMedia] && <img src={media[activeMedia]} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(15,23,42,.92), rgba(15,23,42,.18))', pointerEvents: 'none' }} />
-        <Link to={destination} aria-label={`View ${ad.headline || ad.adTitle || 'advertisement'}`} style={{ position: 'absolute', inset: 0, zIndex: 3, color: 'inherit', textDecoration: 'none', pointerEvents: 'none' }}>
+        <Link
+          to={destination}
+          aria-label={`View ${ad.headline || ad.adTitle || 'advertisement'}`}
+          onClick={event => {
+            if (!ad.promoted || !ad.boost_id) return
+            event.preventDefault()
+            void recordBoostEvent(ad.boost_id, 'click')
+              .catch(error => console.warn(error instanceof Error ? error.message : 'Ad boost click could not be recorded.'))
+              .finally(() => window.location.assign(destination))
+          }}
+          style={{ position: 'absolute', inset: 0, zIndex: 3, color: 'inherit', textDecoration: 'none', pointerEvents: 'none' }}
+        >
           <div style={{ padding: '24px 28px 56px', maxWidth: 360, pointerEvents: 'none' }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', opacity: .8 }}>Sponsored · {ad.sellerName}</span>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', opacity: .8 }}>Sponsored{ad.promoted ? ' · Promoted' : ''} · {ad.sellerName}</span>
             <h3 style={{ fontSize: 'clamp(1.35rem, 2vw, 1.75rem)', margin: '10px 0 8px', lineHeight: 1.05 }}>{ad.headline || ad.adTitle}</h3>
             <p style={{ margin: '0 0 18px', opacity: .88, lineHeight: 1.45, fontSize: '.88rem', maxHeight: 72, overflow: 'hidden' }}>{ad.adText}</p>
             <span style={{ display: 'inline-flex', pointerEvents: 'auto', borderRadius: 999, padding: '10px 18px', background: '#fff', color: '#0f172a', fontWeight: 800 }}>{ad.buttonLabel || 'View'}</span>
@@ -197,7 +215,7 @@ export function BrowsePage({
         sellerName: business.shopName || 'MarketSpace Seller',
         sellerUserId: business.userId,
       }))
-    }).slice(0, 8)
+    }).sort((a, b) => Number(Boolean(b.promoted)) - Number(Boolean(a.promoted))).slice(0, 8)
   }, [allBusinesses])
 
   const newArrivals = useMemo(
@@ -253,15 +271,14 @@ export function BrowsePage({
       )
     }
 
-    if (sortBy === 'price-low') {
-      result.sort((a, b) => Number(a.price) - Number(b.price))
-    } else if (sortBy === 'price-high') {
-      result.sort((a, b) => Number(b.price) - Number(a.price))
-    } else if (sortBy === 'latest') {
-      result.sort((a, b) => Number(b.id) - Number(a.id))
-    }
-
-    return result
+    return result.sort((a, b) => {
+      const promotedOrder = Number(Boolean(b.promoted)) - Number(Boolean(a.promoted))
+      if (promotedOrder) return promotedOrder
+      if (sortBy === 'price-low') return Number(a.price) - Number(b.price)
+      if (sortBy === 'price-high') return Number(b.price) - Number(a.price)
+      if (sortBy === 'latest') return Number(b.id) - Number(a.id)
+      return 0
+    })
   }, [listings, selectedCategory, searchQuery, sortBy])
 
   const scrollToCatalog = () => {

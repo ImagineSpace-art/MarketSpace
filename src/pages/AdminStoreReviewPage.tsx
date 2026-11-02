@@ -1,7 +1,17 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import { adminSupabase } from '../lib/adminSupabaseClient'
 import { getFunctionErrorMessage } from '../utils/functionError'
 import type { BusinessAd, Listing } from '../types'
+import { AdminOverview } from './AdminOverview'
+
+export type AdminSection = 'overview' | 'applications' | 'reports' | 'listings' | 'ads' | 'seller-verifications' | 'boosts' | 'notifications' | 'audit'
+
+type AdminOutletContext = {
+  role: 'moderator' | 'admin'
+  activeSection: AdminSection
+  onNavigate: (section: AdminSection) => void
+}
 
 type PendingListing = Listing & {
   moderation_status: 'pending'
@@ -84,13 +94,31 @@ const REPORT_REASON_LABELS: Record<StoreReport['reason'], string> = {
   other: 'Other',
 }
 
+type AdminBoost = {
+  id: string
+  target_type: 'listing' | 'ad' | 'store'
+  target_id: string
+  target_title: string | null
+  owner_id: string
+  reach_percent: number
+  starts_at: string
+  ends_at: string
+  location_id: string | null
+  status: string
+  end_reason: string | null
+  impressions: number
+  clicks: number
+  notification_sent_at: string | null
+  created_at: string
+}
+
 export function AdminStoreReviewPage() {
+  const { activeSection, onNavigate } = useOutletContext<AdminOutletContext>()
   const [applications, setApplications] = useState<ReviewApplication[]>([])
   const [reportGroups, setReportGroups] = useState<StoreReportGroup[]>([])
   const [pendingListings, setPendingListings] = useState<PendingListing[]>([])
   const [pendingAds, setPendingAds] = useState<PendingAd[]>([])
   const [pendingSellerVerifications, setPendingSellerVerifications] = useState<PendingSellerVerification[]>([])
-  const [activeQueue, setActiveQueue] = useState<'applications' | 'reports' | 'listings' | 'ads' | 'seller-verifications' | 'notifications' | 'audit'>('applications')
   const [loading, setLoading] = useState(true)
   const [reportsLoading, setReportsLoading] = useState(false)
   const [listingsLoading, setListingsLoading] = useState(false)
@@ -116,6 +144,8 @@ export function AdminStoreReviewPage() {
   const [notificationAdminStatus, setNotificationAdminStatus] = useState<'loading' | 'allowed' | 'denied'>('loading')
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([])
   const [auditLoading, setAuditLoading] = useState(false)
+  const [boostRows, setBoostRows] = useState<AdminBoost[]>([])
+  const [boostsLoading, setBoostsLoading] = useState(false)
   const [moderatorUserId, setModeratorUserId] = useState('')
 
   useEffect(() => {
@@ -224,6 +254,38 @@ export function AdminStoreReviewPage() {
     setAuditLoading(false)
   }, [])
 
+  const loadBoosts = useCallback(async () => {
+    setError('')
+    setBoostsLoading(true)
+    try {
+      const { data, error: boostError } = await adminSupabase.rpc('list_admin_visibility_boosts')
+      if (boostError) setError(`Boost metrics could not be loaded: ${boostError.message}`)
+      else setBoostRows((data || []) as AdminBoost[])
+    } catch (boostError) {
+      setError(boostError instanceof Error ? boostError.message : 'Boost metrics could not be loaded.')
+    } finally {
+      setBoostsLoading(false)
+    }
+  }, [])
+
+  const sendBoostExpirationNotice = async (boostId: string) => {
+    setError('')
+    setNotice('')
+    setWorkingId(boostId)
+    try {
+      const { error: sendError } = await adminSupabase.rpc('send_boost_expiration_notification', {
+        p_boost_id: boostId,
+      })
+      if (sendError) throw new Error(sendError.message)
+      setNotice('The prewritten boost-expiration notification was sent to the owner.')
+      await loadBoosts()
+    } catch (sendError) {
+      setError(`Boost expiration notification could not be sent: ${sendError instanceof Error ? sendError.message : 'Unknown error'}`)
+    } finally {
+      setWorkingId('')
+    }
+  }
+
   useEffect(() => {
     const timer = window.setTimeout(() => { void loadQueue() }, 0)
     return () => window.clearTimeout(timer)
@@ -298,20 +360,6 @@ export function AdminStoreReviewPage() {
       setSendingNotification(false)
     }
   }
-
-  const renderQueueNavigation = (currentQueue: typeof activeQueue) => (
-    <nav aria-label="Moderation queues" className="admin-queue-navigation">
-      <button type="button" className={currentQueue === 'applications' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'applications' ? 'page' : undefined} onClick={() => { setActiveQueue('applications'); void loadQueue() }}>Store applications <span className="admin-pending-count">{applications.length}</span></button>
-      <button type="button" className={currentQueue === 'reports' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'reports' ? 'page' : undefined} onClick={() => { setActiveQueue('reports'); void loadReports() }}>Reports <span className="admin-pending-count">{reportGroups.reduce((count, group) => count + group.reports.length, 0)}</span></button>
-      <button type="button" className={currentQueue === 'listings' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'listings' ? 'page' : undefined} onClick={() => { setActiveQueue('listings'); void loadPendingListings() }}>Listings <span className="admin-pending-count">{pendingListings.length}</span></button>
-      <button type="button" className={currentQueue === 'ads' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'ads' ? 'page' : undefined} onClick={() => { setActiveQueue('ads'); void loadPendingAds() }}>Ads <span className="admin-pending-count">{pendingAds.length}</span></button>
-      <button type="button" className={currentQueue === 'seller-verifications' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'seller-verifications' ? 'page' : undefined} onClick={() => { setActiveQueue('seller-verifications'); void loadPendingSellerVerifications() }}>Identity checks <span className="admin-pending-count">{pendingSellerVerifications.length}</span></button>
-      {notificationAdminStatus === 'allowed' && (
-        <button type="button" className={currentQueue === 'notifications' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'notifications' ? 'page' : undefined} onClick={() => setActiveQueue('notifications')}>Notifications</button>
-      )}
-      <button type="button" className={currentQueue === 'audit' ? 'primary-btn' : 'secondary-btn'} aria-current={currentQueue === 'audit' ? 'page' : undefined} onClick={() => { setActiveQueue('audit'); void loadAudit() }}>Audit log</button>
-    </nav>
-  )
 
   const review = async (application: ReviewApplication, decision: 'approve' | 'reject') => {
     setError('')
@@ -451,9 +499,21 @@ export function AdminStoreReviewPage() {
     }
   }
 
+  const navigateToSection = (section: AdminSection) => {
+    onNavigate(section)
+    if (section === 'applications') void loadQueue()
+    else if (section === 'reports') void loadReports()
+    else if (section === 'listings') void loadPendingListings()
+    else if (section === 'ads') void loadPendingAds()
+    else if (section === 'seller-verifications') void loadPendingSellerVerifications()
+    else if (section === 'boosts') void loadBoosts()
+    else if (section === 'audit') void loadAudit()
+  }
+
+  if (activeSection === 'overview') return <AdminOverview onNavigate={navigateToSection} />
   if (loading) return <section className="section-card"><p>Loading store applications…</p></section>
 
-  if (activeQueue === 'notifications') {
+  if (activeSection === 'notifications') {
     if (notificationAdminStatus === 'loading') {
       return <section className="section-card"><p>Checking moderator access…</p></section>
     }
@@ -469,7 +529,6 @@ export function AdminStoreReviewPage() {
             <p>Only moderators can publish notifications to selected users or everyone.</p>
           </div>
         </header>
-        {renderQueueNavigation('notifications')}
         {error && <p role="alert" className="store-wizard-alert error">{error}</p>}
         {notice && <p role="status" className="store-wizard-alert notice">{notice}</p>}
         <form className="admin-notification-form" onSubmit={event => void sendNotification(event)}>
@@ -548,7 +607,72 @@ export function AdminStoreReviewPage() {
     )
   }
 
-  if (activeQueue === 'audit') {
+  if (activeSection === 'boosts') {
+    return (
+      <section className="admin-queue-page">
+        <header className="admin-queue-heading">
+          <div>
+            <p className="admin-eyebrow">MARKETSPACE MODERATION</p>
+            <h2>Visibility boosts</h2>
+            <p>Review boost reach, impressions, clicks, end times, and owner notification status.</p>
+          </div>
+          <button type="button" className="secondary-btn" disabled={boostsLoading} onClick={() => void loadBoosts()}>
+            {boostsLoading ? 'Refreshing…' : 'Refresh boosts'}
+          </button>
+        </header>
+        {error && <p role="alert" className="store-wizard-alert error">{error}</p>}
+        {notice && <p role="status" className="store-wizard-alert notice">{notice}</p>}
+        {boostsLoading ? (
+          <section className="section-card"><p>Loading boosts…</p></section>
+        ) : boostRows.length === 0 ? (
+          <section className="section-card"><p>No visibility boosts have been created.</p></section>
+        ) : (
+          <div style={{ display: 'grid', gap: 12 }}>
+            {boostRows.map(boost => {
+              const expired = boost.status === 'ended' && boost.end_reason === 'expired'
+              const clickRate = boost.impressions > 0
+                ? `${((boost.clicks / boost.impressions) * 100).toFixed(1)}%`
+                : '—'
+              return (
+                <article className="section-card" key={boost.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+                  <div>
+                    <h3 style={{ margin: '0 0 4px' }}>{boost.target_title || `${boost.target_type} (removed)`}</h3>
+                    <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+                      {boost.target_type} · {boost.reach_percent}% audience · {boost.location_id || 'All locations'}
+                    </p>
+                    <p style={{ margin: '4px 0', color: 'var(--text-secondary)' }}>
+                      Owner {boost.owner_id} · {new Date(boost.starts_at).toLocaleString()} – {new Date(boost.ends_at).toLocaleString()}
+                    </p>
+                    <strong>{boost.impressions} impressions · {boost.clicks} clicks · {clickRate} click-through</strong>
+                    <p style={{ margin: '4px 0 0' }}>
+                      Status: {expired ? 'Expired' : boost.status === 'ended' ? 'Ended early' : 'Active'}
+                      {boost.end_reason === 'target_unavailable' ? ' · Target no longer approved/active' : ''}
+                    </p>
+                  </div>
+                  <div>
+                    {expired && !boost.notification_sent_at ? (
+                      <button
+                        type="button"
+                        className="primary-btn"
+                        disabled={workingId === boost.id}
+                        onClick={() => void sendBoostExpirationNotice(boost.id)}
+                      >
+                        {workingId === boost.id ? 'Sending…' : 'Send expiration notice'}
+                      </button>
+                    ) : (
+                      <span role="status">{boost.notification_sent_at ? `Notice sent ${new Date(boost.notification_sent_at).toLocaleString()}` : 'No notice due yet'}</span>
+                    )}
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        )}
+      </section>
+    )
+  }
+
+  if (activeSection === 'audit') {
     return (
       <section className="admin-queue-page">
         <header className="admin-queue-heading">
@@ -561,7 +685,6 @@ export function AdminStoreReviewPage() {
             {auditLoading ? 'Refreshing…' : 'Refresh audit log'}
           </button>
         </header>
-        {renderQueueNavigation('audit')}
         {error && <p role="alert" className="store-wizard-alert error">{error}</p>}
         {auditLoading ? (
           <section className="section-card"><p>Loading audit history…</p></section>
@@ -586,7 +709,7 @@ export function AdminStoreReviewPage() {
     )
   }
 
-  if (activeQueue === 'listings') {
+  if (activeSection === 'listings') {
     return (
       <section style={{ width: 'min(100%, 1100px)', boxSizing: 'border-box', margin: '0 auto', padding: 20 }}>
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
@@ -599,7 +722,6 @@ export function AdminStoreReviewPage() {
             {listingsLoading ? 'Refreshing…' : 'Refresh listings'}
           </button>
         </header>
-        {renderQueueNavigation('listings')}
         {error && <p role="alert" className="store-wizard-alert error">{error}</p>}
         {notice && <p role="status" className="store-wizard-alert notice">{notice}</p>}
         {listingsLoading ? (
@@ -663,7 +785,7 @@ export function AdminStoreReviewPage() {
     )
   }
 
-  if (activeQueue === 'seller-verifications') {
+  if (activeSection === 'seller-verifications') {
     return (
       <section style={{ width: 'min(100%, 1100px)', boxSizing: 'border-box', margin: '0 auto', padding: 20 }}>
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
@@ -676,7 +798,6 @@ export function AdminStoreReviewPage() {
             {sellerVerificationsLoading ? 'Refreshing…' : 'Refresh identity checks'}
           </button>
         </header>
-        {renderQueueNavigation('seller-verifications')}
         {error && <p role="alert" className="store-wizard-alert error">{error}</p>}
         {notice && <p role="status" className="store-wizard-alert notice">{notice}</p>}
         {sellerVerificationsLoading ? (
@@ -761,7 +882,7 @@ export function AdminStoreReviewPage() {
     )
   }
 
-  if (activeQueue === 'ads') {
+  if (activeSection === 'ads') {
     return (
       <section style={{ width: 'min(100%, 1100px)', boxSizing: 'border-box', margin: '0 auto', padding: 20 }}>
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
@@ -774,7 +895,6 @@ export function AdminStoreReviewPage() {
             {adsLoading ? 'Refreshing…' : 'Refresh ads'}
           </button>
         </header>
-        {renderQueueNavigation('ads')}
         {error && <p role="alert" className="store-wizard-alert error">{error}</p>}
         {notice && <p role="status" className="store-wizard-alert notice">{notice}</p>}
         {adsLoading ? (
@@ -836,7 +956,7 @@ export function AdminStoreReviewPage() {
     )
   }
 
-  if (activeQueue === 'reports') {
+  if (activeSection === 'reports') {
     return (
       <section style={{ width: 'min(100%, 1100px)', margin: '0 auto', padding: 20 }}>
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
@@ -851,7 +971,6 @@ export function AdminStoreReviewPage() {
             {reportsLoading ? 'Refreshing…' : 'Refresh reports'}
           </button>
         </header>
-        {renderQueueNavigation('reports')}
         {error && <p role="alert" className="store-wizard-alert error">{error}</p>}
         {notice && <p role="status" className="store-wizard-alert notice">{notice}</p>}
         {reportsLoading ? (
@@ -920,7 +1039,6 @@ export function AdminStoreReviewPage() {
         </div>
         <button type="button" className="secondary-btn" onClick={refreshQueue}>Refresh queue</button>
       </header>
-      {renderQueueNavigation('applications')}
       {error && <p role="alert" className="store-wizard-alert error">{error}</p>}
       {notice && <p role="status" className="store-wizard-alert notice">{notice}</p>}
       {!applications.length && <section className="section-card"><p>No store applications are waiting for review.</p></section>}

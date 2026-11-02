@@ -15,6 +15,7 @@ import { getListingTimeRemainingMs, isListingExpired } from '../features/marketp
 import { DestructiveActionDialog } from '../components/DestructiveActionDialog'
 import { SellerVerificationSubmission } from '../components/SellerVerificationSubmission'
 import { getStoreUrl } from '../utils/storeUrl'
+import { BoostControl } from '../components/BoostControl'
 
 // ---------------- PROFILE PAGE ----------------
 type ProfilePageProps = {
@@ -313,6 +314,14 @@ export function ProfilePage({
                                         <span className="material-icons" style={{ fontSize: '18px' }}>open_in_new</span>
                                         Preview Storefront
                                     </button>
+                                    {businessProfile.storeId && (
+                                        <BoostControl
+                                            targetType="store"
+                                            targetId={businessProfile.storeId}
+                                            targetTitle={businessProfile.shopName}
+                                            eligible={!businessProfile.archivedAt}
+                                        />
+                                    )}
                                 </div>
                             </div>
 
@@ -563,6 +572,13 @@ export function ProfilePage({
                                                                 <span className="material-icons" aria-hidden="true">delete</span>
                                                                 Delete
                                                             </button>
+                                                            <BoostControl
+                                                                targetType="ad"
+                                                                targetId={ad.id}
+                                                                targetTitle={ad.adTitle || 'advertisement'}
+                                                                eligible={ad.status === 'Active'
+                                                                    && ad.moderation_status === 'approved'}
+                                                            />
                                                         </div>
                                                     </div>
                                                 ))}
@@ -862,6 +878,14 @@ export function ProfilePage({
                                                         {listing.status === 'Sold' ? 'Restock' : 'Mark Sold'}
                                                     </button>
                                                     <button className="primary-btn compact-btn" onClick={() => onRenewListing(listing.id)}>Renew Listing</button>
+                                                    <BoostControl
+                                                        targetType="listing"
+                                                        targetId={String(listing.id)}
+                                                        targetTitle={listing.title}
+                                                        eligible={listing.moderation_status === 'approved'
+                                                            && ['active', 'available'].includes((listing.status || 'Available').toLowerCase())
+                                                            && !isListingExpired(listing, globalRenewalFrequency, globalRenewalDay)}
+                                                    />
                                                     <button className="ghost-btn compact-btn delete-btn" onClick={() => setListingToDelete(listing)}>
                                                         <span className="material-icons">delete</span>
                                                     </button>

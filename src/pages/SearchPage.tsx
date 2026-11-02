@@ -1,9 +1,10 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { BusinessProfile, Listing } from '../types'
-import { STORE_MARKET_LOCATIONS } from '../features/marketplace/storeLocations'
+import { MARKETPLACE_LOCATIONS, STORE_MARKET_LOCATIONS } from '../features/marketplace/storeLocations'
 import { ListingCard } from '../components/Listing'
 import { getStoreUrl } from '../utils/storeUrl'
+import { recordBoostEvent, setBoostViewerLocation } from '../utils/visibilityBoosts'
 
 type SearchPageProps = {
   listings: Listing[]
@@ -49,12 +50,23 @@ export function SearchPage({ listings, allBusinesses, searchHistory, clearSearch
     if (key === 'type' && value === 'listings') next.delete(key)
     else if (empty) next.delete(key)
     else next.set(key, value)
+    if (key === 'location') {
+      const selectedLocation = MARKETPLACE_LOCATIONS.find(item => item.name === value)
+      setBoostViewerLocation(selectedLocation?.id || null)
+    }
     setParams(next, { replace: true })
   }
+
+  useEffect(() => {
+    if (location === 'All') return
+    const selectedLocation = MARKETPLACE_LOCATIONS.find(item => item.name === location)
+    if (selectedLocation) setBoostViewerLocation(selectedLocation.id)
+  }, [location])
 
   const clearFilters = () => {
     const next = new URLSearchParams()
     if (submittedQuery) next.set('q', submittedQuery)
+    setBoostViewerLocation(null)
     setParams(next, { replace: true })
   }
 
@@ -69,8 +81,17 @@ export function SearchPage({ listings, allBusinesses, searchHistory, clearSearch
       if (category !== 'All' && (store.category || '').toLowerCase() !== category.toLowerCase()) return false
       if (minRating !== '0' && Number(store.rating || 0) < Number(minRating)) return false
       return true
-    })
+    }).sort((a, b) => Number(Boolean(b.promoted)) - Number(Boolean(a.promoted)))
   }, [submittedQuery, allBusinesses, location, category, minRating])
+
+  useEffect(() => {
+    storeResults.forEach(store => {
+      if (store.promoted && store.boost_id) {
+        void recordBoostEvent(store.boost_id, 'impression')
+          .catch(error => console.warn(error instanceof Error ? error.message : 'Store boost impression could not be recorded.'))
+      }
+    })
+  }, [storeResults])
 
   const results = useMemo(() => {
     const terms = submittedQuery.toLowerCase().trim().split(/\s+/).filter(Boolean)
@@ -86,7 +107,7 @@ export function SearchPage({ listings, allBusinesses, searchHistory, clearSearch
       const sellerRating = Number(listing.rating || allBusinesses[listing.user_id || '']?.rating || 0)
       if (sellerRating < Number(minRating || 0)) return false
       return true
-    })
+    }).sort((a, b) => Number(Boolean(b.promoted)) - Number(Boolean(a.promoted)))
   }, [submittedQuery, listings, location, condition, category, storeId, minPrice, maxPrice, minRating, allBusinesses])
 
   const renderListing = (listing: Listing) => (
@@ -175,7 +196,7 @@ export function SearchPage({ listings, allBusinesses, searchHistory, clearSearch
               <div><h1>{submittedQuery ? `Results for “${submittedQuery}”` : 'Discover stores and listings'}</h1><p>{resultType === 'stores' ? `${storeResults.length} store${storeResults.length === 1 ? '' : 's'}` : `${results.length} listing${results.length === 1 ? '' : 's'}`} found</p></div>
               <div className="search-result-tabs" role="tablist"><button type="button" className={resultType === 'listings' ? 'active' : ''} onClick={() => updateParam('type', 'listings')}>Listings</button><button type="button" className={resultType === 'stores' ? 'active' : ''} onClick={() => updateParam('type', 'stores')}>Stores</button></div>
             </div>
-            {resultType === 'stores' ? (storeResults.length ? <div className="store-search-results-grid">{storeResults.map(store => <button key={store.userId} type="button" className="store-search-result" onClick={() => window.open(getStoreUrl(store.userId, store.subdomain), '_blank', 'noopener,noreferrer')}><span className="store-search-logo">{store.logo ? <img src={store.logo} alt="" /> : <span className="material-icons">storefront</span>}</span><strong>{store.shopName}</strong><small>{store.category || 'Marketplace store'}</small><span>{store.locationName || store.address || 'Location unavailable'}</span>{store.rating ? <em>★ {store.rating.toFixed(1)}</em> : null}</button>)}</div> : <div className="search-empty-state">No stores match these filters.</div>) : results.length ? <div className="search-results-grid">{results.map(renderListing)}</div> : <div className="search-empty-state">No listings match these filters.</div>}
+            {resultType === 'stores' ? (storeResults.length ? <div className="store-search-results-grid">{storeResults.map(store => <button key={store.userId} type="button" className="store-search-result" onClick={() => { if (store.promoted && store.boost_id) void recordBoostEvent(store.boost_id, 'click').catch(error => console.warn(error instanceof Error ? error.message : 'Store boost click could not be recorded.')); window.open(getStoreUrl(store.userId, store.subdomain), '_blank', 'noopener,noreferrer') }}><span className="store-search-logo">{store.logo ? <img src={store.logo} alt="" /> : <span className="material-icons">storefront</span>}</span><strong>{store.shopName}</strong>{store.promoted && <span className="sponsored-badge">Promoted</span>}<small>{store.category || 'Marketplace store'}</small><span>{store.locationName || store.address || 'Location unavailable'}</span>{store.rating ? <em>★ {store.rating.toFixed(1)}</em> : null}</button>)}</div> : <div className="search-empty-state">No stores match these filters.</div>) : results.length ? <div className="search-results-grid">{results.map(renderListing)}</div> : <div className="search-empty-state">No listings match these filters.</div>}
           </> : <div className="search-results-empty"><span className="material-icons">search</span><h2>Search MarketSpace</h2><p>Search listings or stores, or choose filters from the category menu.</p></div>}
         </section>
       </div>
