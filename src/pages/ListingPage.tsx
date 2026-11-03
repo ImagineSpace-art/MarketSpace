@@ -770,7 +770,7 @@ export function ListingDetailPage({
         <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 16px 0', color: 'var(--text)' }}>
           Customer Ratings & Reviews
         </h3>
-        <ListingRatingReviewBox listingId={selectedListing.id} currentUserName={session?.user?.user_metadata?.username || session?.user?.email?.split('@')[0] || 'Buyer'} />
+        <ListingRatingReviewBox currentUserName={session?.user?.user_metadata?.username || session?.user?.email?.split('@')[0] || 'Buyer'} />
       </div>
       {isDeleteDialogOpen && onDeleteListing && (
         <DestructiveActionDialog
@@ -790,7 +790,7 @@ export function ListingDetailPage({
   )
 }
 
-function ListingRatingReviewBox({ listingId: _listingId, currentUserName }: { listingId: number; currentUserName: string }) {
+function ListingRatingReviewBox({ currentUserName }: { currentUserName: string }) {
   const [rating, setRating] = useState(5)
   const [comment, setComment] = useState('')
   const [isAnonymous, setIsAnonymous] = useState(false)

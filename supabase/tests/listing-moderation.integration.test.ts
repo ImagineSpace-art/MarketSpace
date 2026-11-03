@@ -14,7 +14,7 @@ describe.skipIf(!enabled)('listing moderation Supabase integration', () => {
   let probationSellerId = ''
   let trustedStoreId = ''
   let probationStoreId = ''
-  let listingIds: number[] = []
+  const listingIds: number[] = []
 
   async function createSeller(client: SupabaseClient) {
     const email = `listing-moderation-${crypto.randomUUID()}@example.test`

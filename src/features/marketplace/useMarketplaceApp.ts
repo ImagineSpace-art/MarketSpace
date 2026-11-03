@@ -854,7 +854,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   }
 
   async function loadProfile(userId: string, userObj?: any) {
-    let { data } = await supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle()
+    const { data } = await supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle()
 
     const fallbackUsername = userObj?.user_metadata?.username || (userObj?.email ? userObj.email.split('@')[0] : '') || 'User'
     const fallbackEmail = userObj?.email || ''

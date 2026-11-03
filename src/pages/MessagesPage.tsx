@@ -119,7 +119,7 @@ function renderMessageContent(content: string) {
           )}
         </div>
       )
-    } catch (e) {
+    } catch {
       return <p style={{ margin: 0 }}>{content}</p>
     }
   }
@@ -181,7 +181,7 @@ function renderMessageContent(content: string) {
           </div>
         </div>
       )
-    } catch (e) {
+    } catch {
       return <p style={{ margin: 0 }}>{content}</p>
     }
   }
