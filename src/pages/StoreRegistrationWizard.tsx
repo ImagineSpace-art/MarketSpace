@@ -601,8 +601,11 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
 
       {step === 1 && (
         <div className="store-wizard-fields">
-          <p className="store-wizard-description">Your MarketSpace login is your account. Email and password are managed securely by Supabase Auth.</p>
-          <label>Email address<input value={email} readOnly autoComplete="email" /></label>
+          <p className="store-wizard-description">Verify your contact details before continuing.</p>
+          <div className="store-wizard-account-email">
+            <span>Email address</span>
+            <strong>{email || 'Not available'}</strong>
+          </div>
           <div className={emailVerified ? 'store-wizard-verification verified' : 'store-wizard-verification'}>
             <span>{emailVerified ? 'Email confirmed' : 'Email confirmation required'}</span>
             {!emailVerified && <button type="button" className="secondary-btn" onClick={() => void resendEmailConfirmation()}>Resend link</button>}
@@ -632,16 +635,15 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
                       <button type="button" className="primary-btn" disabled={saving || !otp.trim()} onClick={() => void verifyPhoneOtp()}>Verify phone</button>
                     </div>
                   )}
-                  <p className="store-wizard-help">Supabase Auth test phone numbers and fixed OTPs work here when configured in your Supabase project.</p>
                 </>
               )}
             </>
           ) : (
-            <div className="store-wizard-verification">Phone verification is disabled by VITE_PHONE_OTP_REQUIRED=false.</div>
+            <div className="store-wizard-verification">Phone verification is not required for this application.</div>
           )}
           {TURNSTILE_SITE_KEY
             ? <TurnstileCaptcha key={captchaGeneration} onToken={receiveCaptchaToken} />
-            : <p className="store-wizard-help">CAPTCHA is disabled until VITE_TURNSTILE_SITE_KEY is configured.</p>}
+            : null}
         </div>
       )}
 
@@ -662,7 +664,7 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
       {step === 3 && (
         <div className="store-wizard-fields">
           <label>Store name<input value={data.store.name} onChange={(event) => update('store', { name: event.target.value })} autoComplete="organization" /></label>
-          <label>Store address
+          <label>Store web address
             <div className="store-wizard-domain-input">
               <input
                 value={data.store.subdomain}
@@ -724,7 +726,6 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
                 <label>Map latitude<input value={data.location.latitude} onChange={(event) => update('location', { latitude: event.target.value })} inputMode="decimal" /></label>
                 <label>Map longitude<input value={data.location.longitude} onChange={(event) => update('location', { longitude: event.target.value })} inputMode="decimal" /></label>
               </div>
-              <small className="store-wizard-help">Map data © OpenStreetMap contributors · Nominatim is rate-limited.</small>
               <label>Opening hours<input value={data.location.openingHours} onChange={(event) => update('location', { openingHours: event.target.value })} placeholder="Mon–Sat, 08:00–18:00" /></label>
             </>
           ) : (
@@ -800,14 +801,14 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
           <p>Check your details before sending the application. Your store remains private until reviewed.</p>
           <dl>
             <dt>Store name</dt><dd>{data.store.name || 'Not provided'}</dd>
-            <dt>Store address</dt><dd>{normalizedSubdomain || 'Not provided'}.{STORE_DOMAIN}</dd>
+            <dt>Store web address</dt><dd>{normalizedSubdomain || 'Not provided'}.{STORE_DOMAIN}</dd>
             <dt>Category & type</dt><dd>{data.store.category} · {data.store.type.replace('_', ' ')}</dd>
             <dt>Owner</dt><dd>{data.identity.legalName || 'Not provided'} · ID and selfie uploaded</dd>
-            <dt>Location proof</dt><dd>{data.location.proofPath ? 'Uploaded' : 'Will be arranged with a reviewer'}</dd>
+            <dt>Location verification</dt><dd>{data.location.verificationMethod === 'photo' ? (data.location.proofPath ? 'Photo uploaded' : 'Photo required') : 'Video call requested'}</dd>
             <dt>Payout</dt><dd>{data.payout.method === 'bank' ? 'Bank account' : 'Mobile money'} · {data.payout.accountHolderName}</dd>
           </dl>
           {TURNSTILE_SITE_KEY && <TurnstileCaptcha key={captchaGeneration} onToken={receiveCaptchaToken} />}
-          <p className="store-wizard-help">Submission runs automated duplicate, banned-account, prohibited-keyword, and payout-name checks. Any flag goes to manual review.</p>
+          <p className="store-wizard-help">Your application will be reviewed before the store is made public.</p>
           {rejectionReason && <p className="store-wizard-help">Previous reviewer feedback: {rejectionReason}</p>}
         </div>
       )}

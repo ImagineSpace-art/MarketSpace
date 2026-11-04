@@ -284,7 +284,7 @@ export function Shell({
                 </button>
               )}
               <Link
-                to="/onboarding"
+                to="/profile/business-setup"
                 className="header-nav-pill header-open-store-link"
                 style={{
                   display: 'inline-flex',

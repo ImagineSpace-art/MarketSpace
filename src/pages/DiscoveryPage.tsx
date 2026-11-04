@@ -690,7 +690,7 @@ export function DiscoveryPage({
               ) : (
                 <>
                   <Link to="/stores" style={{ textDecoration: 'none', color: '#6b7280' }}>Official Stores</Link>
-                  <Link to="/onboarding" style={{ textDecoration: 'none', color: '#2563eb', fontWeight: 600 }}>Create Your Store</Link>
+                  <Link to="/profile/business-setup" style={{ textDecoration: 'none', color: '#2563eb', fontWeight: 600 }}>Create Your Store</Link>
                 </>
               )}
             </div>

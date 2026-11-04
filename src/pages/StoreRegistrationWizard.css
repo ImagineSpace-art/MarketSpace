@@ -115,13 +115,25 @@
 }
 
 .store-wizard-fields > label,
-.store-wizard-inline label {
+.store-wizard-inline label,
+.store-wizard-account-email {
   display: flex;
   flex-direction: column;
   gap: 7px;
   color: var(--text);
   font-size: 0.9rem;
   font-weight: 700;
+}
+
+.store-wizard-account-email strong {
+  min-height: 46px;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text-secondary);
+  font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
 .store-wizard-fields input:not([type="checkbox"]):not([type="file"]),
@@ -372,12 +384,29 @@
 
 @media (max-width: 760px) {
   .store-wizard-progress {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    row-gap: 12px;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px;
+    margin: 24px 0;
+  }
+
+  .store-wizard-progress li {
+    justify-content: center;
+  }
+
+  .store-wizard-progress li > span {
+    width: 28px;
+    height: 28px;
+    flex-basis: 28px;
   }
 
   .store-wizard-progress small {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    clip-path: inset(50%);
   }
 
   .store-wizard-header {
@@ -394,13 +423,22 @@
   }
 
   .store-wizard-actions {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .store-wizard-actions > span {
-    order: 3;
-    width: 100%;
+    grid-column: 1 / -1;
+    grid-row: 1;
     text-align: center;
+  }
+
+  .store-wizard-actions > button {
+    min-width: 0;
+  }
+
+  .store-wizard-upload input {
+    max-width: 100%;
   }
 }
 

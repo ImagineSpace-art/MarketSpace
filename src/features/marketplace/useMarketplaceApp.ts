@@ -1037,7 +1037,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
             setMessage(signOutError
               ? `Moderator account detected, but regular sign-out failed: ${signOutError.message}`
               : 'Moderator account detected. Sign in through the admin portal.')
-            navigate('/admin/login', { replace: true })
+            navigate('/admin/login', { replace: true, state: { adminLoginEntry: true } })
             marketplaceSession = null
           }
         } catch (error) {
@@ -1051,9 +1051,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       }
       setSession(marketplaceSession)
 
-      let loadedProfile: Profile | null = null
       if (marketplaceSession) {
-        loadedProfile = await loadProfile(marketplaceSession.user.id, marketplaceSession.user)
+        await loadProfile(marketplaceSession.user.id, marketplaceSession.user)
         const { data: followRows } = await supabase.from('store_followers').select('store_id').eq('user_id', marketplaceSession.user.id)
         if (followRows) {
           setFollowingIds(followRows.map((r: any) => r.store_id))
@@ -1063,13 +1062,6 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       await Promise.all([fetchListings(marketplaceSession?.user.id), fetchStores(), fetchStoreReviews()])
       setLoading(false)
 
-      const needsOnboarding = marketplaceSession && (
-        !loadedProfile?.onboarding_choice
-      )
-
-      if (needsOnboarding && (window.location.pathname === '/' || window.location.pathname === '/profile')) {
-        navigate('/onboarding')
-      }
     }
 
     void loadInitialData()
@@ -1102,7 +1094,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
               setMessage(signOutError
                 ? `Moderator account detected, but regular sign-out failed: ${signOutError.message}`
                 : 'Moderator account detected. Sign in through the admin portal.')
-              navigate('/admin/login', { replace: true })
+              navigate('/admin/login', { replace: true, state: { adminLoginEntry: true } })
               return
             }
           } catch (error) {
@@ -1117,13 +1109,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
           }
 
           setSession(currentSession)
-          const loadedProfile = await loadProfile(currentSession.user.id, currentSession.user)
+          await loadProfile(currentSession.user.id, currentSession.user)
           void fetchListings(currentSession.user.id)
-
-          const needsOnboarding = !loadedProfile?.onboarding_choice
-          if (needsOnboarding && (window.location.pathname === '/' || window.location.pathname === '/profile')) {
-            navigate('/onboarding')
-          }
         })()
       }, 0)
     })
@@ -1167,7 +1154,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         setMessage(signOutError
           ? `Moderator account detected, but regular sign-out failed: ${signOutError.message}`
           : 'Moderator account detected. Sign in through the admin portal.')
-        navigate('/admin/login', { replace: true })
+        navigate('/admin/login', { replace: true, state: { adminLoginEntry: true } })
         return
       }
     } catch (roleError) {
@@ -1186,13 +1173,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setAuthEmail('')
     setAuthPassword('')
 
-    // Fetch user profile choice
-    const { data: profileRow } = await supabase.from('profiles').select('onboarding_choice').eq('user_id', data.user.id).maybeSingle()
-    if (!profileRow?.onboarding_choice) {
-      navigate('/onboarding')
-    } else {
-      navigate('/')
-    }
+    navigate('/')
   }
 
   const handleSignup = async (captchaToken?: string) => {
@@ -1241,7 +1222,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setAuthPassword('')
     setAuthFirstName('')
     setAuthLastName('')
-    navigate('/onboarding')
+    navigate('/')
   }
 
   const handleLogout = async () => {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { Outlet, Route, Routes, useNavigate } from 'react-router-dom'
+import { Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { TurnstileCaptcha } from '../components/TurnstileCaptcha'
 import { adminSupabase } from '../lib/adminSupabaseClient'
@@ -379,6 +379,14 @@ function AdminLayout({ role }: { role: 'moderator' | 'admin' }) {
 }
 
 export function AdminArea() {
+  const location = useLocation()
+  const isAdminLogin = location.pathname === '/admin/login'
+  const isMarketplaceAuthEntry = (location.state as { adminLoginEntry?: boolean } | null)?.adminLoginEntry === true
+
+  if (isAdminLogin && !isMarketplaceAuthEntry) {
+    return <Navigate to="/login" replace />
+  }
+
   return (
     <Routes>
       <Route path="/admin/login" element={<AdminLoginPage />} />

@@ -92,8 +92,8 @@ export function AuthPage({
 
     try {
       await onSubmit(e, captchaToken)
-    } catch (err: any) {
-      setLocalError(err?.message || 'Authentication failed. Please verify your credentials.')
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : 'Authentication failed. Please verify your credentials.')
     }
   }
 

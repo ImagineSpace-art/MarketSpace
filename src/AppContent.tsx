@@ -8,7 +8,6 @@ import { ListingDetailPage, ListingFormPage } from './pages/ListingPage'
 import { SavedItemsPage } from './pages/SavedNotificationsPage'
 import { MessagesPage } from './pages/MessagesPage'
 import { AuthPage } from './pages/AuthenticationPage'
-import { OnboardingPage } from './pages/OnboardingPage'
 import { StoreViewPage } from './pages/StoreViewPage'
 import { StoresPage } from './pages/StoresPage'
 import { SearchPage } from './pages/SearchPage'
@@ -876,21 +875,7 @@ export function AppContent() {
               />
             }
           />
-          <Route
-            path="/onboarding"
-            element={
-              session ? (
-                <OnboardingPage
-                  session={session}
-                  profile={profile}
-                  setProfile={app.setProfile}
-                  setMessage={app.setMessage}
-                />
-              ) : (
-                <Navigate to="/login" replace />
-              )
-            }
-          />
+          <Route path="/onboarding" element={<Navigate to="/profile/business-setup" replace />} />
           <Route path="/auth" element={<Navigate to="/login" replace />} />
           <Route
             path="*"
