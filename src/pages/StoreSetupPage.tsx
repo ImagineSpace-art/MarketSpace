@@ -3,6 +3,8 @@ import type { BusinessProfile } from '../types'
 import { uploadImageToSupabase } from '../features/marketplace/ImageUploader'
 import { supabase } from '../lib/supabaseClient'
 import { getFunctionErrorMessage } from '../utils/functionError'
+import { StorePoliciesEditor } from '../components/StorePoliciesEditor'
+import { normalizeStorePolicies, validateStorePolicies } from '../utils/storePolicies'
 
 // ---------------- STORE SETUP PAGE ----------------
 type StoreSetupPageProps = {
@@ -25,8 +27,7 @@ export function StoreSetupPage({ userId, businessProfile, onSave, onCancel }: St
     const [accentColor, setAccentColor] = useState(businessProfile?.accentColor || '#2563eb')
     const [announcementBar, setAnnouncementBar] = useState(businessProfile?.announcementBar || '')
     const [workingHours, setWorkingHours] = useState(businessProfile?.customerCare?.workingHours || 'Mon-Sat: 08:00 - 18:00')
-    const [deliveryPolicy, setDeliveryPolicy] = useState(businessProfile?.customerCare?.deliveryPolicy || 'Same-day delivery in Lusaka for orders placed before 14:00.')
-    const [returnPolicy, setReturnPolicy] = useState(businessProfile?.customerCare?.returnPolicy || '3-day inspection & exchange guarantee.')
+    const [policies, setPolicies] = useState(() => normalizeStorePolicies(businessProfile?.customerCare))
     const [supportPhone, setSupportPhone] = useState(businessProfile?.customerCare?.phone || businessProfile?.whatsapp || '')
     const [supportEmail, setSupportEmail] = useState(businessProfile?.customerCare?.email || '')
     const [privacyNotice, setPrivacyNotice] = useState('')
@@ -93,6 +94,11 @@ export function StoreSetupPage({ userId, businessProfile, onSave, onCancel }: St
             setFormError('Enter a store name between 2 and 120 characters and a description no longer than 5,000 characters.')
             return
         }
+        const policiesError = validateStorePolicies(policies)
+        if (policiesError) {
+            setFormError(policiesError)
+            return
+        }
         onSave({
             userId,
             shopName,
@@ -108,8 +114,7 @@ export function StoreSetupPage({ userId, businessProfile, onSave, onCancel }: St
             collections,
             customerCare: {
                 workingHours,
-                deliveryPolicy,
-                returnPolicy,
+                policies,
                 phone: supportPhone || whatsapp,
                 email: supportEmail,
                 address
@@ -293,8 +298,7 @@ export function StoreSetupPage({ userId, businessProfile, onSave, onCancel }: St
                     <h3 style={{ marginTop: 0, fontSize: '1.05rem', color: 'var(--text)' }}>4. Customer Care & Store Policies</h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
                         <input value={workingHours} onChange={(e) => setWorkingHours(e.target.value)} placeholder="Business Working Hours (e.g. Mon-Sat: 08:00 - 18:00)" style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
-                        <textarea value={deliveryPolicy} onChange={(e) => setDeliveryPolicy(e.target.value)} placeholder="Delivery Policy (e.g. Same-day delivery in Lusaka)" rows={2} style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit' }} />
-                        <textarea value={returnPolicy} onChange={(e) => setReturnPolicy(e.target.value)} placeholder="Return & Refund Policy (e.g. 3-day guarantee)" rows={2} style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit' }} />
+                        <StorePoliciesEditor policies={policies} onChange={setPolicies} />
                         <input value={supportPhone} onChange={(e) => setSupportPhone(e.target.value.slice(0, 24))} type="tel" inputMode="tel" maxLength={24} placeholder="Customer Care Direct Phone" style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
                         <input value={supportEmail} onChange={(e) => setSupportEmail(e.target.value)} type="email" maxLength={254} placeholder="Customer Support Email" style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
                     </div>

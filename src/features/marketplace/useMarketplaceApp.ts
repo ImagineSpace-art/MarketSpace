@@ -1037,7 +1037,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
             setMessage(signOutError
               ? `Moderator account detected, but regular sign-out failed: ${signOutError.message}`
               : 'Moderator account detected. Sign in through the admin portal.')
-            navigate('/admin/login', { replace: true, state: { adminLoginEntry: true } })
+            navigate('/admin/login', { replace: true })
             marketplaceSession = null
           }
         } catch (error) {
@@ -1094,7 +1094,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
               setMessage(signOutError
                 ? `Moderator account detected, but regular sign-out failed: ${signOutError.message}`
                 : 'Moderator account detected. Sign in through the admin portal.')
-              navigate('/admin/login', { replace: true, state: { adminLoginEntry: true } })
+              navigate('/admin/login', { replace: true })
               return
             }
           } catch (error) {
@@ -1154,7 +1154,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         setMessage(signOutError
           ? `Moderator account detected, but regular sign-out failed: ${signOutError.message}`
           : 'Moderator account detected. Sign in through the admin portal.')
-        navigate('/admin/login', { replace: true, state: { adminLoginEntry: true } })
+        navigate('/admin/login', { replace: true })
         return
       }
     } catch (roleError) {
@@ -2042,12 +2042,9 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     }
 
     const dbStores: Record<string, BusinessProfile> = {}
-    const nonPublicStoreOwners = new Set<string>()
-    const archivedStoreOwners = new Set<string>()
     const archivedOwnerStores: BusinessProfile[] = []
     ;(data || []).forEach((s: any) => {
         if (s.status && s.status !== 'approved') {
-          nonPublicStoreOwners.add(s.user_id)
           return
         }
         const storeProfile: BusinessProfile = {
@@ -2083,22 +2080,22 @@ export function useMarketplaceApp(): MarketplaceAppModel {
           if (s.user_id === session?.user?.id) {
             archivedOwnerStores.push(storeProfile)
           }
-          archivedStoreOwners.add(s.user_id)
           return
         }
         dbStores[s.user_id] = storeProfile
     })
     const archivedOwnerStore = archivedOwnerStores[0] || null
+    setAllBusinesses(dbStores)
+    try {
+      window.localStorage.setItem('marketspace-all-businesses', JSON.stringify(dbStores))
+    } catch (cacheError) {
+      console.error('Failed to refresh cached store data:', cacheError)
+    }
+
     const { data: adRows, error: adsError } = await supabase
       .from('store_ads')
       .select('id,user_id,status,ad_data,moderation_status,moderation_reason,created_at')
     if (adsError) {
-      setAllBusinesses(prev => {
-        const next = { ...prev, ...dbStores }
-        nonPublicStoreOwners.forEach((ownerId) => delete next[ownerId])
-        archivedStoreOwners.forEach((ownerId) => delete next[ownerId])
-        return next
-      })
       setMessage(`Store ads could not be loaded: ${adsError.message}`)
       return
     }
@@ -2122,16 +2119,12 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     if (archivedOwnerStore) {
       archivedOwnerStore.ads = adsByUser.get(archivedOwnerStore.userId) || []
     }
-    const storeOwnerIds = new Set((data || []).map((store: any) => store.user_id))
-    setAllBusinesses(prev => {
-      const next = { ...prev, ...dbStores }
-      nonPublicStoreOwners.forEach((ownerId) => delete next[ownerId])
-      archivedStoreOwners.forEach((ownerId) => delete next[ownerId])
-      if (session?.user?.id && !storeOwnerIds.has(session.user.id)) {
-        delete next[session.user.id]
-      }
-      return next
-    })
+    setAllBusinesses(dbStores)
+    try {
+      window.localStorage.setItem('marketspace-all-businesses', JSON.stringify(dbStores))
+    } catch (cacheError) {
+      console.error('Failed to refresh cached store data:', cacheError)
+    }
     if (session?.user?.id) {
       setBusinessProfile(archivedOwnerStore || dbStores[session.user.id] || null)
     }

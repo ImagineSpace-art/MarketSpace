@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
-  fuzzyNameSimilarity,
   isAtLeast18,
   isDisposableEmailDomain,
   isValidZambianNrc,
+  validateOptionalMapCoordinates,
   validateStoreSubdomain,
 } from '../../supabase/functions/_shared/storeRegistrationValidation'
 
@@ -40,9 +40,11 @@ describe('store registration validation', () => {
     expect(isValidZambianNrc('12345A789')).toBe(false)
   })
 
-  it('returns a normalized fuzzy similarity score for payout-name review', () => {
-    expect(fuzzyNameSimilarity('Grace Banda', 'Banda Grace')).toBe(1)
-    expect(fuzzyNameSimilarity('Grace Banda', 'Grace Mumba')).toBeCloseTo(0.5)
-    expect(fuzzyNameSimilarity('', 'Grace Banda')).toBe(0)
+  it('allows physical store applications without a map pin but validates optional coordinates', () => {
+    expect(validateOptionalMapCoordinates('', '')).toBe('')
+    expect(validateOptionalMapCoordinates(' -15.4 ', '28.3')).toBe('')
+    expect(validateOptionalMapCoordinates('-15.4', '')).toContain('both map coordinates')
+    expect(validateOptionalMapCoordinates('91', '28.3')).toContain('valid map coordinates')
+    expect(validateOptionalMapCoordinates('-15.4', '181')).toContain('valid map coordinates')
   })
 })

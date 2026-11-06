@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, Outlet, Route, Routes, useNavigate } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { TurnstileCaptcha } from '../components/TurnstileCaptcha'
 import { adminSupabase } from '../lib/adminSupabaseClient'
@@ -10,17 +10,18 @@ import './AdminArea.css'
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000
 const SESSION_DENIED_MESSAGE = 'The code could not be verified. Request a new code and try again.'
-const SEPARATE_ACCOUNT_MESSAGE = 'Use a different account for moderator access than the account currently signed in to MarketSpace.'
 type LoginResponse = {
   success: boolean
   message?: string
   session?: { access_token: string; refresh_token: string }
 }
 
-async function usesSeparateAccount(moderatorUserId: string) {
+async function clearMarketplaceSession() {
   const { data, error } = await supabase.auth.getSession()
-  if (error) throw new Error('The active MarketSpace account could not be checked.')
-  return data.session?.user.id !== moderatorUserId
+  if (error) throw new Error('The active Marketplace session could not be checked.')
+  if (!data.session) return
+  const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' })
+  if (signOutError) throw new Error('The Marketplace account could not be signed out.')
 }
 
 function NotFoundPage() {
@@ -41,6 +42,7 @@ function AdminLoginPage() {
   const [captchaToken, setCaptchaToken] = useState('')
   const [captchaGeneration, setCaptchaGeneration] = useState(0)
   const [codeRequested, setCodeRequested] = useState(false)
+  const [ready, setReady] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -48,20 +50,33 @@ function AdminLoginPage() {
 
   useEffect(() => {
     let active = true
-    void adminSupabase.auth.getSession().then(async ({ data, error }) => {
-      if (!active || error || !data.session) return
-      const { data: moderator, error: roleError } = await adminSupabase.rpc('is_moderator')
-      if (!active || roleError || moderator !== true) return
-      try {
-        if (await usesSeparateAccount(data.session.user.id)) {
-          navigate('/admin', { replace: true })
-        } else {
-          setError(SEPARATE_ACCOUNT_MESSAGE)
-        }
-      } catch (accountError) {
-        setError(accountError instanceof Error ? accountError.message : 'The active MarketSpace account could not be checked.')
+    void (async () => {
+      const [{ data: marketplaceData, error: marketplaceError }, { data: adminData, error: adminError }] = await Promise.all([
+        supabase.auth.getSession(),
+        adminSupabase.auth.getSession(),
+      ])
+      if (!active) return
+      if (marketplaceError || adminError) {
+        setError('The current sign-in state could not be checked. Refresh and try again.')
+        return
       }
-    })
+
+      if (!marketplaceData.session && adminData.session) {
+        const { data: moderator, error: roleError } = await adminSupabase.rpc('is_moderator')
+        if (!active) return
+        if (!roleError && moderator === true) {
+          navigate('/admin', { replace: true })
+          return
+        }
+        const { error: signOutError } = await adminSupabase.auth.signOut({ scope: 'local' })
+        if (!active) return
+        if (signOutError) {
+          setError(`The invalid moderator session could not be cleared: ${signOutError.message}`)
+          return
+        }
+      }
+      setReady(true)
+    })()
     return () => { active = false }
   }, [navigate])
 
@@ -98,25 +113,33 @@ function AdminLoginPage() {
           return
         }
 
+        await clearMarketplaceSession()
         const { data: sessionData, error: sessionError } = await adminSupabase.auth.setSession({
           access_token: data.session.access_token,
           refresh_token: data.session.refresh_token,
         })
         if (sessionError) throw new Error('The moderator session could not be established.')
-        if (!sessionData.session || !await usesSeparateAccount(sessionData.session.user.id)) {
-          await adminSupabase.auth.signOut()
-          setError(SEPARATE_ACCOUNT_MESSAGE)
-          setCaptchaGeneration(value => value + 1)
-          setCaptchaToken('')
-          return
+        if (!sessionData.session) {
+          const { error: signOutError } = await adminSupabase.auth.signOut({ scope: 'local' })
+          if (signOutError) throw new Error('The incomplete moderator session could not be cleared.')
+          throw new Error('The moderator session could not be established.')
         }
         const { data: moderator, error: roleError } = await adminSupabase.rpc('is_moderator')
         if (roleError || moderator !== true) {
-          await adminSupabase.auth.signOut()
+          const { error: signOutError } = await adminSupabase.auth.signOut({ scope: 'local' })
+          if (signOutError) throw new Error('The unverified moderator session could not be cleared.')
           setError(SESSION_DENIED_MESSAGE)
           setCaptchaGeneration(value => value + 1)
           setCaptchaToken('')
           return
+        }
+        const { data: marketplaceData, error: marketplaceError } = await supabase.auth.getSession()
+        if (marketplaceError || marketplaceData.session) {
+          const { error: signOutError } = await adminSupabase.auth.signOut({ scope: 'local' })
+          if (signOutError) throw new Error('The moderator session could not be cleared because a Marketplace session is active.')
+          throw new Error(marketplaceError
+            ? 'The active Marketplace session could not be checked.'
+            : 'A Marketplace account became active. Sign in to the moderator workspace again.')
         }
         navigate('/admin', { replace: true })
       }
@@ -172,7 +195,7 @@ function AdminLoginPage() {
           <TurnstileCaptcha key={captchaGeneration} onToken={receiveCaptchaToken} />
           {message && <p className="admin-login-notice" role="status">{message}</p>}
           {error && <p className="admin-login-error" role="alert">{error}</p>}
-          <button type="submit" className="admin-login-submit" disabled={busy || !captchaToken}>
+          <button type="submit" className="admin-login-submit" disabled={!ready || busy || !captchaToken}>
             {busy ? 'Please wait…' : codeRequested ? 'Verify and sign in' : 'Send one-time code'}
           </button>
           {codeRequested && (
@@ -194,21 +217,37 @@ function AdminLoginPage() {
 }
 
 function AdminGate() {
-  const [status, setStatus] = useState<'checking' | 'allowed' | 'denied'>('checking')
+  const [status, setStatus] = useState<'checking' | 'allowed' | 'login' | 'denied'>('checking')
   const [role, setRole] = useState<'moderator' | 'admin'>('moderator')
 
   useEffect(() => {
     let active = true
     let latestCheck = 0
+    let moderatorSignOut: Promise<void> | null = null
+    const clearModeratorSession = () => {
+      if (!moderatorSignOut) {
+        moderatorSignOut = (async () => {
+          const { data, error } = await adminSupabase.auth.getSession()
+          if (error) throw new Error('The moderator session could not be checked.')
+          if (!data.session) return
+          const { error: signOutError } = await adminSupabase.auth.signOut({ scope: 'local' })
+          if (signOutError) throw new Error('The previous moderator session could not be cleared.')
+        })().finally(() => { moderatorSignOut = null })
+      }
+      return moderatorSignOut
+    }
     const check = async (session: Session | null) => {
       const checkId = ++latestCheck
       if (!session) {
-        if (active) setStatus('denied')
+        if (active) setStatus('login')
         return
       }
       try {
-        if (!await usesSeparateAccount(session.user.id)) {
-          if (active && checkId === latestCheck) setStatus('denied')
+        const { data: marketplaceData, error: marketplaceError } = await supabase.auth.getSession()
+        if (marketplaceError) throw new Error('The active Marketplace session could not be checked.')
+        if (marketplaceData.session) {
+          await clearModeratorSession()
+          if (active && checkId === latestCheck) setStatus('login')
           return
         }
         const [{ data: moderator, error: moderatorError }, { data: assignment, error: assignmentError }] = await Promise.all([
@@ -217,9 +256,24 @@ function AdminGate() {
         ])
         if (!active || checkId !== latestCheck) return
         if (moderatorError || assignmentError || moderator !== true || !assignment) {
-          setStatus('denied')
+          let signOutError: Error | null = null
+          try {
+            await clearModeratorSession()
+          } catch (signOutFailure) {
+            signOutError = signOutFailure instanceof Error ? signOutFailure : new Error('Moderator session sign-out failed.')
+          }
+          if (!active || checkId !== latestCheck) return
+          setStatus(signOutError ? 'denied' : 'login')
           return
         }
+        const { data: latestMarketplaceData, error: latestMarketplaceError } = await supabase.auth.getSession()
+        if (latestMarketplaceError) throw new Error('The active Marketplace session could not be checked.')
+        if (latestMarketplaceData.session) {
+          await clearModeratorSession()
+          if (active && checkId === latestCheck) setStatus('login')
+          return
+        }
+        if (!active || checkId !== latestCheck) return
         setRole(assignment.role === 'admin' ? 'admin' : 'moderator')
         setStatus('allowed')
       } catch {
@@ -230,7 +284,7 @@ function AdminGate() {
     const reloadAdminSession = async () => {
       const { data, error } = await adminSupabase.auth.getSession()
       if (error) {
-        setStatus('denied')
+        setStatus('login')
         return
       }
       void check(data.session)
@@ -238,7 +292,7 @@ function AdminGate() {
 
     void adminSupabase.auth.getSession().then(({ data, error }) => {
       if (error) {
-        if (active) setStatus('denied')
+        if (active) setStatus('login')
         return
       }
       void check(data.session)
@@ -259,6 +313,7 @@ function AdminGate() {
   if (status === 'checking') {
     return <main className="admin-gate-loading" aria-label="Loading">Loading…</main>
   }
+  if (status === 'login') return <Navigate to="/admin/login" replace />
   if (status === 'denied') return <NotFoundPage />
   return <AdminLayout role={role} />
 }
@@ -325,6 +380,7 @@ function AdminLayout({ role }: { role: 'moderator' | 'admin' }) {
         { section: 'boosts', title: 'Visibility boosts', icon: 'trending_up' },
         { section: 'notifications', title: 'Notifications', icon: 'notifications' },
         { section: 'audit', title: 'Audit history', icon: 'history' },
+        ...(role === 'admin' ? [{ section: 'terms' as const, title: 'Platform terms', icon: 'description' }] : []),
       ],
     },
   ]
@@ -379,14 +435,6 @@ function AdminLayout({ role }: { role: 'moderator' | 'admin' }) {
 }
 
 export function AdminArea() {
-  const location = useLocation()
-  const isAdminLogin = location.pathname === '/admin/login'
-  const isMarketplaceAuthEntry = (location.state as { adminLoginEntry?: boolean } | null)?.adminLoginEntry === true
-
-  if (isAdminLogin && !isMarketplaceAuthEntry) {
-    return <Navigate to="/login" replace />
-  }
-
   return (
     <Routes>
       <Route path="/admin/login" element={<AdminLoginPage />} />

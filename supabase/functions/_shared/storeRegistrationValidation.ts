@@ -66,20 +66,24 @@ export function isValidZambianNrc(value: string) {
   return /^[0-9]{9}$/.test(value)
 }
 
+export function validateOptionalMapCoordinates(latitudeValue: string, longitudeValue: string) {
+  const latitudeText = latitudeValue.trim()
+  const longitudeText = longitudeValue.trim()
+  if (Boolean(latitudeText) !== Boolean(longitudeText)) return 'Provide both map coordinates, or leave both blank.'
+  if (!latitudeText) return ''
+
+  const latitude = Number(latitudeText)
+  const longitude = Number(longitudeText)
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
+    !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    return 'Provide valid map coordinates, or leave both blank.'
+  }
+  return ''
+}
+
 export function isAtLeast18(dateOfBirth: string, today = new Date()) {
   const birthDate = new Date(`${dateOfBirth}T00:00:00Z`)
   if (Number.isNaN(birthDate.getTime())) return false
   const cutoff = new Date(Date.UTC(today.getUTCFullYear() - 18, today.getUTCMonth(), today.getUTCDate()))
   return birthDate <= cutoff
-}
-
-export function fuzzyNameSimilarity(left: string, right: string) {
-  const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(Boolean)
-  const a = normalize(left)
-  const b = normalize(right)
-  if (!a.length || !b.length) return 0
-  const rightSet = new Set(b)
-  const leftSet = new Set(a)
-  const overlap = [...leftSet].filter((part) => rightSet.has(part)).length
-  return (2 * overlap) / (leftSet.size + rightSet.size)
 }

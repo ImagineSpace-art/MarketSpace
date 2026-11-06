@@ -56,7 +56,7 @@ describe.skipIf(!enabled)('store registration Supabase integration', () => {
     return data as T
   }
 
-  it('saves each step, encrypts payout data, and submits a pending-review store', async () => {
+  it('saves each step and submits a pending-review store', async () => {
     const imageBytes = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l5sAAAAASUVORK5CYII='), (char) => char.charCodeAt(0))
     const idImagePath = `${userId}/idImagePath/${crypto.randomUUID()}.png`
     const selfiePath = `${userId}/selfiePath/${crypto.randomUUID()}.png`
@@ -88,6 +88,7 @@ describe.skipIf(!enabled)('store registration Supabase integration', () => {
         businessRegistrationNumber: '',
       },
       location: {
+        marketplaceLocation: 'Lusaka',
         streetAddress: '',
         latitude: '',
         longitude: '',
@@ -97,16 +98,15 @@ describe.skipIf(!enabled)('store registration Supabase integration', () => {
         verificationMethod: 'video',
         proofPath: '',
       },
-      payout: {
-        method: 'mobile_money',
-        accountHolderName: 'MarketSpace Test Owner',
-        accountNumber: '',
-      },
       policies: {
         termsAccepted: true,
-        returnsAccepted: true,
+        termsAcceptedVersion: '1',
         prohibitedItemsAccepted: true,
-        returnPolicy: 'Returns accepted within three days.',
+        storePolicies: [{
+          id: 'pickup-policy',
+          title: 'Pickup arrangements',
+          content: 'Contact the store to arrange collection.',
+        }],
       },
     }
 
@@ -114,24 +114,29 @@ describe.skipIf(!enabled)('store registration Supabase integration', () => {
     await invoke('save_draft', { step: 2, data, identityNumber: `TEST-${crypto.randomUUID()}` })
     await invoke('save_draft', { step: 3, data })
     await invoke('save_draft', { step: 4, data })
-    await invoke('save_draft', { step: 5, data, payoutAccountNumber: '0970000000' })
-    await invoke('save_draft', { step: 6, data })
+    await invoke('save_draft', { step: 5, data })
 
     const submitted = await invoke<{ status: string }>('submit_application', {
       captchaToken: 'local-test-token',
-      termsVersion: '2026-10-26',
-      returnsVersion: '2026-10-26',
+      termsVersion: 1,
       prohibitedItemsVersion: '2026-10-26',
     })
     expect(submitted.status).toBe('pending_review')
     const { data: store, error: storeError } = await owner
       .from('stores')
-      .select('status, subdomain')
+      .select('status, subdomain, customer_care')
       .eq('user_id', userId)
       .single()
     expect(storeError).toBeNull()
     expect(store?.status).toBe('pending_review')
     expect(store?.subdomain).toBe(subdomain)
+    expect(store?.customer_care).toMatchObject({
+      policies: [{
+        id: 'pickup-policy',
+        title: 'Pickup arrangements',
+        content: 'Contact the store to arrange collection.',
+      }],
+    })
   }, 60_000)
 
   it('refuses direct client writes to protected template fields', async () => {

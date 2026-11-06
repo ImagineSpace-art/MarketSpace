@@ -184,6 +184,330 @@
   color: #64748b;
 }
 
+.admin-application-review {
+  width: 100%;
+  box-sizing: border-box;
+  padding: clamp(12px, 2vw, 22px);
+}
+
+.admin-application-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.admin-application-heading .admin-eyebrow,
+.admin-application-detail-heading .admin-eyebrow {
+  margin: 0;
+  color: #2563eb;
+  font-size: .75rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+}
+
+.admin-application-heading h2 {
+  margin: 4px 0;
+  color: #172033;
+}
+
+.admin-application-heading > div > p:last-child,
+.admin-application-detail-heading p:last-child {
+  margin: 5px 0;
+  color: #64748b;
+}
+
+.admin-application-workspace {
+  display: grid;
+  grid-template-columns: minmax(260px, 330px) minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.admin-application-list {
+  position: sticky;
+  top: 90px;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 112px);
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #dce2eb;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.admin-application-search {
+  display: grid;
+  gap: 6px;
+  padding: 14px 14px 8px;
+  color: #334155;
+  font-size: .82rem;
+  font-weight: 700;
+}
+
+.admin-application-search input {
+  width: 100%;
+  min-height: 40px;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #172033;
+  background: #fff;
+  font: inherit;
+}
+
+.admin-application-list-count {
+  margin: 0;
+  padding: 5px 14px 10px;
+  color: #64748b;
+  font-size: .78rem;
+}
+
+.admin-application-list-items {
+  display: grid;
+  gap: 1px;
+  overflow-y: auto;
+  border-top: 1px solid #e2e8f0;
+}
+
+.admin-application-list-item {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  padding: 13px 14px;
+  border: 0;
+  border-bottom: 1px solid #edf0f5;
+  color: #172033;
+  background: #fff;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.admin-application-list-item:hover {
+  background: #f8fafc;
+}
+
+.admin-application-list-item.is-selected {
+  background: #eff6ff;
+  box-shadow: inset 3px 0 #2563eb;
+}
+
+.admin-application-list-title {
+  overflow: hidden;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-application-list-meta {
+  overflow: hidden;
+  color: #64748b;
+  font-size: .78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-application-status {
+  justify-self: start;
+  margin-top: 2px;
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: #047857;
+  background: #d1fae5;
+  font-size: .7rem;
+  font-weight: 750;
+}
+
+.admin-application-status.is-flagged {
+  color: #b45309;
+  background: #fef3c7;
+}
+
+.admin-application-list-empty {
+  margin: 0;
+  padding: 18px 14px;
+  color: #64748b;
+  font-size: .86rem;
+}
+
+.admin-application-detail {
+  min-width: 0;
+}
+
+.admin-application-card {
+  display: grid;
+  gap: 14px;
+  padding: clamp(16px, 2vw, 24px);
+}
+
+.admin-application-back {
+  display: none;
+  justify-self: start;
+  border: 0;
+  padding: 4px 0;
+  color: #1d4ed8;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-application-detail-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.admin-application-detail-heading h3 {
+  margin: 4px 0;
+  color: #172033;
+  font-size: 1.3rem;
+}
+
+.admin-application-detail-heading > strong {
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: .78rem;
+}
+
+.admin-application-detail-heading > strong.is-flagged {
+  color: #b45309;
+  background: #fef3c7;
+}
+
+.admin-application-detail-heading > strong.is-passed {
+  color: #047857;
+  background: #d1fae5;
+}
+
+.admin-application-evidence {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 16px;
+}
+
+.admin-application-evidence section {
+  min-width: 0;
+}
+
+.admin-application-evidence h4 {
+  margin: 0 0 8px;
+}
+
+.admin-application-evidence p {
+  overflow-wrap: anywhere;
+}
+
+.admin-application-identity-images {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.admin-application-identity-images img,
+.admin-application-location-image {
+  width: 100%;
+  max-height: 230px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #0b1220;
+}
+
+.admin-application-evidence pre {
+  overflow-x: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: .77rem;
+}
+
+.admin-application-badges {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.admin-application-badges label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-application-review-reason {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-application-review-reason textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font: inherit;
+}
+
+.admin-application-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-application-detail-empty {
+  display: grid;
+  min-height: 260px;
+  align-content: center;
+  justify-items: center;
+  padding: 24px;
+  color: #64748b;
+  text-align: center;
+}
+
+.admin-application-detail-empty h3 {
+  margin: 0;
+  color: #172033;
+}
+
+.admin-application-detail-empty p {
+  margin-bottom: 0;
+}
+
+@media (max-width: 900px) {
+  .admin-application-workspace {
+    grid-template-columns: minmax(230px, 290px) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 700px) {
+  .admin-application-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-application-list {
+    position: static;
+    max-height: none;
+  }
+
+  .admin-application-list-items {
+    max-height: 55vh;
+  }
+
+  .admin-application-review.has-selected-application .admin-application-list {
+    display: none;
+  }
+
+  .admin-application-review.has-selected-application .admin-application-back {
+    display: inline-flex;
+  }
+}
+
 .admin-audit-list {
   display: grid;
   gap: 9px;

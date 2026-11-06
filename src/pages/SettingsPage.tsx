@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
+import { supabase } from '../lib/supabaseClient'
 import type { PaymentMethodItem, NotificationConfig } from '../types'
 import type { Listing, BusinessProfile } from '../types'
 import { SettingsNavigation } from '../components/SettingsNavigation'
@@ -68,6 +69,7 @@ export function SettingsPage({
     setEnableGlobalRenewal,
 }: SettingsPageProps) {
     const { category = 'account' } = useParams<{ category?: string }>()
+    const activeTab = category.toLowerCase()
     const [isMobileNavigationOpen, setIsMobileNavigationOpen] = useState(false)
     const [isDesktopNavigationCollapsed, setIsDesktopNavigationCollapsed] = useState(false)
     const [destructiveAction, setDestructiveAction] = useState<'disable-store' | 'restore-store' | 'delete-store' | 'delete-account' | null>(null)
@@ -95,6 +97,28 @@ export function SettingsPage({
 
     // Legal Document Tab
     const [legalTab, setLegalTab] = useState<'tos' | 'privacy' | 'buyer'>('tos')
+    const [termsDocument, setTermsDocument] = useState<{ version: number; content: string } | null>(null)
+    const [termsError, setTermsError] = useState('')
+
+    useEffect(() => {
+        if (activeTab !== 'legal' || legalTab !== 'tos') return
+        let active = true
+        void supabase
+            .from('marketspace_terms')
+            .select('version, content')
+            .order('version', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+            .then(({ data, error }) => {
+                if (!active) return
+                if (error || !data) setTermsError('MarketSpace terms are currently unavailable.')
+                else {
+                    setTermsDocument({ version: data.version, content: data.content })
+                    setTermsError('')
+                }
+            })
+        return () => { active = false }
+    }, [activeTab, legalTab])
 
     const handlePasswordChange = (e: FormEvent) => {
         e.preventDefault()
@@ -141,7 +165,6 @@ export function SettingsPage({
         setPayAcc('')
     }
 
-    const activeTab = category.toLowerCase()
     const notificationOptions: Array<{ key: keyof NotificationConfig; label: string; desc: string }> = [
         { key: 'email', label: 'Email Notifications', desc: 'Receive message alerts and order updates via email' },
         { key: 'push', label: 'Browser Push Notifications', desc: 'Get instant pop-up alerts on desktop/mobile' },
@@ -630,9 +653,12 @@ export function SettingsPage({
                     <div style={{ background: 'var(--panel)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border)', lineHeight: 1.6, fontSize: '0.9rem' }}>
                         {legalTab === 'tos' && (
                             <div>
-                                <h3 style={{ marginTop: 0 }}>MarketSpace Terms of Service</h3>
-                                <p>Welcome to MarketSpace. By using our platform to buy, sell, or advertise products and services, you agree to comply with our community standards. All listed products must comply with local laws in Zambia.</p>
-                                <p>Sellers are responsible for accurately describing items, pricing, and fulfillment. ImagineSpace Technologies provides the platform and communication tools to connect local buyers and sellers.</p>
+                                <h3 style={{ marginTop: 0 }}>MarketSpace Terms of Service {termsDocument && `(Version ${termsDocument.version})`}</h3>
+                                {termsError
+                                    ? <p role="alert">{termsError}</p>
+                                    : termsDocument
+                                    ? <div style={{ whiteSpace: 'pre-wrap' }}>{termsDocument.content}</div>
+                                    : <p>Loading current terms…</p>}
                             </div>
                         )}
                         {legalTab === 'privacy' && (

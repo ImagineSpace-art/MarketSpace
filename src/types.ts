@@ -127,6 +127,7 @@ export type StoreCollection = {
 }
 
 export type StoreCustomerCare = {
+  policies?: Array<{ id: string; title: string; content: string }>
   workingHours?: string
   phone?: string
   email?: string

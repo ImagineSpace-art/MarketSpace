@@ -1,8 +1,8 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
-  fuzzyNameSimilarity,
   isDisposableEmailDomain,
   isValidZambianNrc,
+  validateOptionalMapCoordinates,
   validateStoreSubdomain,
 } from '../_shared/storeRegistrationValidation.ts'
 import { hashSensitiveIdentifier } from '../_shared/storeRegistrationHash.ts'
@@ -14,8 +14,6 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-const TERMS_VERSION = '2026-10-26'
-const RETURNS_VERSION = '2026-10-26'
 const PROHIBITED_ITEMS_VERSION = '2026-10-26'
 
 type Json = Record<string, unknown>
@@ -30,14 +28,6 @@ function respond(body: Json, status = 200) {
 
 function fail(message: string, status = 400) {
   return respond({ error: message }, status)
-}
-
-async function keyedHash(value: string, secretName: string) {
-  const secret = Deno.env.get(secretName)
-  if (!secret) throw new Error(`${secretName} must be configured in Supabase Edge Function secrets.`)
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
-  const digest = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value))
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
 async function hashRateLimitKey(request: Request, userId: string) {
@@ -120,6 +110,25 @@ function getStepData(data: Json, key: string) {
   return getObject(data[key])
 }
 
+function validateStorePolicies(value: unknown) {
+  if (value === undefined || value === null) return ''
+  if (!Array.isArray(value)) return 'Store policies must be a list.'
+  if (value.length > 20) return 'Add no more than 20 store policies.'
+  const titles = new Set<string>()
+  for (const item of value) {
+    const policy = getObject(item)
+    const title = getString(policy.title)
+    const content = getString(policy.content)
+    if (!title || !content) return 'Complete or remove each policy you add.'
+    if (title.length > 80) return 'Policy titles must be 80 characters or fewer.'
+    if (content.length > 2000) return 'Each policy must be 2,000 characters or fewer.'
+    const normalizedTitle = title.toLocaleLowerCase()
+    if (titles.has(normalizedTitle)) return 'Each policy must have a different title.'
+    titles.add(normalizedTitle)
+  }
+  return ''
+}
+
 async function checkAvailable(admin: SupabaseClient, slug: string, userId: string) {
   const { data, error } = await admin.rpc('store_subdomain_available', {
     p_subdomain: slug,
@@ -129,7 +138,7 @@ async function checkAvailable(admin: SupabaseClient, slug: string, userId: strin
   return data === true
 }
 
-function validateDraftStep(step: number, data: Json, body?: Json) {
+function validateDraftStep(step: number, data: Json) {
   if (step <= 2) {
     const identity = getStepData(data, 'identity')
     if (step === 2) {
@@ -158,52 +167,22 @@ function validateDraftStep(step: number, data: Json, body?: Json) {
     const location = getStepData(data, 'location')
     if (!getString(location.marketplaceLocation)) return 'Select the marketplace location for your store.'
     if (store.type === 'physical') {
-      const latitude = Number(location.latitude)
-      const longitude = Number(location.longitude)
-      if (!getString(location.streetAddress) || !Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
-        !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
-        return 'Provide a physical address and valid map coordinates.'
-      }
+      if (getString(location.streetAddress).length < 8) return 'Provide a complete physical address.'
+      const coordinateError = validateOptionalMapCoordinates(getString(location.latitude), getString(location.longitude))
+      if (coordinateError) return coordinateError
     }
     if (store.type === 'online_delivery' && !getString(location.deliveryAreas)) return 'List the store delivery areas.'
     if (store.type === 'meetup_only' && !getString(location.safeMeetupLocations)) return 'List the safe meetup locations.'
   }
   if (step >= 5) {
-    const payout = getStepData(data, 'payout')
-    if (!['mobile_money', 'bank'].includes(getString(payout.method))) return 'Select a valid payout method.'
-    if (getString(payout.accountHolderName).length < 4) return 'Enter the account holder name.'
-    if (body && step === 5) {
-      const accountNumber = getString(body.payoutAccountNumber).replace(/\s/g, '')
-      if (payout.method === 'mobile_money' && !/^(?:\+?260)?[0-9]{9}$/.test(accountNumber)) {
-        return 'Enter a valid Zambian mobile money number (9 digits, optionally prefixed by +260).'
-      }
-      if (payout.method === 'bank' && !/^[0-9]{5,30}$/.test(accountNumber)) {
-        return 'Enter a bank account number containing 5 to 30 digits.'
-      }
-    }
-  }
-  if (step >= 6) {
     const policies = getStepData(data, 'policies')
-    if (policies.termsAccepted !== true || policies.returnsAccepted !== true || policies.prohibitedItemsAccepted !== true) {
+    if (policies.termsAccepted !== true || policies.prohibitedItemsAccepted !== true) {
       return 'Accept all required policies before continuing.'
     }
-    if (getString(policies.returnPolicy).length < 10) return 'Add a customer-facing return policy.'
+    const storePoliciesError = validateStorePolicies(policies.storePolicies)
+    if (storePoliciesError) return storePoliciesError
   }
   return ''
-}
-
-async function encryptPayout(accountNumber: string) {
-  const encodedKey = Deno.env.get('STORE_PAYOUT_ENCRYPTION_KEY')
-  if (!encodedKey) throw new Error('STORE_PAYOUT_ENCRYPTION_KEY must be configured in Supabase Edge Function secrets.')
-  const keyBytes = Uint8Array.from(atob(encodedKey), (char) => char.charCodeAt(0))
-  if (keyBytes.length !== 32) throw new Error('STORE_PAYOUT_ENCRYPTION_KEY must be a base64-encoded 32-byte key.')
-  const key = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['encrypt'])
-  const iv = crypto.getRandomValues(new Uint8Array(12))
-  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(accountNumber))
-  const combined = new Uint8Array(iv.length + encrypted.byteLength)
-  combined.set(iv)
-  combined.set(new Uint8Array(encrypted), iv.length)
-  return btoa(String.fromCharCode(...combined))
 }
 
 async function verifyPrivateImage(admin: SupabaseClient, path: string, userId: string, folder: string) {
@@ -227,9 +206,9 @@ async function sendOwnerEmail(to: string, subject: string, html: string) {
 
 async function saveDraft(context: HandlerContext, body: Json) {
   const step = Number(body.step)
-  if (!Number.isInteger(step) || step < 1 || step > 6) return fail('Invalid application step.')
-  const rateLimitAction = step === 2 ? 'identity' : step === 5 ? 'payout' : 'draft'
-  await enforceRateLimit(context.admin, context.request, context.userId, rateLimitAction, step === 2 || step === 5 ? 5 : 30)
+  if (!Number.isInteger(step) || step < 1 || step > 5) return fail('Invalid application step.')
+  const rateLimitAction = step === 2 ? 'identity' : 'draft'
+  await enforceRateLimit(context.admin, context.request, context.userId, rateLimitAction, step === 2 ? 5 : 30)
   if (step === 1) {
     await verifyCaptcha(body.captchaToken, context.request, true)
     const { data: authData, error: authError } = await context.admin.auth.admin.getUserById(context.userId)
@@ -243,7 +222,7 @@ async function saveDraft(context: HandlerContext, body: Json) {
   if (step === 2 && !isValidZambianNrc(getString(body.identityNumber))) {
     return fail('Enter your 9-digit NRC number using numbers only.')
   }
-  const validationMessage = validateDraftStep(step, data, body)
+  const validationMessage = validateDraftStep(step, data)
   if (validationMessage) return fail(validationMessage)
   const store = getStepData(data, 'store')
   if (step >= 3 && !(await checkAvailable(context.admin, getString(store.subdomain).toLowerCase(), context.userId))) {
@@ -282,25 +261,7 @@ async function saveDraft(context: HandlerContext, body: Json) {
     if (identityError) throw new Error('Owner verification details could not be saved securely.')
   }
 
-  if (step === 5) {
-    const payout = getStepData(data, 'payout')
-    const accountNumber = getString(body.payoutAccountNumber)
-    if (!accountNumber) return fail('Enter your bank or mobile money account number.')
-    const accountCiphertext = await encryptPayout(accountNumber)
-    const { error: payoutError } = await context.admin.from('store_payout_accounts').upsert({
-      user_id: context.userId,
-      payout_method: getString(payout.method),
-      account_holder_name: getString(payout.accountHolderName),
-      account_number_ciphertext: accountCiphertext,
-      status: 'pending',
-      updated_at: new Date().toISOString(),
-    })
-    if (payoutError) throw new Error('Payout details could not be encrypted and saved.')
-  }
-
   const safeData = structuredClone(data)
-  const payout = getStepData(safeData, 'payout')
-  payout.accountNumber = ''
   const { data: currentDraft } = await context.admin
     .from('store_registration_drafts')
     .select('status')
@@ -320,30 +281,6 @@ async function saveDraft(context: HandlerContext, body: Json) {
   const { error: draftError } = await context.admin.from('store_registration_drafts').upsert(update)
   if (draftError) throw new Error('Application progress could not be saved.')
   return respond({ saved: true })
-}
-
-async function generateLocationCode(context: HandlerContext) {
-  await enforceRateLimit(context.admin, context.request, context.userId, 'location_code', 10)
-  const { data: draft, error } = await context.admin
-    .from('store_registration_drafts')
-    .select('data, status, location_code_hash, location_code_text, location_code_expires_at')
-    .eq('user_id', context.userId)
-    .maybeSingle()
-  if (error || !draft || !['draft', 'rejected'].includes(draft.status)) return fail('Save your application details before generating a code.', 409)
-  const validationMessage = validateDraftStep(4, getObject(draft.data))
-  if (validationMessage) return fail(validationMessage)
-  const expiry = Date.parse(draft.location_code_expires_at || '')
-  if (draft.location_code_text && expiry > Date.now()) return respond({ locationCode: draft.location_code_text })
-
-  const locationCode = String(crypto.getRandomValues(new Uint32Array(1))[0] % 900000 + 100000)
-  const { error: updateError } = await context.admin.from('store_registration_drafts').update({
-    location_code_hash: await keyedHash(locationCode, 'STORE_ID_HASH_SECRET'),
-    location_code_text: locationCode,
-    location_code_expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date().toISOString(),
-  }).eq('user_id', context.userId)
-  if (updateError) throw new Error('The location verification code could not be created.')
-  return respond({ locationCode })
 }
 
 async function checkSubdomainAction(context: HandlerContext, body: Json) {
@@ -368,14 +305,14 @@ async function submitApplication(context: HandlerContext, body: Json) {
 
   const { data: draft, error: draftError } = await context.admin
     .from('store_registration_drafts')
-    .select('data, status, current_step, location_code_hash, location_code_text, location_code_expires_at')
+    .select('data, status, current_step')
     .eq('user_id', context.userId)
     .maybeSingle()
   if (draftError || !draft) return fail('Save all application steps before submitting.')
   if (draft.status !== 'draft') return fail('This application has already been submitted.', 409)
-  if (draft.current_step < 7) return fail('Complete every application step before submitting.')
+  if (draft.current_step < 6) return fail('Complete every application step before submitting.')
   const data = getObject(draft.data)
-  const validationMessage = validateDraftStep(6, data)
+  const validationMessage = validateDraftStep(5, data)
   if (validationMessage) return fail(validationMessage)
 
   const identity = getStepData(data, 'identity')
@@ -394,19 +331,25 @@ async function submitApplication(context: HandlerContext, body: Json) {
   if (!(await checkAvailable(context.admin, slug, context.userId))) return fail('That store address is no longer available.')
   const verificationMethod = getString(location.verificationMethod) === 'video' ? 'video' : 'photo'
   if (verificationMethod === 'photo') {
-    if (!getString(location.proofPath)) return fail('Upload a photo showing the one-time location code.')
-    if (!getString(draft.location_code_text) || Date.parse(draft.location_code_expires_at || '') <= Date.now()) {
-      return fail('The location code expired. Generate a new code and upload a new proof photo.')
-    }
+    if (!getString(location.proofPath)) return fail('Upload a location photo for admin review.')
     await verifyPrivateImage(context.admin, getString(location.proofPath), context.userId, 'proofPath')
   }
-  const { data: payoutAccount, error: payoutError } = await context.admin
-    .from('store_payout_accounts')
-    .select('account_holder_name')
-    .eq('user_id', context.userId)
+  const { data: currentTerms, error: termsError } = await context.admin
+    .from('marketspace_terms')
+    .select('version')
+    .order('version', { ascending: false })
+    .limit(1)
     .maybeSingle()
-  if (payoutError || !payoutAccount) return fail('Save payout details before submitting.')
-
+  if (termsError || !currentTerms) return fail('Current MarketSpace terms could not be verified.', 503)
+  const termsVersion = String(currentTerms.version)
+  if (String(body.termsVersion || '') !== termsVersion ||
+    getString(getStepData(data, 'policies').termsAcceptedVersion) !== termsVersion) {
+    return fail('Review and accept the current MarketSpace terms before submitting.')
+  }
+  const prohibitedItemsVersion = String(body.prohibitedItemsVersion || PROHIBITED_ITEMS_VERSION)
+  if (prohibitedItemsVersion !== PROHIBITED_ITEMS_VERSION) {
+    return fail('The policy versions changed. Review and accept the current policies before submitting.')
+  }
   const idHash = ownerIdentity.id_number_hash
   const verifiedPhone = authData.user.phone || ''
   const phoneHash = verifiedPhone
@@ -468,20 +411,17 @@ async function submitApplication(context: HandlerContext, body: Json) {
     String(existing.residential_address || '').toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedAddress && normalizedAddress.length > 7
   ))
 
-  const payoutMatch = fuzzyNameSimilarity(payoutAccount.account_holder_name, ownerIdentity.legal_name)
   const results = {
     duplicateId: Boolean(duplicateIdentity),
     duplicatePhone: Boolean(duplicatePhoneRows?.length),
     duplicateAddress,
     bannedUserMatch: Boolean(banned?.length),
     prohibitedKeywords: prohibitedMatches,
-    payoutNameMatch: payoutMatch,
-    payoutNameFlagged: payoutMatch < 0.6,
     locationProofProvided: Boolean(getString(location.proofPath)),
     idImagesProvided: Boolean(ownerIdentity.id_image_path && ownerIdentity.selfie_path),
   }
   const flagged = results.duplicateId || results.duplicatePhone || results.duplicateAddress ||
-    results.bannedUserMatch || results.prohibitedKeywords.length > 0 || results.payoutNameFlagged
+    results.bannedUserMatch || results.prohibitedKeywords.length > 0
 
   const storePayload = {
     user_id: context.userId,
@@ -495,13 +435,14 @@ async function submitApplication(context: HandlerContext, body: Json) {
       : null,
     whatsapp: isPhone(getString(storeData.supportContact)) ? getString(storeData.supportContact) : '',
     logo: getString(storeData.logo),
-    logo: getString(storeData.logo),
     subdomain: slug,
     store_type: getString(storeData.type),
     operation_type: getString(storeData.type) === 'physical' ? 'physical' : 'online',
     business_registration_number: getString(storeData.businessRegistrationNumber) || null,
     customer_care: {
-      returnPolicy: getString(getStepData(data, 'policies').returnPolicy),
+      policies: Array.isArray(getStepData(data, 'policies').storePolicies)
+        ? getStepData(data, 'policies').storePolicies
+        : [],
       email: isEmail(getString(storeData.supportContact)) ? getString(storeData.supportContact) : '',
     },
     opening_hours: { text: getString(location.openingHours) },
@@ -513,7 +454,6 @@ async function submitApplication(context: HandlerContext, body: Json) {
     probation_state: 'probation',
     active_listing_limit: 10,
     max_order_value_zmw: Number(Deno.env.get('PROBATION_MAX_ORDER_VALUE_ZMW') || '5000'),
-    payout_hold_days: 5,
   }
   const { data: savedStore, error: storeError } = await context.admin
     .from('stores')
@@ -541,9 +481,6 @@ async function submitApplication(context: HandlerContext, body: Json) {
   const { error: locationError } = await context.admin.from('store_location_verifications').upsert({
     store_id: savedStore.id,
     user_id: context.userId,
-    code_hash: getString(draft.location_code_hash) || await keyedHash(crypto.randomUUID(), 'STORE_ID_HASH_SECRET'),
-    code_text: getString(draft.location_code_text) || 'N/A',
-    code_expires_at: getString(draft.location_code_expires_at) || new Date(Date.now() + 86400000).toISOString(),
     verification_method: verificationMethod,
     proof_path: getString(location.proofPath) || null,
     status: 'pending',
@@ -551,20 +488,13 @@ async function submitApplication(context: HandlerContext, body: Json) {
   })
   if (locationError) throw new Error('Location verification could not be recorded.')
 
-  const termsVersion = String(body.termsVersion || TERMS_VERSION)
-  const returnsVersion = String(body.returnsVersion || RETURNS_VERSION)
-  const prohibitedItemsVersion = String(body.prohibitedItemsVersion || PROHIBITED_ITEMS_VERSION)
-  if (termsVersion !== TERMS_VERSION || returnsVersion !== RETURNS_VERSION || prohibitedItemsVersion !== PROHIBITED_ITEMS_VERSION) {
-    return fail('The policy versions changed. Review and accept the current policies before submitting.')
-  }
   const { error: policyError } = await context.admin.from('store_policy_acceptances').upsert({
     store_id: savedStore.id,
     user_id: context.userId,
     terms_version: termsVersion,
-    returns_version: returnsVersion,
     prohibited_items_version: prohibitedItemsVersion,
     accepted_at: new Date().toISOString(),
-  }, { onConflict: 'store_id,terms_version,returns_version,prohibited_items_version' })
+  }, { onConflict: 'store_id,terms_version,prohibited_items_version' })
   if (policyError) throw new Error('Policy acceptance could not be recorded.')
 
   const { error: checksError } = await context.admin.from('store_review_checks').upsert({
@@ -594,7 +524,7 @@ async function submitApplication(context: HandlerContext, body: Json) {
     'Your MarketSpace store application was received',
     `<p>We received your application for <strong>${escapeHtml(getString(storeData.name))}</strong>.</p><p>It is now pending review.</p>`,
   )
-  const response = { status: 'pending_review', locationCode: draft.location_code_text || undefined, emailWarning: confirmation || undefined }
+  const response = { status: 'pending_review', emailWarning: confirmation || undefined }
   return respond(response)
 }
 
@@ -620,10 +550,9 @@ async function reviewQueue(context: HandlerContext) {
   if (error) throw new Error('The review queue could not be loaded.')
   const queue = []
   for (const store of stores || []) {
-    const [identityResult, locationResult, payoutResult, checksResult] = await Promise.all([
+    const [identityResult, locationResult, checksResult] = await Promise.all([
       context.admin.from('store_owner_identity').select('legal_name, date_of_birth, residential_address, id_image_path, selfie_path, status').eq('user_id', store.user_id).maybeSingle(),
-      context.admin.from('store_location_verifications').select('proof_path, code_text, verification_method, status').eq('store_id', store.id).maybeSingle(),
-      context.admin.from('store_payout_accounts').select('account_holder_name, payout_method, status').eq('user_id', store.user_id).maybeSingle(),
+      context.admin.from('store_location_verifications').select('proof_path, verification_method, status').eq('store_id', store.id).maybeSingle(),
       context.admin.from('store_review_checks').select('results, flagged').eq('store_id', store.id).maybeSingle(),
     ])
     const identity = identityResult.data
@@ -643,7 +572,6 @@ async function reviewQueue(context: HandlerContext) {
       ...store,
       identity: identity ? { ...identity, id_image_url: idUrl, selfie_url: selfieUrl } : null,
       location: proof ? { ...proof, proof_url: proofUrl } : null,
-      payout: payoutResult.data,
       checks: checksResult.data,
     })
   }
@@ -677,7 +605,6 @@ async function reviewApplication(context: HandlerContext, body: Json) {
     probation_state: 'probation',
     active_listing_limit: 10,
     max_order_value_zmw: Number(Deno.env.get('PROBATION_MAX_ORDER_VALUE_ZMW') || '5000'),
-    payout_hold_days: 5,
   }).eq('id', store.id)
   if (updateError) throw new Error('The review decision could not be saved.')
 
@@ -790,7 +717,6 @@ Deno.serve(async (request: Request) => {
     const body = getObject(await request.json())
     const action = getString(body.action)
     if (action === 'save_draft') return await saveDraft(context, body)
-    if (action === 'generate_location_code') return await generateLocationCode(context)
     if (action === 'check_subdomain') return await checkSubdomainAction(context, body)
     if (action === 'submit_application') return await submitApplication(context, body)
     if (action === 'review_queue') return await reviewQueue(context)

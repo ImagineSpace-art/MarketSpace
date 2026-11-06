@@ -4,8 +4,9 @@ import { adminSupabase } from '../lib/adminSupabaseClient'
 import { getFunctionErrorMessage } from '../utils/functionError'
 import type { BusinessAd, Listing } from '../types'
 import { AdminOverview } from './AdminOverview'
+import { AdminTermsPage } from './AdminTermsPage'
 
-export type AdminSection = 'overview' | 'applications' | 'reports' | 'listings' | 'ads' | 'seller-verifications' | 'boosts' | 'notifications' | 'audit'
+export type AdminSection = 'overview' | 'applications' | 'reports' | 'listings' | 'ads' | 'seller-verifications' | 'boosts' | 'notifications' | 'audit' | 'terms'
 
 type AdminOutletContext = {
   role: 'moderator' | 'admin'
@@ -52,8 +53,7 @@ type ReviewApplication = {
     id_image_url: string | null
     selfie_url: string | null
   } | null
-  location: { proof_url: string | null; code_text: string; verification_method: 'photo' | 'video' } | null
-  payout: { account_holder_name: string; payout_method: string } | null
+  location: { proof_url: string | null; verification_method: 'photo' | 'video' } | null
   checks: { flagged: boolean; results: Record<string, unknown> } | null
 }
 
@@ -113,8 +113,10 @@ type AdminBoost = {
 }
 
 export function AdminStoreReviewPage() {
-  const { activeSection, onNavigate } = useOutletContext<AdminOutletContext>()
+  const { activeSection, onNavigate, role } = useOutletContext<AdminOutletContext>()
   const [applications, setApplications] = useState<ReviewApplication[]>([])
+  const [selectedApplicationId, setSelectedApplicationId] = useState('')
+  const [applicationSearch, setApplicationSearch] = useState('')
   const [reportGroups, setReportGroups] = useState<StoreReportGroup[]>([])
   const [pendingListings, setPendingListings] = useState<PendingListing[]>([])
   const [pendingAds, setPendingAds] = useState<PendingAd[]>([])
@@ -148,6 +150,27 @@ export function AdminStoreReviewPage() {
   const [boostsLoading, setBoostsLoading] = useState(false)
   const [moderatorUserId, setModeratorUserId] = useState('')
 
+  const filteredApplications = applications.filter(application => {
+    const query = applicationSearch.trim().toLocaleLowerCase()
+    if (!query) return true
+    return [
+      application.shop_name,
+      application.subdomain,
+      application.category,
+      application.identity?.legal_name,
+    ].some(value => value?.toLocaleLowerCase().includes(query))
+  })
+  const selectedApplication = applications.find(application => application.id === selectedApplicationId) || null
+  const application = selectedApplication
+  const selectedBadges = selectedApplication
+    ? badges[selectedApplication.id] || {
+      verifiedId: false,
+      verifiedLocation: false,
+      registeredBusiness: Boolean(selectedApplication.business_registration_number),
+    }
+    : null
+  const selectedChecks = selectedApplication?.checks?.results || {}
+
   useEffect(() => {
     let active = true
     void (async () => {
@@ -173,7 +196,11 @@ export function AdminStoreReviewPage() {
         body: { action: 'review_queue' },
       })
       if (invokeError) setError(await getFunctionErrorMessage(invokeError))
-      else setApplications(data?.applications || [])
+      else {
+        const nextApplications = data?.applications || []
+        setApplications(nextApplications)
+        setSelectedApplicationId(current => nextApplications.some(application => application.id === current) ? current : '')
+      }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'The review queue could not be loaded.')
     } finally {
@@ -511,6 +538,7 @@ export function AdminStoreReviewPage() {
   }
 
   if (activeSection === 'overview') return <AdminOverview onNavigate={navigateToSection} />
+  if (activeSection === 'terms') return <AdminTermsPage role={role} />
   if (loading) return <section className="section-card"><p>Loading store applications…</p></section>
 
   if (activeSection === 'notifications') {
@@ -1030,50 +1058,95 @@ export function AdminStoreReviewPage() {
   }
 
   return (
-    <section style={{ width: 'min(100%, 1100px)', margin: '0 auto', padding: 20 }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
+    <section className={`admin-application-review${selectedApplication ? ' has-selected-application' : ''}`}>
+      <header className="admin-application-heading">
         <div>
-          <p style={{ margin: 0, color: '#2563eb', fontSize: '.75rem', fontWeight: 800, letterSpacing: '.1em' }}>MARKETSPACE MODERATION</p>
-          <h2 style={{ margin: '4px 0' }}>Store review queue</h2>
-          <p style={{ margin: 0, color: 'var(--text-secondary)' }}>{applications.length} application{applications.length === 1 ? '' : 's'} waiting for review</p>
+          <p className="admin-eyebrow">MARKETSPACE MODERATION</p>
+          <h2>Store applications</h2>
+          <p>{applications.length} application{applications.length === 1 ? '' : 's'} waiting for review</p>
         </div>
-        <button type="button" className="secondary-btn" onClick={refreshQueue}>Refresh queue</button>
+        <button type="button" className="secondary-btn" disabled={loading} onClick={refreshQueue}>
+          {loading ? 'Refreshing…' : 'Refresh queue'}
+        </button>
       </header>
       {error && <p role="alert" className="store-wizard-alert error">{error}</p>}
       {notice && <p role="status" className="store-wizard-alert notice">{notice}</p>}
-      {!applications.length && <section className="section-card"><p>No store applications are waiting for review.</p></section>}
+      {loading ? (
+        <section className="section-card"><p>Loading store applications…</p></section>
+      ) : !applications.length ? (
+        <section className="section-card"><p>No store applications are waiting for review.</p></section>
+      ) : (
+        <div className="admin-application-workspace">
+          <aside className="admin-application-list" aria-label="Applications awaiting review">
+            <label className="admin-application-search">
+              <span>Find an application</span>
+              <input
+                type="search"
+                value={applicationSearch}
+                onChange={event => setApplicationSearch(event.target.value)}
+                placeholder="Store, owner, category…"
+              />
+            </label>
+            <p className="admin-application-list-count">
+              Showing {filteredApplications.length} of {applications.length}
+            </p>
+            <div className="admin-application-list-items">
+              {filteredApplications.map(application => (
+                <button
+                  type="button"
+                  key={application.id}
+                  className={`admin-application-list-item${application.id === selectedApplicationId ? ' is-selected' : ''}`}
+                  aria-pressed={application.id === selectedApplicationId}
+                  onClick={() => setSelectedApplicationId(application.id)}
+                >
+                  <span className="admin-application-list-title">{application.shop_name}</span>
+                  <span className="admin-application-list-meta">
+                    {application.identity?.legal_name || 'Owner not provided'}
+                  </span>
+                  <span className="admin-application-list-meta">
+                    {application.category} · {application.store_type.replaceAll('_', ' ')}
+                  </span>
+                  <span className={`admin-application-status${application.checks?.flagged ? ' is-flagged' : ''}`}>
+                    {application.checks?.flagged ? 'Manual checks' : 'Checks passed'}
+                  </span>
+                </button>
+              ))}
+              {filteredApplications.length === 0 && (
+                <p className="admin-application-list-empty">No applications match that search.</p>
+              )}
+            </div>
+          </aside>
 
-      <div style={{ display: 'grid', gap: 18 }}>
-        {applications.map((application) => {
-          const selectedBadges = badges[application.id] || {
-            verifiedId: false,
-            verifiedLocation: false,
-            registeredBusiness: Boolean(application.business_registration_number),
-          }
-          const checks = application.checks?.results || {}
-          return (
-            <article key={application.id} className="section-card" style={{ padding: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div className="admin-application-detail">
+          {application && selectedBadges ? (
+            <article className="section-card admin-application-card">
+              <button
+                type="button"
+                className="admin-application-back"
+                onClick={() => setSelectedApplicationId('')}
+              >
+                <span aria-hidden="true">←</span> All applications
+              </button>
+              <div className="admin-application-detail-heading">
                 <div>
-                  <h3 style={{ margin: '0 0 4px' }}>{application.shop_name}</h3>
-                  <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
-                    {application.subdomain}.marketspace · {application.store_type.replace('_', ' ')} · {application.category}
-                  </p>
+                  <p className="admin-eyebrow">APPLICATION DETAILS</p>
+                  <h3>{application.shop_name}</h3>
+                  <p>{application.subdomain}.marketspace · {application.store_type.replaceAll('_', ' ')} · {application.category}</p>
                 </div>
-                <strong style={{ color: application.checks?.flagged ? '#d97706' : '#059669' }}>
+                <strong className={application.checks?.flagged ? 'is-flagged' : 'is-passed'}>
                   {application.checks?.flagged ? 'Flagged for manual checks' : 'Automated checks passed'}
                 </strong>
               </div>
 
               <p>{application.description}</p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(230px,1fr))', gap: 16 }}>
+              <div className="admin-application-evidence">
                 <section>
                   <h4>Owner identity</h4>
                   <p>{application.identity?.legal_name || 'Missing'} · DOB {application.identity?.date_of_birth || '—'}</p>
                   <p>{application.identity?.residential_address || 'No residential address'}</p>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    {application.identity?.id_image_url && <img src={application.identity.id_image_url} alt="Government ID submitted for verification" style={{ width: '100%', maxHeight: 220, objectFit: 'contain', background: '#0b1220', borderRadius: 8 }} />}
-                    {application.identity?.selfie_url && <img src={application.identity.selfie_url} alt="Owner selfie submitted for verification" style={{ width: '100%', maxHeight: 220, objectFit: 'contain', background: '#0b1220', borderRadius: 8 }} />}
+                  <div className="admin-application-identity-images">
+                    {application.identity?.id_image_url && <img src={application.identity.id_image_url} alt="Government ID submitted for verification" />}
+                    {application.identity?.selfie_url && <img src={application.identity.selfie_url} alt="Owner selfie submitted for verification" />}
                   </div>
                 </section>
                 <section>
@@ -1084,26 +1157,24 @@ export function AdminStoreReviewPage() {
                     ? <p>Owner requested a reviewer video call for location verification.</p>
                     : application.location?.proof_url
                     ? <>
-                      <p>One-time code shown on proof: <strong>{application.location.code_text}</strong></p>
-                      <img src={application.location.proof_url} alt="Private location verification photo" style={{ width: '100%', maxHeight: 260, objectFit: 'contain', background: '#0b1220', borderRadius: 8 }} />
+                      <p>Review the photo against the declared store address and marketplace location.</p>
+                      <img className="admin-application-location-image" src={application.location.proof_url} alt="Private location verification photo" />
                     </>
                     : <p>No location proof photo; arrange video call or request resubmission.</p>}
                 </section>
                 <section>
-                  <h4>Payout name</h4>
-                  <p>{application.payout?.account_holder_name || 'Missing'} · {application.payout?.payout_method || '—'}</p>
                   <h4>Automated checks</h4>
-                  <pre style={{ overflowX: 'auto', whiteSpace: 'pre-wrap', fontSize: '.77rem' }}>{JSON.stringify(checks, null, 2)}</pre>
+                  <pre>{JSON.stringify(selectedChecks, null, 2)}</pre>
                 </section>
               </div>
 
-              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', margin: '16px 0' }}>
+              <div className="admin-application-badges">
                 {([
                   ['verifiedId', 'Verified ID'],
                   ['verifiedLocation', 'Verified location'],
                   ['registeredBusiness', 'Registered business'],
                 ] as const).map(([key, label]) => (
-                  <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <label key={key}>
                     <input type="checkbox" checked={selectedBadges[key]} onChange={(event) => setBadges((current) => ({
                       ...current,
                       [application.id]: { ...selectedBadges, [key]: event.target.checked },
@@ -1112,11 +1183,11 @@ export function AdminStoreReviewPage() {
                   </label>
                 ))}
               </div>
-              <label style={{ display: 'grid', gap: 6, marginBottom: 12 }}>
+              <label className="admin-application-review-reason">
                 Review reason (required for approval or rejection)
                 <textarea rows={2} value={reasons[application.id] || ''} onChange={(event) => setReasons((current) => ({ ...current, [application.id]: event.target.value }))} />
               </label>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <div className="admin-application-actions">
                 <button type="button" className="secondary-btn" disabled={workingId === application.id} onClick={() => void review(application, 'reject')}>
                   Reject with reason
                 </button>
@@ -1125,9 +1196,15 @@ export function AdminStoreReviewPage() {
                 </button>
               </div>
             </article>
-          )
-        })}
-      </div>
+          ) : (
+            <section className="section-card admin-application-detail-empty">
+              <h3>Select an application to review</h3>
+              <p>Choose an application from the list to inspect its details and make a decision.</p>
+            </section>
+          )}
+          </div>
+        </div>
+      )}
     </section>
   )
 }

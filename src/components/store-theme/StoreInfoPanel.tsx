@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { BusinessProfile } from '../../types'
+import { normalizeStorePolicies } from '../../utils/storePolicies'
 
 export interface StoreInfoPanelProps {
   isOpen: boolean
@@ -43,6 +44,7 @@ export function StoreInfoPanel({
 
   const logoImage = shop.logo || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=120&auto=format&fit=crop&q=60'
   const care = shop.customerCare || {}
+  const storePolicies = normalizeStorePolicies(care)
 
   const handleShare = () => {
     const url = window.location.href
@@ -308,6 +310,28 @@ export function StoreInfoPanel({
               <span style={{ fontWeight: 600 }}>{followerCount} shoppers</span>
             </div>
           </div>
+
+          {storePolicies.length > 0 && (
+            <section
+              style={{
+                padding: '16px',
+                borderRadius: '14px',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+              }}
+            >
+              <h4 style={{ margin: 0 }}>Store policies</h4>
+              {storePolicies.map(policy => (
+                <div key={policy.id}>
+                  <strong>{policy.title}</strong>
+                  <p style={{ margin: '4px 0 0', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{policy.content}</p>
+                </div>
+              ))}
+            </section>
+          )}
 
           {/* ACTION BUTTONS */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: 'auto', paddingTop: '16px' }}>

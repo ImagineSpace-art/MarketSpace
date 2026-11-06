@@ -1,11 +1,10 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import type { BusinessProfile, Profile } from '../types'
 import { STORE_MARKET_LOCATIONS } from '../features/marketplace/storeLocations'
 import { CartDrawer, type CartItem } from './CartDrawer'
 import { SettingsNavigationDrawer } from './SettingsNavigation'
-import { adminSupabase } from '../lib/adminSupabaseClient'
 
 type ShellProps = {
   children: ReactNode
@@ -118,32 +117,8 @@ export function Shell({
   const [megaMinPrice, setMegaMinPrice] = useState('')
   const [megaMaxPrice, setMegaMaxPrice] = useState('')
   const [megaRating, setMegaRating] = useState('0')
-  const [hasModeratorSession, setHasModeratorSession] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
-
-  useEffect(() => {
-    let active = true
-    const checkModerator = async (moderatorSession: Session | null) => {
-      if (!moderatorSession || moderatorSession.user.id === session?.user.id) {
-        if (active) setHasModeratorSession(false)
-        return
-      }
-      const { data, error } = await adminSupabase.rpc('is_moderator')
-      if (active) setHasModeratorSession(!error && data === true)
-    }
-
-    void adminSupabase.auth.getSession().then(({ data, error }) => {
-      void checkModerator(error ? null : data.session)
-    })
-    const { data: { subscription } } = adminSupabase.auth.onAuthStateChange((_event, session) => {
-      void checkModerator(session)
-    })
-    return () => {
-      active = false
-      subscription.unsubscribe()
-    }
-  }, [session?.user.id])
 
   const isCategoryPage = location.pathname === '/' || location.pathname === '/discovery' || location.pathname === '/browse'
   const isDiscoveryPage = location.pathname === '/' || location.pathname === '/discovery'
@@ -409,12 +384,6 @@ export function Shell({
                 </span>
               )}
             </Link>
-
-            {hasModeratorSession && (
-              <Link to="/admin" className="header-icon-link" title="Moderator workspace" aria-label="Moderator workspace">
-                <span className="material-icons">admin_panel_settings</span>
-              </Link>
-            )}
 
             {/* Shopping Bag Trigger */}
             <button

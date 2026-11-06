@@ -2,16 +2,20 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } f
 import { supabase } from '../lib/supabaseClient'
 import { uploadImageToSupabase } from '../features/marketplace/ImageUploader'
 import { TurnstileCaptcha } from '../components/TurnstileCaptcha'
-import { isAtLeast18, isValidZambianNrc } from '../../supabase/functions/_shared/storeRegistrationValidation'
+import { isAtLeast18, isValidZambianNrc, validateOptionalMapCoordinates } from '../../supabase/functions/_shared/storeRegistrationValidation'
 import { getFunctionErrorMessage } from '../utils/functionError'
 import { makeMetadataFreeImage } from '../features/marketplace/metadataFreeImage'
 import './StoreRegistrationWizard.css'
 import { STORE_MARKET_LOCATIONS } from '../features/marketplace/storeLocations'
+import { StorePoliciesEditor } from '../components/StorePoliciesEditor'
+import { normalizeStorePolicies, validateStorePolicies, type StorePolicy } from '../utils/storePolicies'
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
 
 type RegistrationData = {
   identity: {
+    firstName: string
+    lastName: string
     legalName: string
     dateOfBirth: string
     residentialAddress: string
@@ -39,21 +43,20 @@ type RegistrationData = {
     verificationMethod: 'photo' | 'video'
     proofPath: string
   }
-  payout: {
-    method: 'mobile_money' | 'bank'
-    accountHolderName: string
-    accountNumber: string
-  }
   policies: {
     termsAccepted: boolean
-    returnsAccepted: boolean
+    termsAcceptedVersion: string
     prohibitedItemsAccepted: boolean
-    returnPolicy: string
+    storePolicies: StorePolicy[]
+    deliveryPolicy?: string
+    returnPolicy?: string
   }
 }
 
 const INITIAL_DATA: RegistrationData = {
   identity: {
+    firstName: '',
+    lastName: '',
     legalName: '',
     dateOfBirth: '',
     residentialAddress: '',
@@ -81,16 +84,11 @@ const INITIAL_DATA: RegistrationData = {
     verificationMethod: 'photo',
     proofPath: '',
   },
-  payout: {
-    method: 'mobile_money',
-    accountHolderName: '',
-    accountNumber: '',
-  },
   policies: {
     termsAccepted: false,
-    returnsAccepted: false,
+    termsAcceptedVersion: '',
     prohibitedItemsAccepted: false,
-    returnPolicy: '3-day inspection and exchange guarantee.',
+    storePolicies: [],
   },
 }
 
@@ -99,15 +97,12 @@ const STEP_TITLES = [
   'Owner identity',
   'Store details',
   'Location',
-  'Payouts',
   'Policies',
   'Review & submit',
 ]
 
 const PHONE_OTP_REQUIRED = import.meta.env.VITE_PHONE_OTP_REQUIRED !== 'false'
 const STORE_DOMAIN = import.meta.env.VITE_STORE_DOMAIN || 'yourdomain.com'
-const TERMS_VERSION = '2026-10-26'
-const RETURNS_VERSION = '2026-10-26'
 const PROHIBITED_ITEMS_VERSION = '2026-10-26'
 
 const cardStyle = {
@@ -146,12 +141,13 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
   const [captchaGeneration, setCaptchaGeneration] = useState(0)
   const [identityNumber, setIdentityNumber] = useState('')
   const [subdomainState, setSubdomainState] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle')
-  const [locationCode, setLocationCode] = useState('')
   const [logoUploading, setLogoUploading] = useState(false)
   const [searchingLocation, setSearchingLocation] = useState(false)
   const [applicationStatus, setApplicationStatus] = useState('')
   const [rejectionReason, setRejectionReason] = useState('')
   const [email, setEmail] = useState('')
+  const [termsDocument, setTermsDocument] = useState<{ version: number; content: string } | null>(null)
+  const [termsError, setTermsError] = useState('')
   const lastMapRequest = useRef(0)
 
   const update = useCallback(<K extends keyof RegistrationData>(
@@ -182,19 +178,54 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
       setEmailVerified(Boolean(authData.user.email_confirmed_at))
       setPhone(authData.user.phone || '')
       setPhoneVerified(Boolean(authData.user.phone_confirmed_at))
+      const { data: terms, error: termsQueryError } = await supabase
+        .from('marketspace_terms')
+        .select('version, content')
+        .order('version', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (termsQueryError || !terms) {
+        if (alive) setTermsError('MarketSpace terms could not be loaded. Please try again later.')
+      } else if (alive) {
+        setTermsDocument({ version: terms.version, content: terms.content })
+      }
       const { data: draft, error: draftError } = await supabase
         .from('store_registration_drafts')
-        .select('current_step, data, status, location_code_text')
+        .select('current_step, data, status')
         .eq('user_id', userId)
         .maybeSingle()
       if (draftError && draftError.code !== 'PGRST116') {
         if (alive) setError(draftError.message)
       } else if (draft) {
         if (alive) {
-          setData({ ...INITIAL_DATA, ...(draft.data as Partial<RegistrationData>) })
-          setStep(Math.min(Math.max(Number(draft.current_step) || 1, 1), 7))
+          const draftData = draft.data as Partial<RegistrationData>
+          const savedIdentity = draftData.identity
+          const legacyName = savedIdentity?.legalName?.trim() || ''
+          const [legacyFirstName = '', ...legacyLastName] = legacyName.split(/\s+/)
+          const firstName = savedIdentity?.firstName || legacyFirstName
+          const lastName = savedIdentity?.lastName || legacyLastName.join(' ')
+          setData({
+            ...INITIAL_DATA,
+            ...draftData,
+            identity: {
+              ...INITIAL_DATA.identity,
+              ...savedIdentity,
+              firstName,
+              lastName,
+              legalName: [firstName, lastName].filter(Boolean).join(' ').trim(),
+            },
+            policies: {
+              ...INITIAL_DATA.policies,
+              ...draftData.policies,
+              storePolicies: normalizeStorePolicies({
+                policies: draftData.policies?.storePolicies,
+                deliveryPolicy: draftData.policies?.deliveryPolicy,
+                returnPolicy: draftData.policies?.returnPolicy,
+              }),
+            },
+          })
+          setStep(Math.min(Math.max(Number(draft.current_step) || 1, 1), 6))
           if (draft.status !== 'draft') setApplicationStatus(draft.status)
-          if (draft.location_code_text) setLocationCode(draft.location_code_text)
           if (draft.status === 'rejected') {
             const { data: store } = await supabase.from('stores').select('rejection_reason').eq('user_id', userId).maybeSingle()
             if (alive && store?.rejection_reason) setRejectionReason(store.rejection_reason)
@@ -226,25 +257,17 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
   }
 
   const saveDraft = async (nextStep: number, options?: { identityNumber?: string }) => {
-    const safeData: RegistrationData = {
-      ...data,
-      identity: { ...data.identity },
-      payout: { ...data.payout, accountNumber: '' },
-    }
+    const safeData: RegistrationData = { ...data, identity: { ...data.identity } }
     setSaving(true)
     try {
-      const response = await invoke<{ locationCode?: string }>('save_draft', {
+      await invoke<{ saved: boolean }>('save_draft', {
         step: nextStep,
         data: safeData,
         identityNumber: options?.identityNumber || '',
-        payoutAccountNumber: data.payout.accountNumber,
         captchaToken,
       })
-      if (response.locationCode) setLocationCode(response.locationCode)
       if (options?.identityNumber) setIdentityNumber('')
-      update('payout', { accountNumber: '' })
       setNotice('Progress saved securely. You can return to this step later.')
-      return response
     } finally {
       setSaving(false)
     }
@@ -389,27 +412,12 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
       const response = await fetch(url, { headers: { Accept: 'application/json' } })
       if (!response.ok) throw new Error(`Map search failed (${response.status}).`)
       const results = await response.json() as Array<{ lat: string; lon: string }>
-      if (!results.length) throw new Error('No matching map location was found. Enter coordinates manually.')
+      if (!results.length) throw new Error('No matching map location was found. You can continue without a map pin.')
       update('location', { latitude: results[0].lat, longitude: results[0].lon })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not find this address on the map.')
     } finally {
       setSearchingLocation(false)
-    }
-  }
-
-  const createLocationCode = async () => {
-    setError('')
-    setSaving(true)
-    try {
-      await saveDraft(3)
-      const response = await invoke<{ locationCode?: string }>('generate_location_code')
-      if (response.locationCode) setLocationCode(response.locationCode)
-      setNotice('Use this short-lived code in your private location proof photo.')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'The verification code could not be generated.')
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -440,7 +448,9 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
         await saveDraft(1)
         setCaptchaToken('')
       } else if (step === 2) {
-        if (data.identity.legalName.trim().length < 4) throw new Error('Enter your full legal name as shown on your ID.')
+        if (!data.identity.firstName.trim() || !data.identity.lastName.trim() || data.identity.legalName.trim().length < 4) {
+          throw new Error('Enter your first and last legal names as shown on your ID.')
+        }
         if (!isAtLeast18(data.identity.dateOfBirth)) throw new Error('Store owners must be at least 18 years old.')
         if (data.identity.residentialAddress.trim().length < 8) throw new Error('Enter your complete residential address.')
         if (!isValidZambianNrc(identityNumber)) throw new Error('Enter your 9-digit NRC number using numbers only.')
@@ -460,34 +470,29 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
         if (!data.location.marketplaceLocation.trim()) throw new Error('Select the marketplace location for your store.')
         if (data.store.type === 'physical') {
           if (data.location.streetAddress.trim().length < 8) throw new Error('Enter the physical storefront address.')
-          if (!data.location.latitude || !data.location.longitude) throw new Error('Add the map coordinates for the physical storefront.')
+          const coordinateError = validateOptionalMapCoordinates(data.location.latitude, data.location.longitude)
+          if (coordinateError) throw new Error(coordinateError)
         } else if (data.store.type === 'online_delivery' && !data.location.deliveryAreas.trim()) {
           throw new Error('List the areas this store delivers to.')
         } else if (data.store.type === 'meetup_only' && !data.location.safeMeetupLocations.trim()) {
           throw new Error('List the safe meetup locations offered to customers.')
         }
-        if (data.location.verificationMethod === 'photo' && (!locationCode || !data.location.proofPath)) {
-          throw new Error('Generate the one-time code and upload a photo showing it, or choose a video call.')
+        if (data.location.verificationMethod === 'photo' && !data.location.proofPath) {
+          throw new Error('Upload a location photo, or choose a video call with a reviewer.')
         }
         await saveDraft(4)
       } else if (step === 5) {
-        if (data.payout.accountHolderName.trim().length < 4) throw new Error('Enter the account holder name.')
-        const accountNumber = data.payout.accountNumber.replace(/\s/g, '')
-        if (data.payout.method === 'mobile_money' && !/^(?:\+?260)?[0-9]{9}$/.test(accountNumber)) {
-          throw new Error('Enter a valid Zambian mobile money number (9 digits, optionally prefixed by +260).')
-        }
-        if (data.payout.method === 'bank' && !/^[0-9]{5,30}$/.test(accountNumber)) {
-          throw new Error('Enter a bank account number containing 5 to 30 digits.')
-        }
-        await saveDraft(5)
-      } else if (step === 6) {
-        if (!data.policies.termsAccepted || !data.policies.returnsAccepted || !data.policies.prohibitedItemsAccepted) {
+        if (!termsDocument) throw new Error(termsError || 'MarketSpace terms are unavailable. Please try again later.')
+        if (!data.policies.termsAccepted ||
+          data.policies.termsAcceptedVersion !== String(termsDocument.version) ||
+          !data.policies.prohibitedItemsAccepted) {
           throw new Error('Review and accept each policy to continue.')
         }
-        if (data.policies.returnPolicy.trim().length < 10) throw new Error('Write a return policy of at least 10 characters.')
-        await saveDraft(6)
+        const policiesError = validateStorePolicies(data.policies.storePolicies)
+        if (policiesError) throw new Error(policiesError)
+        await saveDraft(5)
       }
-      setStep((current) => Math.min(current + 1, 7))
+      setStep((current) => Math.min(current + 1, 6))
     } catch (err) {
       if (step === 1 && TURNSTILE_SITE_KEY) {
         setCaptchaToken('')
@@ -502,14 +507,12 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
     setNotice('')
     setSaving(true)
     try {
-      const response = await invoke<{ status: string; locationCode?: string; emailWarning?: string }>('submit_application', {
+      const response = await invoke<{ status: string; emailWarning?: string }>('submit_application', {
         captchaToken,
-        termsVersion: TERMS_VERSION,
-        returnsVersion: RETURNS_VERSION,
+        termsVersion: termsDocument?.version,
         prohibitedItemsVersion: PROHIBITED_ITEMS_VERSION,
       })
       setApplicationStatus(response.status)
-      if (response.locationCode) setLocationCode(response.locationCode)
       setNotice(response.emailWarning || 'Your application has been submitted for review.')
     } catch (err) {
       if (TURNSTILE_SITE_KEY) {
@@ -552,13 +555,6 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
             ? 'Your store has completed the application process.'
             : 'We will email you when the review is complete. You can safely leave this page.'}
         </p>
-        {locationCode && (
-          <div className="store-wizard-code">
-            <span>One-time location verification code</span>
-            <strong>{locationCode}</strong>
-            <small>Display this code in your storefront or stock verification photo.</small>
-          </div>
-        )}
         <button type="button" className="secondary-btn" onClick={onCancel}>Back to profile</button>
       </section>
     )
@@ -571,7 +567,7 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
           <p className="store-wizard-kicker">MarketSpace merchant onboarding</p>
           <h2>Open your store</h2>
           <p className="store-wizard-description">
-            A guided setup, saved as you go. Your private identity and payout details are never displayed on your storefront.
+            A guided setup, saved as you go. Your private identity details are never displayed on your storefront.
           </p>
         </div>
         <button type="button" className="ghost-btn" onClick={onCancel}>Exit setup</button>
@@ -587,7 +583,7 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
       </ol>
 
       <div className="store-wizard-step-heading">
-        <span>STEP {step} OF 7</span>
+        <span>STEP {step} OF 6</span>
         <h3>{STEP_TITLES[step - 1]}</h3>
       </div>
 
@@ -650,9 +646,16 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
       {step === 2 && (
         <div className="store-wizard-fields">
           <p className="store-wizard-description">This information is private and used only for owner verification. Your ID number is hashed on the server and not retained.</p>
-          <label>Full legal name<input value={data.identity.legalName} onChange={(event) => update('identity', { legalName: event.target.value })} autoComplete="name" /></label>
+          <label>First name<input value={data.identity.firstName} onChange={(event) => {
+            const firstName = event.target.value
+            update('identity', { firstName, legalName: [firstName, data.identity.lastName].filter(Boolean).join(' ').trim() })
+          }} autoComplete="given-name" /></label>
+          <label>Last name<input value={data.identity.lastName} onChange={(event) => {
+            const lastName = event.target.value
+            update('identity', { lastName, legalName: [data.identity.firstName, lastName].filter(Boolean).join(' ').trim() })
+          }} autoComplete="family-name" /></label>
           <label>Date of birth<input type="date" value={data.identity.dateOfBirth} onChange={(event) => update('identity', { dateOfBirth: event.target.value })} /></label>
-          <label>Residential address<textarea rows={3} value={data.identity.residentialAddress} onChange={(event) => update('identity', { residentialAddress: event.target.value })} autoComplete="street-address" /></label>
+          <label>Residential address<input type="text" value={data.identity.residentialAddress} onChange={(event) => update('identity', { residentialAddress: event.target.value })} autoComplete="street-address" /></label>
           <label>NRC number (9 digits)<input value={identityNumber} onChange={(event) => setIdentityNumber(event.target.value.replace(/\D/g, '').slice(0, 9))} inputMode="numeric" pattern="[0-9]{9}" maxLength={9} autoComplete="off" required title="Enter exactly 9 digits." /></label>
           <div className="store-wizard-upload-grid">
             {renderPrivateUpload('Government ID photo', 'idImagePath', data.identity.idImagePath)}
@@ -719,13 +722,17 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
           {data.store.type === 'physical' ? (
             <>
               <label>Street address<input value={data.location.streetAddress} onChange={(event) => update('location', { streetAddress: event.target.value })} /></label>
-              <button type="button" className="secondary-btn" disabled={searchingLocation} onClick={() => void searchAddress()}>
-                {searchingLocation ? 'Searching map…' : 'Find address on OpenStreetMap'}
-              </button>
-              <div className="store-wizard-inline">
-                <label>Map latitude<input value={data.location.latitude} onChange={(event) => update('location', { latitude: event.target.value })} inputMode="decimal" /></label>
-                <label>Map longitude<input value={data.location.longitude} onChange={(event) => update('location', { longitude: event.target.value })} inputMode="decimal" /></label>
-              </div>
+              <details className="store-wizard-map-pin">
+                <summary>Optional map pin <span>Not required for location verification</span></summary>
+                <p className="store-wizard-help">You can search the store address to suggest a map pin. This is for map display only; it does not verify your location.</p>
+                <button type="button" className="secondary-btn" disabled={searchingLocation} onClick={() => void searchAddress()}>
+                  {searchingLocation ? 'Searching map…' : 'Find map pin from address'}
+                </button>
+                <div className="store-wizard-inline">
+                  <label>Map latitude<input value={data.location.latitude} onChange={(event) => update('location', { latitude: event.target.value })} inputMode="decimal" /></label>
+                  <label>Map longitude<input value={data.location.longitude} onChange={(event) => update('location', { longitude: event.target.value })} inputMode="decimal" /></label>
+                </div>
+              </details>
               <label>Opening hours<input value={data.location.openingHours} onChange={(event) => update('location', { openingHours: event.target.value })} placeholder="Mon–Sat, 08:00–18:00" /></label>
             </>
           ) : (
@@ -739,23 +746,14 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
           )}
           <label>Location verification method
             <select value={data.location.verificationMethod} onChange={(event) => update('location', { verificationMethod: event.target.value as 'photo' | 'video' })}>
-              <option value="photo">Upload a photo showing the one-time code</option>
+              <option value="photo">Upload a store location photo</option>
               <option value="video">Request a video call with a reviewer</option>
             </select>
           </label>
-          {locationCode && (
-            <div className="store-wizard-code">
-              <span>One-time location code</span><strong>{locationCode}</strong>
-              <small>Show this code in the storefront photo, or in a photo with your stock.</small>
-            </div>
-          )}
           {data.location.verificationMethod === 'photo' ? (
             <>
-              <button type="button" className="secondary-btn" disabled={saving} onClick={() => void createLocationCode()}>
-                {locationCode ? 'Show or refresh location code' : 'Generate location code'}
-              </button>
-              {renderPrivateUpload('Location proof photo', 'proofPath', data.location.proofPath)}
-              <p className="store-wizard-help">The proof photo is private and visible only to authorized reviewers. Upload a new photo if you refresh the code.</p>
+              {renderPrivateUpload('Store location photo', 'proofPath', data.location.proofPath)}
+              <p className="store-wizard-help">The photo is private and reviewed by an admin alongside your declared store address and marketplace location.</p>
             </>
           ) : (
             <p className="store-wizard-help">A moderator will contact you to arrange the verification call. Your application will remain in manual review.</p>
@@ -764,31 +762,30 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
       )}
 
       {step === 5 && (
-        <div className="store-wizard-fields">
-          <p className="store-wizard-description">Account numbers are encrypted server-side before storage. The account holder name is compared with your verified ID name.</p>
-          <label>Payout method
-            <select value={data.payout.method} onChange={(event) => update('payout', { method: event.target.value as RegistrationData['payout']['method'] })}>
-              <option value="mobile_money">Mobile money</option><option value="bank">Bank account</option>
-            </select>
-          </label>
-          <label>Account holder name<input value={data.payout.accountHolderName} onChange={(event) => update('payout', { accountHolderName: event.target.value })} /></label>
-          <label>{data.payout.method === 'bank' ? 'Bank account number' : 'Mobile money number'}
-            <input type="password" value={data.payout.accountNumber} onChange={(event) => update('payout', { accountNumber: event.target.value.slice(0, 30) })} inputMode="numeric" maxLength={30} autoComplete="off" required />
-          </label>
-          <small className="store-wizard-help">The account number is not saved in browser storage and is cleared from the form after secure submission.</small>
-        </div>
-      )}
-
-      {step === 6 && (
         <div className="store-wizard-fields store-wizard-policy-list">
-          <label className="store-wizard-policy-copy">Your public return policy
-            <textarea rows={3} value={data.policies.returnPolicy} onChange={(event) => update('policies', { returnPolicy: event.target.value })} />
-          </label>
-          <label><input type="checkbox" checked={data.policies.termsAccepted} onChange={(event) => update('policies', { termsAccepted: event.target.checked })} />
-            <span>I agree to the MarketSpace seller terms (version {TERMS_VERSION}).</span>
-          </label>
-          <label><input type="checkbox" checked={data.policies.returnsAccepted} onChange={(event) => update('policies', { returnsAccepted: event.target.checked })} />
-            <span>I have reviewed and agree to publish a clear returns policy (version {RETURNS_VERSION}).</span>
+          <section className="store-wizard-terms">
+            <h4>MarketSpace seller terms · Version {termsDocument?.version ?? 'unavailable'}</h4>
+            {termsError
+              ? <p role="alert">{termsError}</p>
+              : termsDocument
+              ? <div className="store-wizard-terms-content">{termsDocument.content}</div>
+              : <p>Loading the current terms…</p>}
+          </section>
+          <p className="store-wizard-description">Set the policies customers will see for your store. MarketSpace’s platform terms are shown separately below.</p>
+          <StorePoliciesEditor
+            policies={data.policies.storePolicies}
+            onChange={storePolicies => update('policies', { storePolicies })}
+          />
+          <label><input
+            type="checkbox"
+            checked={data.policies.termsAccepted && data.policies.termsAcceptedVersion === String(termsDocument?.version ?? '')}
+            disabled={!termsDocument}
+            onChange={(event) => update('policies', {
+              termsAccepted: event.target.checked,
+              termsAcceptedVersion: event.target.checked ? String(termsDocument?.version ?? '') : '',
+            })}
+          />
+            <span>I have read and agree to the MarketSpace seller terms above (version {termsDocument?.version ?? 'unavailable'}).</span>
           </label>
           <label><input type="checkbox" checked={data.policies.prohibitedItemsAccepted} onChange={(event) => update('policies', { prohibitedItemsAccepted: event.target.checked })} />
             <span>I have read and will comply with the prohibited-items list (version {PROHIBITED_ITEMS_VERSION}).</span>
@@ -796,7 +793,7 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
         </div>
       )}
 
-      {step === 7 && (
+      {step === 6 && (
         <div className="store-wizard-review">
           <p>Check your details before sending the application. Your store remains private until reviewed.</p>
           <dl>
@@ -804,9 +801,16 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
             <dt>Store web address</dt><dd>{normalizedSubdomain || 'Not provided'}.{STORE_DOMAIN}</dd>
             <dt>Category & type</dt><dd>{data.store.category} · {data.store.type.replace('_', ' ')}</dd>
             <dt>Owner</dt><dd>{data.identity.legalName || 'Not provided'} · ID and selfie uploaded</dd>
-            <dt>Location verification</dt><dd>{data.location.verificationMethod === 'photo' ? (data.location.proofPath ? 'Photo uploaded' : 'Photo required') : 'Video call requested'}</dd>
-            <dt>Payout</dt><dd>{data.payout.method === 'bank' ? 'Bank account' : 'Mobile money'} · {data.payout.accountHolderName}</dd>
+            <dt>Location verification</dt><dd>{data.location.verificationMethod === 'photo' ? (data.location.proofPath ? 'Photo submitted for admin review' : 'Photo required') : 'Video call requested'}</dd>
           </dl>
+          {data.policies.storePolicies.length > 0 && (
+            <section aria-label="Your store policies">
+              <h3>Your store policies</h3>
+              {data.policies.storePolicies.map(policy => (
+                <p key={policy.id}><strong>{policy.title}:</strong> {policy.content}</p>
+              ))}
+            </section>
+          )}
           {TURNSTILE_SITE_KEY && <TurnstileCaptcha key={captchaGeneration} onToken={receiveCaptchaToken} />}
           <p className="store-wizard-help">Your application will be reviewed before the store is made public.</p>
           {rejectionReason && <p className="store-wizard-help">Previous reviewer feedback: {rejectionReason}</p>}
@@ -818,7 +822,7 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
           Back
         </button>
         <span>{saving ? 'Saving securely…' : 'Progress saves as you continue'}</span>
-        {step < 7 ? (
+        {step < 6 ? (
           <button type="button" className="primary-btn" onClick={() => void validateStep()} disabled={saving || logoUploading}>
             Save & continue
           </button>

@@ -89,9 +89,7 @@ The application also needs these Supabase Edge Function secrets:
   ID numbers, verified E.164 phone numbers, and rate-limit identifiers. Changing
   identifier normalization means existing ID/phone hashes created from
   non-canonical values will not match their newly normalized hashes; clear
-  applicable test rows and re-register test accounts. Location-code hashing is
-  unchanged.
-- `STORE_PAYOUT_ENCRYPTION_KEY`: base64-encoded 32-byte AES-GCM key.
+  applicable test rows and re-register test accounts.
 - `PHONE_OTP_REQUIRED`: `true` for production; `false` only for local development.
 - `TURNSTILE_SECRET_KEY`: required to validate CAPTCHA tokens. `APP_ENV` defaults to
   `production` (fail-closed when this secret is missing); set it to `development`
@@ -200,8 +198,10 @@ WHERE lower(email) = lower('owner@example.com')
 Moderators open `/admin/login` to establish the isolated moderator session.
 If a moderator or admin signs in through the regular marketplace login, MarketSpace
 signs out that shopper session and redirects them to `/admin/login`. The shopper
-Shell only displays the moderator workspace shortcut while the isolated
-moderator session is active.
+Shell does not provide an admin-workspace shortcut. Admin routes require a valid
+moderator session and no active shopper session. Completing moderator sign-in
+ends any shopper session; entering the admin route while a shopper session is
+active clears the moderator session and requires moderator sign-in again.
 
 For a confirmed account already in `auth.users`, grant temporary moderator
 access for a sign-in test with:
@@ -225,9 +225,8 @@ length to six digits, and use `{{ .Token }}` in the email template. Configure
 `VITE_TURNSTILE_SITE_KEY` for the frontend and the `TURNSTILE_SECRET_KEY`,
 `ADMIN_AUTH_HASH_SECRET`, and exact frontend `ALLOWED_ORIGIN` Edge Function
 secrets before testing. The hash secret must be a random, private value; it is
-used only to hash rate-limit identifiers. Do not use the same Auth user for
-simultaneous shopper and moderator sessions; the `/admin` gate rejects matching
-user IDs.
+used only to hash rate-limit identifiers. Shopper and moderator sessions cannot
+be active at the same time.
 If the built-in mailer cannot deliver to the owner's address, configure SMTP
 before testing. Remove a temporary moderator row with SQL after the test; do
 not remove the last account assigned the `admin` role.
@@ -281,8 +280,10 @@ HAVING COUNT(l.id) > s.active_listing_limit;
    header. Schedule `SELECT public.promote_trusted_stores();` daily using Supabase
    Cron. The cleanup function deletes verification photos 30 days after a review;
    reviewed store owners can delete them sooner from their store settings.
-6. Replace the seller terms, return-policy wording, prohibited-items list, and
-   policy version constants in `StoreRegistrationWizard.tsx` before launch.
+6. Publish legally reviewed MarketSpace terms from the admin terms page and
+   review the prohibited-items list before launch. Store owners define their own
+   customer-facing policies during registration and can edit them in store setup;
+   existing delivery and return policy text is preserved as editable policies.
 7. Configure a wildcard `*.your-marketspace-domain.com` DNS record and matching
    hosting/custom-domain routing for store subdomains. Set `VITE_STORE_DOMAIN` to
    the platform's real domain; the app resolves a registered subdomain to its
@@ -308,7 +309,7 @@ It prepares the caller's data through the service-role-only
 The `202610260002_store_registration_fixes.sql` migration adds the
 `prepare_account_deletion` RPC and is safe to rerun if the patch was previously
 applied manually. Account deletion does not yet check open orders, unresolved
-disputes, or pending payouts because those tables are not present in this schema.
+disputes, because those tables are not present in this schema.
 
 The two client-side store upserts in `useMarketplaceApp.ts` write these columns:
 
@@ -336,14 +337,16 @@ subdomain, store-type, or storefront-coordinate fields.
    and verify the badge, audit event, owner email, and probation state.
 6. Confirm owner privacy-photo deletion works after review and the scheduled purge
    removes expired media.
+7. As an administrator, publish a new version of MarketSpace Terms of Service.
+   Confirm the full text appears in seller onboarding and account legal settings,
+   and that a seller must accept the latest version before submitting.
 
 ### Current platform limits
 
-The existing app has no persisted orders/checkout, disputes, or payout execution
-subsystem. Probation order limits are not checked at order creation, completed
-order counts are not incremented, and payout holds are not applied when scheduling
-payouts. The migration's `store_can_accept_order` helper and configured probation
-fields are not wired into those flows. Trusted-store promotion reads
+The existing app has no persisted orders/checkout or disputes. Probation order
+limits are not checked at order creation, and completed order counts are not
+incremented. The migration's `store_can_accept_order` helper and configured
+probation fields are not wired into those flows. Trusted-store promotion reads
 `completed_order_count`, which must be incremented by the eventual order-completion
 workflow. These remain integration work when those flows exist; listing statuses
 and the existing database-level active-listing limit are unchanged.

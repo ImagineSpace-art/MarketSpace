@@ -68,7 +68,7 @@ Deno.serve(async (request: Request) => {
     const admin = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     })
-    // TODO(account-deletion): block deletion on open orders, unresolved disputes, or pending payouts once those tables exist.
+    // TODO(account-deletion): block deletion on open orders or unresolved disputes once those tables exist.
     await deleteAccountData(userId, createDeletionOperations(admin))
     return respond({ success: true })
   } catch (error) {
