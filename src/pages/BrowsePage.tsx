@@ -960,7 +960,7 @@ export function BrowsePage({
               security
             </span>
             <strong style={{ display: 'block', fontSize: '0.9rem', color: '#0f172a' }}>Direct Merchant Chat</strong>
-            <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Direct WhatsApp inquiry</span>
+            <span style={{ fontSize: '0.78rem', color: '#64748b' }}>In-app seller messaging</span>
           </div>
 
           <div>

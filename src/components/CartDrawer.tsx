@@ -8,7 +8,6 @@ export type CartItem = {
   image?: string
   sellerName?: string
   sellerUserId?: string
-  sellerPhone?: string
   quantity: number
 }
 
@@ -40,23 +39,6 @@ export function CartDrawer({
   const subtotal = items.reduce((acc, item) => acc + item.price * item.quantity, 0)
   const shippingFee = subtotal >= 500 || items.length === 0 ? 0 : 45
   const total = subtotal + shippingFee
-
-  const handleWhatsAppCheckout = () => {
-    if (items.length === 0) return
-    const orderLines = items
-      .map((it, idx) => `${idx + 1}. ${it.title} (Qty: ${it.quantity}) - K${(it.price * it.quantity).toFixed(2)}`)
-      .join('%0A')
-    const msg = `Hello MarketSpace Merchant! I would like to place an order:%0A%0A${orderLines}%0A%0ASubtotal: K${subtotal.toFixed(
-      2
-    )}%0ADelivery Fee: K${shippingFee.toFixed(2)}%0ATotal: K${total.toFixed(
-      2
-    )}%0A%0APlease confirm availability and payment details.`
-    
-    // Find first seller's phone or default support
-    const targetPhone = items[0]?.sellerPhone || '260970000000'
-    const cleanPhone = targetPhone.replace(/[^0-9]/g, '')
-    window.open(`https://wa.me/${cleanPhone}?text=${msg}`, '_blank')
-  }
 
   const handlePlaceOrder = (e: React.FormEvent) => {
     e.preventDefault()
@@ -401,28 +383,6 @@ export function CartDrawer({
                 <span className="material-icons" style={{ fontSize: '18px' }}>arrow_forward</span>
               </button>
 
-              <button
-                type="button"
-                onClick={handleWhatsAppCheckout}
-                style={{
-                  width: '100%',
-                  height: '42px',
-                  borderRadius: '999px',
-                  backgroundColor: '#22c55e',
-                  color: '#ffffff',
-                  border: 'none',
-                  fontSize: '0.9rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                }}
-              >
-                <span>Order via WhatsApp</span>
-                <span className="material-icons" style={{ fontSize: '18px' }}>chat</span>
-              </button>
             </div>
           </div>
         )}
@@ -465,7 +425,7 @@ export function CartDrawer({
                   Order Confirmed!
                 </h3>
                 <p style={{ margin: 0, color: '#64748b', fontSize: '0.9rem', lineHeight: 1.5 }}>
-                  Thank you for shopping on MarketSpace. The merchant has received your order and will contact you via WhatsApp / SMS for dispatch.
+                  Thank you for shopping on MarketSpace. This prototype does not process payments or send orders to sellers.
                 </p>
               </div>
             ) : (

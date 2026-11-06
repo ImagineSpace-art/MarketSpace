@@ -41,19 +41,13 @@ export function StoreCartDrawer({
 
   if (!isOpen) return null
 
-  const handleWhatsAppCheckout = async () => {
-    const cleanNumber = (shop.whatsapp || '').replace(/\D/g, '')
+  const handleCopyOrderSummary = async () => {
     const itemsSummary = items
       .map(item => `- ${item.listing.title} x${item.quantity} (${formatZMWPrice(Number(item.listing.price) * item.quantity)})`)
       .join('\n')
     const message = `Hello ${shop.shopName}, I would like to place an order:\n\n${itemsSummary}\n\nSubtotal: ${formatZMWPrice(subtotal)}${orderNote ? `\nNote: ${orderNote}` : ''}\n\nPlease confirm availability and delivery details.`
 
     setCheckoutError('')
-    if (cleanNumber) {
-      window.open(`https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer')
-      return
-    }
-
     try {
       await navigator.clipboard.writeText(message)
       setIsCopiedOrder(true)
@@ -128,8 +122,8 @@ export function StoreCartDrawer({
             <label htmlFor="store-cart-note">Order note (optional)</label>
             <textarea id="store-cart-note" value={orderNote} onChange={event => setOrderNote(event.target.value)} rows={2} />
             <div className="store-cart-subtotal"><span>Subtotal</span><strong>{formatZMWPrice(subtotal)}</strong></div>
-            <button className="store-cart-checkout" type="button" onClick={() => void handleWhatsAppCheckout()} style={{ backgroundColor: accentColor }}>
-              {isCopiedOrder ? 'Order copied' : shop.whatsapp ? 'Continue with WhatsApp' : 'Copy order message'}
+            <button className="store-cart-checkout" type="button" onClick={() => void handleCopyOrderSummary()} style={{ backgroundColor: accentColor }}>
+              {isCopiedOrder ? 'Order summary copied' : 'Copy order summary'}
             </button>
             {checkoutError && <p className="store-cart-error" role="alert">{checkoutError}</p>}
           </footer>

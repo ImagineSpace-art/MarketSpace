@@ -1156,7 +1156,6 @@ function StoreViewRoute({ stores, businessProfile, allBusinesses, listings, hand
     description: `Welcome to the official storefront of ${seller!.username || 'our store'}. Browse our active inventory below.`,
     category: 'General Merchant',
     address: 'Lusaka, Zambia',
-    whatsapp: '',
     logo: seller!.avatar_url || '',
     cover: '/banners/store_banner_apparel.png',
     accentColor: '#2563eb',

@@ -20,7 +20,6 @@ export function StoreSetupPage({ userId, businessProfile, onSave, onCancel }: St
     const [category, setCategory] = useState(businessProfile?.category || 'Retail')
     const [operationType, setOperationType] = useState<'online' | 'physical' | 'omnichannel'>(businessProfile?.operationType || 'omnichannel')
     const [address, setAddress] = useState(businessProfile?.address || '')
-    const [whatsapp, setWhatsapp] = useState(businessProfile?.whatsapp || '')
     const [logo, setLogo] = useState(businessProfile?.logo || '')
     const [cover, setCover] = useState(businessProfile?.cover || '')
 
@@ -28,7 +27,7 @@ export function StoreSetupPage({ userId, businessProfile, onSave, onCancel }: St
     const [announcementBar, setAnnouncementBar] = useState(businessProfile?.announcementBar || '')
     const [workingHours, setWorkingHours] = useState(businessProfile?.customerCare?.workingHours || 'Mon-Sat: 08:00 - 18:00')
     const [policies, setPolicies] = useState(() => normalizeStorePolicies(businessProfile?.customerCare))
-    const [supportPhone, setSupportPhone] = useState(businessProfile?.customerCare?.phone || businessProfile?.whatsapp || '')
+    const [supportPhone, setSupportPhone] = useState(businessProfile?.customerCare?.phone || '')
     const [supportEmail, setSupportEmail] = useState(businessProfile?.customerCare?.email || '')
     const [privacyNotice, setPrivacyNotice] = useState('')
     const [privacyBusy, setPrivacyBusy] = useState(false)
@@ -78,10 +77,6 @@ export function StoreSetupPage({ userId, businessProfile, onSave, onCancel }: St
             const digits = value.replace(/\D/g, '')
             return /^[+0-9 ()-]+$/.test(value) && digits.length >= 8 && digits.length <= 15
         }
-        if (!validPhone(whatsapp)) {
-            setFormError('Enter a valid business WhatsApp number.')
-            return
-        }
         if (supportPhone.trim() && !validPhone(supportPhone.trim())) {
             setFormError('Enter a valid customer care phone number.')
             return
@@ -105,7 +100,6 @@ export function StoreSetupPage({ userId, businessProfile, onSave, onCancel }: St
             description,
             category,
             address,
-            whatsapp,
             logo,
             cover,
             operationType,
@@ -115,7 +109,7 @@ export function StoreSetupPage({ userId, businessProfile, onSave, onCancel }: St
             customerCare: {
                 workingHours,
                 policies,
-                phone: supportPhone || whatsapp,
+                phone: supportPhone,
                 email: supportEmail,
                 address
             },
@@ -186,7 +180,6 @@ export function StoreSetupPage({ userId, businessProfile, onSave, onCancel }: St
                         </label>
 
                         <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Physical Address / Branch Location" maxLength={500} required style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
-                        <input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value.slice(0, 24))} type="tel" inputMode="tel" maxLength={24} placeholder="Business WhatsApp Number (e.g. +260...)" required style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
                     </div>
                 </div>
 

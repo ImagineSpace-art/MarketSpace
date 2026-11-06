@@ -56,29 +56,11 @@ function safeImageUrl(value: string | undefined, fallback: string) {
   return getStoreTemplateImageUrl(value)
 }
 
-function WhatsAppLink({ shop, number, onMessageSeller }: { shop: BusinessProfile; number?: string; onMessageSeller?: () => void }) {
-  const cleanNumber = (number || shop.whatsapp || '').replace(/\D/g, '')
-  if (!cleanNumber) {
-    return (
-      <button className="boutique-contact-button" type="button" onClick={onMessageSeller}>
-        Contact store
-      </button>
-    )
-  }
+function ContactStoreButton({ onMessageSeller }: { onMessageSeller?: () => void }) {
   return (
-    <a
-      className="boutique-contact-button"
-      href={`https://wa.me/${cleanNumber}`}
-      target="_blank"
-      rel="noreferrer"
-      onClick={event => {
-        event.stopPropagation()
-        if (!number && shop.whatsapp) return
-        if (!shop.whatsapp) onMessageSeller?.()
-      }}
-    >
-      WhatsApp
-    </a>
+    <button className="boutique-contact-button" type="button" onClick={onMessageSeller}>
+      Message store on MarketSpace
+    </button>
   )
 }
 
@@ -134,7 +116,6 @@ export function BoutiqueGridTemplate({
     ? safeImageUrl(content.logoImage, DEFAULT_LOGO_IMAGE)
     : shop.logo || DEFAULT_LOGO_IMAGE
   const accent = content.accentColor || STORE_ACCENT_PALETTE[0]
-  const whatsappNumber = content.whatsappNumber
   const averageRating = reviews.length
     ? (reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length).toFixed(1)
     : null
@@ -360,7 +341,7 @@ export function BoutiqueGridTemplate({
           <div>
             <p className="boutique-kicker">Stay in touch</p>
             <h2>{content.footerTagline || 'Good finds, shared thoughtfully.'}</h2>
-            <WhatsAppLink shop={shop} number={whatsappNumber} onMessageSeller={onMessageSeller} />
+            <ContactStoreButton onMessageSeller={onMessageSeller} />
           </div>
           <div className="boutique-footer-links">
             <strong>Explore</strong>

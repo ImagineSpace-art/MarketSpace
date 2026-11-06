@@ -98,13 +98,7 @@ export function AdCreationPage({
         }
     }
 
-    // Additional Contact Method
-    const [enableWhatsApp, setEnableWhatsApp] = useState(true)
-    const [contactMethod, setContactMethod] = useState<'WhatsApp' | 'Direct Chat'>('WhatsApp')
-    const [contactPhone, setContactPhone] = useState(() => {
-        const digits = (businessProfile?.whatsapp || (profile as any)?.phone || '975102312').replace(/\D/g, '')
-        return digits.startsWith('260') ? digits.slice(3, 12) : digits.slice(0, 9)
-    })
+    const [enableDirectChat, setEnableDirectChat] = useState(true)
 
     // Advantage+ Creative & Special Category
     const [advantageCreative, setAdvantageCreative] = useState(true)
@@ -222,11 +216,6 @@ export function AdCreationPage({
             alert('Choose an end date later than the start date.')
             return
         }
-        if (enableWhatsApp && contactMethod === 'WhatsApp' && !/^\d{9}$/.test(contactPhone)) {
-            alert('Enter the 9-digit Zambian phone number after +260.')
-            return
-        }
-
         setIsPublishing(true)
         const canonicalDestination = selectedListing
             ? `/listings/${selectedListing.id}`
@@ -244,8 +233,7 @@ export function AdCreationPage({
             mediaTypes: mediaTypes.length === mediaList.length ? mediaTypes : mediaList.map(() => 'image'),
             buttonLabel,
             destinationUrl: canonicalDestination,
-            contactMethod: enableWhatsApp ? (contactMethod === 'WhatsApp' ? 'whatsapp' : 'messenger') : 'none',
-            contactPhone: enableWhatsApp ? contactPhone : undefined,
+            contactMethod: enableDirectChat ? 'messenger' : 'none',
             enableAdvantageCreative: advantageCreative,
             isSpecialCategory: specialCategory,
             audienceLocation,
@@ -537,7 +525,7 @@ export function AdCreationPage({
                     <div className="section-card" style={{ padding: '20px', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--panel)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div>
-                                <h3 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', fontWeight: 700 }}>Additional contact method</h3>
+                                <h3 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', fontWeight: 700 }}>Allow direct messages</h3>
                                 <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
                                     Help customers contact you easily after they view your ad.
                                 </p>
@@ -545,45 +533,16 @@ export function AdCreationPage({
                             <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
                                 <input
                                     type="checkbox"
-                                    checked={enableWhatsApp}
-                                    onChange={(e) => setEnableWhatsApp(e.target.checked)}
+                                    checked={enableDirectChat}
+                                    onChange={(e) => setEnableDirectChat(e.target.checked)}
                                     style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                                 />
                             </label>
                         </div>
 
-                        {enableWhatsApp && (
-                            <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '12px', padding: '14px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, marginBottom: '6px' }}>Contact method:</label>
-                                    <select
-                                        value={contactMethod}
-                                        onChange={(e) => setContactMethod(e.target.value as any)}
-                                        style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
-                                    >
-                                        <option value="WhatsApp">WhatsApp Message</option>
-                                        <option value="Direct Chat">MarketSpace Direct Chat</option>
-                                    </select>
-                                </div>
-                                {contactMethod === 'WhatsApp' && (
-                                    <div>
-                                        <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, marginBottom: '6px' }}>Phone number:</label>
-                                        <div style={{ display: 'flex', gap: '8px' }}>
-                                            <span style={{ padding: '8px 12px', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 600 }}>+260</span>
-                                            <input
-                                                type="text"
-                                                value={contactPhone}
-                                                onChange={(e) => setContactPhone(e.target.value.replace(/\D/g, '').slice(0, 9))}
-                                                placeholder="975102312"
-                                                inputMode="numeric"
-                                                maxLength={9}
-                                                style={{ flexGrow: 1, padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                        <p style={{ margin: '14px 0 0', fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
+                            {enableDirectChat ? 'Customers can message you through MarketSpace.' : 'No contact action will appear on this ad.'}
+                        </p>
                     </div>
 
                     {/* 5. Creative Enhancements & Special Category */}

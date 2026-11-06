@@ -100,7 +100,6 @@ describe('store template slot validation', () => {
       'instagramUrl',
       'facebookUrl',
       'tiktokUrl',
-      'whatsappNumber',
       'accentColor',
     ])
   })

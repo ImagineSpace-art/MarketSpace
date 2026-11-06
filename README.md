@@ -314,12 +314,15 @@ disputes, because those tables are not present in this schema.
 The two client-side store upserts in `useMarketplaceApp.ts` write these columns:
 
 - Store editor: `user_id`, `shop_name`, `description`, `category`, `address`,
-  `whatsapp`, `logo`, `cover`, `accent_color`, `announcement_bar`, `collections`,
+  `logo`, `cover`, `accent_color`, `announcement_bar`, `collections`,
   `customer_care`, `catalog`, `ads`, and `theme_config`.
 - Theme editor: `user_id`, `shop_name`, `theme_config`, and `accent_color`.
 
 Neither upsert explicitly writes the protected status, verification, trust,
 subdomain, store-type, or storefront-coordinate fields.
+Store support phone numbers are stored in `customer_care.phone`; the
+`202611050001_remove_whatsapp.sql` migration preserves existing support numbers,
+cleans saved contact settings, and removes the old store contact column.
 
 ### Manual store-registration test
 

@@ -34,7 +34,6 @@ export const STORE_TEMPLATE_SLOT_SCHEMAS = {
     instagramUrl: { type: 'link', maxLength: 500 },
     facebookUrl: { type: 'link', maxLength: 500 },
     tiktokUrl: { type: 'link', maxLength: 500 },
-    whatsappNumber: { type: 'phone', maxLength: 20 },
     accentColor: { type: 'color' },
   },
   'storefront-landing': {
@@ -54,7 +53,6 @@ export const STORE_TEMPLATE_SLOT_SCHEMAS = {
     instagramUrl: { type: 'link', maxLength: 500 },
     facebookUrl: { type: 'link', maxLength: 500 },
     tiktokUrl: { type: 'link', maxLength: 500 },
-    whatsappNumber: { type: 'phone', maxLength: 20 },
     accentColor: { type: 'color' },
   },
 } as const satisfies Record<StoreTemplateId, Record<string, StoreTemplateSlot>>

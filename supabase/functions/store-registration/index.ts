@@ -160,7 +160,7 @@ function validateDraftStep(step: number, data: Json) {
     if (getString(store.description).length < 20) return 'Add a store description of at least 20 characters.'
     if (!['physical', 'online_delivery', 'meetup_only'].includes(getString(store.type))) return 'Select a valid store type.'
     const supportContact = getString(store.supportContact)
-    if (!isEmail(supportContact) && !isPhone(supportContact)) return 'Enter a valid email address or WhatsApp number.'
+    if (!isEmail(supportContact) && !isPhone(supportContact)) return 'Enter a valid support email address or phone number.'
   }
   if (step >= 4) {
     const store = getStepData(data, 'store')
@@ -433,7 +433,6 @@ async function submitApplication(context: HandlerContext, body: Json) {
     location_id: getString(location.marketplaceLocation)
       ? getString(location.marketplaceLocation).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
       : null,
-    whatsapp: isPhone(getString(storeData.supportContact)) ? getString(storeData.supportContact) : '',
     logo: getString(storeData.logo),
     subdomain: slug,
     store_type: getString(storeData.type),
@@ -444,6 +443,7 @@ async function submitApplication(context: HandlerContext, body: Json) {
         ? getStepData(data, 'policies').storePolicies
         : [],
       email: isEmail(getString(storeData.supportContact)) ? getString(storeData.supportContact) : '',
+      phone: isPhone(getString(storeData.supportContact)) ? getString(storeData.supportContact) : '',
     },
     opening_hours: { text: getString(location.openingHours) },
     delivery_areas: getString(location.deliveryAreas).split(',').map((item) => item.trim()).filter(Boolean),
@@ -544,7 +544,7 @@ async function reviewQueue(context: HandlerContext) {
   await ensureAdmin(context.admin, context.userId)
   const { data: stores, error } = await context.admin
     .from('stores')
-    .select('id, user_id, shop_name, description, category, address, whatsapp, subdomain, store_type, business_registration_number, created_at')
+    .select('id, user_id, shop_name, description, category, address, customer_care, subdomain, store_type, business_registration_number, created_at')
     .eq('status', 'pending_review')
     .order('created_at', { ascending: true })
   if (error) throw new Error('The review queue could not be loaded.')

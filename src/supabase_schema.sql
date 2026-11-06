@@ -25,7 +25,6 @@ CREATE TABLE IF NOT EXISTS public.stores (
     description TEXT,
     category TEXT,
     address TEXT,
-    whatsapp TEXT,
     logo TEXT,
     cover TEXT,
     accent_color TEXT DEFAULT '#2563eb',
@@ -36,6 +35,10 @@ CREATE TABLE IF NOT EXISTS public.stores (
     ads JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Remove the retired contact field from existing installations.
+ALTER TABLE public.stores
+  DROP COLUMN IF EXISTS whatsapp;
 
 -- Migration for existing stores table:
 ALTER TABLE public.stores
@@ -239,5 +242,3 @@ DROP POLICY IF EXISTS "User follow store" ON public.store_followers;
 CREATE POLICY "User follow store" ON public.store_followers FOR INSERT WITH CHECK (auth.uid() = user_id);
 DROP POLICY IF EXISTS "User unfollow store" ON public.store_followers;
 CREATE POLICY "User unfollow store" ON public.store_followers FOR DELETE USING (auth.uid() = user_id);
-
-

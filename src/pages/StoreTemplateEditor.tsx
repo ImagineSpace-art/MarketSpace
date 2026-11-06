@@ -25,7 +25,6 @@ const FIELD_LABELS: Record<string, string> = {
   instagramUrl: 'Instagram URL',
   facebookUrl: 'Facebook URL',
   tiktokUrl: 'TikTok URL',
-  whatsappNumber: 'WhatsApp number',
   accentColor: 'Accent colour',
   announcementText: 'Announcement', heroImage: 'Hero image', heroHeadline: 'Hero headline',
   heroSubheadline: 'Hero subheadline', heroButtonLabel: 'Hero button', promoImage: 'Promotion image',
@@ -37,7 +36,7 @@ const FIELD_GROUPS: Array<{ title: string; slots: string[] }> = [
   { title: 'Store banner', slots: ['logoImage', 'bannerImage', 'bannerTitle', 'bannerSubtitle'] },
   { title: 'Shop', slots: ['shopHeading', 'accentColor'] },
   { title: 'About', slots: ['aboutText'] },
-  { title: 'Footer and contact', slots: ['footerTagline', 'instagramUrl', 'facebookUrl', 'tiktokUrl', 'whatsappNumber'] },
+  { title: 'Footer and social links', slots: ['footerTagline', 'instagramUrl', 'facebookUrl', 'tiktokUrl'] },
 ]
 
 function imageUrl(path: string | undefined, fallback: string) {
@@ -74,7 +73,7 @@ export function StoreTemplateEditor({ businessProfile, myListings, onSave, onClo
         { title: 'Hero', slots: ['heroImage', 'heroHeadline', 'heroSubheadline', 'heroButtonLabel', 'accentColor'] },
         { title: 'Promotion', slots: ['promoImage', 'promoHeading', 'promoText', 'promoButtonLabel'] },
         { title: 'Store story', slots: ['storyImage', 'storyHeading', 'storyText'] },
-        { title: 'Footer and contact', slots: ['footerTagline', 'instagramUrl', 'facebookUrl', 'tiktokUrl', 'whatsappNumber'] },
+        { title: 'Footer and social links', slots: ['footerTagline', 'instagramUrl', 'facebookUrl', 'tiktokUrl'] },
       ]
     : FIELD_GROUPS
 

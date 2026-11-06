@@ -463,7 +463,7 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
         if (data.store.description.trim().length < 20) throw new Error('Add a description of at least 20 characters.')
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.store.supportContact.trim()) &&
           !/^\+?[0-9 ()-]{8,20}$/.test(data.store.supportContact.trim())) {
-          throw new Error('Enter a valid email address or WhatsApp number for store support.')
+          throw new Error('Enter a valid support email address or phone number.')
         }
         await saveDraft(3)
       } else if (step === 4) {
@@ -704,7 +704,7 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
               <option value="meetup_only">Online with safe meetups</option>
             </select>
           </label>
-          <label>Customer support contact (email or WhatsApp)<input value={data.store.supportContact} onChange={(event) => update('store', { supportContact: event.target.value })} /></label>
+          <label>Customer support email or phone<input value={data.store.supportContact} onChange={(event) => update('store', { supportContact: event.target.value })} /></label>
           <label>Business registration number <span className="store-wizard-optional">Optional</span>
             <input value={data.store.businessRegistrationNumber} onChange={(event) => update('store', { businessRegistrationNumber: event.target.value })} />
           </label>

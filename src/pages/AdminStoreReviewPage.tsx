@@ -42,7 +42,7 @@ type ReviewApplication = {
   description: string
   category: string
   address: string
-  whatsapp: string
+  customer_care: { email?: string; phone?: string } | null
   subdomain: string
   store_type: string
   business_registration_number: string | null
@@ -1152,7 +1152,7 @@ export function AdminStoreReviewPage() {
                 <section>
                   <h4>Store and location</h4>
                   <p>{application.address}</p>
-                  <p>Support: {application.whatsapp}</p>
+                  <p>Support: {[application.customer_care?.email, application.customer_care?.phone].filter(Boolean).join(' · ') || 'Not provided'}</p>
                   {application.location?.verification_method === 'video'
                     ? <p>Owner requested a reviewer video call for location verification.</p>
                     : application.location?.proof_url

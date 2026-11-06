@@ -305,6 +305,20 @@ export function StoreInfoPanel({
               </div>
             )}
 
+            {care.phone && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Phone:</span>
+                <a href={`tel:${care.phone.replace(/[^\d+]/g, '')}`} style={{ color: brandColor, fontWeight: 600 }}>{care.phone}</a>
+              </div>
+            )}
+
+            {care.email && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Email:</span>
+                <a href={`mailto:${care.email}`} style={{ color: brandColor, fontWeight: 600 }}>{care.email}</a>
+              </div>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: 'var(--text-secondary)' }}>Followers:</span>
               <span style={{ fontWeight: 600 }}>{followerCount} shoppers</span>
@@ -357,30 +371,6 @@ export function StoreInfoPanel({
                 <span className="material-icons" style={{ fontSize: '18px' }}>chat</span>
                 Message Seller Directly
               </button>
-            )}
-
-            {shop.whatsapp && (
-              <a
-                href={`https://wa.me/${shop.whatsapp.replace(/[^\d]/g, '')}?text=${encodeURIComponent(`Hi ${shop.shopName}, I'm reaching out from your official store page.`)}`}
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  backgroundColor: '#25D366',
-                  color: '#ffffff',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  textDecoration: 'none',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  fontWeight: 700,
-                  fontSize: '0.9rem'
-                }}
-              >
-                <span className="material-icons" style={{ fontSize: '18px' }}>chat</span>
-                Chat on WhatsApp
-              </a>
             )}
 
             <div style={{ display: 'flex', gap: '8px' }}>

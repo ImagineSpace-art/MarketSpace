@@ -512,7 +512,7 @@ export function SettingsPage({
                             <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
                                 <div>
                                     <strong style={{ fontSize: '0.9rem' }}>Display Mobile Number on Listings</strong>
-                                    <p className="text-muted" style={{ margin: '2px 0 0 0', fontSize: '0.8rem' }}>Show your WhatsApp/mobile number to buyers in the Buy Box.</p>
+                                    <p className="text-muted" style={{ margin: '2px 0 0 0', fontSize: '0.8rem' }}>Show your mobile number to buyers in the listing details.</p>
                                 </div>
                                 <input type="checkbox" checked={showPhone} onChange={(e) => setShowPhone(e.target.checked)} style={{ width: '18px', height: '18px' }} />
                             </label>

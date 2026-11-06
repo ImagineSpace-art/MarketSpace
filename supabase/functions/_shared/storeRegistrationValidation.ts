@@ -8,7 +8,7 @@ export const PROTECTED_BRANDS = [
   'adidas', 'aliexpress', 'amazon', 'apple', 'balenciaga', 'chanel', 'cocacola', 'disney',
   'ebay', 'facebook', 'google', 'gucci', 'instagram', 'louisvuitton', 'lululemon', 'meta',
   'microsoft', 'netflix', 'nike', 'porsche', 'puma', 'rolex', 'samsung', 'shein', 'tesla',
-  'tiktok', 'toyota', 'whatsapp', 'youtube', 'zara',
+  'tiktok', 'toyota', 'youtube', 'zara',
 ]
 
 export const DISPOSABLE_EMAIL_DOMAINS = new Set([

@@ -32,7 +32,6 @@ export function TemplateStoreListingView({ templateId, listing, shop, storeListi
   const [formError, setFormError] = useState('')
   const [copied, setCopied] = useState(false)
   const isService = listing.listing_type === 'service'
-  const whatsappNumber = shop.whatsapp.replace(/\D/g, '')
   const images = listing.images?.length ? listing.images : ['/illustrations/store_banner_electronics.png']
   const availableSizes = listing.available_sizes
     || (['Fashion & Apparel', 'Footwear'].includes(listing.category) ? ['S', 'M', 'L', 'XL'] : [])
@@ -182,9 +181,6 @@ export function TemplateStoreListingView({ templateId, listing, shop, storeListi
                 <button className="template-product-primary-contact" type="button" onClick={inquiry}>
                   <span className="material-icons">chat_bubble_outline</span>{isService ? 'Message provider' : 'Message seller'}
                 </button>
-                {isService && whatsappNumber && <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noreferrer">
-                  <span className="material-icons">phone</span>WhatsApp provider
-                </a>}
                 <button type="button" onClick={() => onToggleSave(listing.id)}><span className="material-icons">{isSaved ? 'favorite' : 'favorite_border'}</span>{isSaved ? 'Saved' : 'Save'}</button>
                 <button type="button" onClick={share}><span className="material-icons">{copied ? 'check' : 'share'}</span>{copied ? 'Copied' : 'Share'}</button>
               </div>

@@ -658,19 +658,6 @@ export function ListingDetailPage({
               Instant Buy
             </button>}
 
-            {isService && selectedListing.user_id && allBusinesses[selectedListing.user_id]?.whatsapp && (
-              <a
-                className="secondary-btn"
-                href={`https://wa.me/${allBusinesses[selectedListing.user_id].whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello, I'm interested in ${selectedListing.title}.`)}`}
-                target="_blank"
-                rel="noreferrer"
-                style={{ width: '100%', padding: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', textDecoration: 'none' }}
-              >
-                <span className="material-icons" style={{ fontSize: '18px' }}>chat</span>
-                WhatsApp provider
-              </a>
-            )}
-
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               <button type="button" className="secondary-btn" onClick={() => onToggleSave(Number(selectedListing.id))} style={{ padding: '10px' }}>
                 Wishlist
@@ -1519,7 +1506,7 @@ export function ListingFormPage({
           {/* SELLER PHONE NUMBER INPUT */}
           {listingKind !== 'service' && <div>
             <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text)' }}>
-              Seller Contact / WhatsApp Number <span style={{ color: '#ef4444' }}>*</span>
+              Seller Contact Phone Number <span style={{ color: '#ef4444' }}>*</span>
             </label>
             <input
               type="tel"

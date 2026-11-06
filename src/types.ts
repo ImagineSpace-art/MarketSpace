@@ -75,8 +75,7 @@ export type BusinessAd = {
   mediaTypes?: Array<'image' | 'video'>
   buttonLabel?: string
   destinationUrl?: string
-  contactMethod?: 'whatsapp' | 'messenger' | 'none'
-  contactPhone?: string
+  contactMethod?: 'messenger' | 'none'
   enableAdvantageCreative?: boolean
   isSpecialCategory?: boolean
   audienceLocation?: string
@@ -172,7 +171,6 @@ export type BusinessProfile = {
   address: string
   locationId?: string
   locationName?: string
-  whatsapp: string
   logo: string // base64 data url
   cover: string // base64 data url
   operationType?: 'online' | 'physical' | 'omnichannel'

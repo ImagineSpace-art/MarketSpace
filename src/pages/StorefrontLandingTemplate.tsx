@@ -151,7 +151,7 @@ export function StorefrontLandingTemplate({
       <footer className="landing-footer">
         <div><button className="landing-brand" type="button" onClick={() => scrollTo('landing-top')}>{shop.shopName}</button><p>{content.footerTagline || 'Distinctive finds, thoughtfully delivered.'}</p></div>
         <div><strong>Social</strong>{content.instagramUrl && <a href={content.instagramUrl}>Instagram</a>}{content.facebookUrl && <a href={content.facebookUrl}>Facebook</a>}{content.tiktokUrl && <a href={content.tiktokUrl}>TikTok</a>}</div>
-        <div>{content.whatsappNumber && <a href={`https://wa.me/${content.whatsappNumber.replace(/\D/g, '')}`}>WhatsApp</a>}<span>Powered by MarketSpace</span>{!preview && shop.storeId && currentUserId !== shop.userId && <StoreReportControl storeId={shop.storeId} currentUserId={currentUserId} onRequireSignIn={onRequireSignIn} />}</div>
+        <div><span>Powered by MarketSpace</span>{!preview && shop.storeId && currentUserId !== shop.userId && <StoreReportControl storeId={shop.storeId} currentUserId={currentUserId} onRequireSignIn={onRequireSignIn} />}</div>
       </footer>
 
       {!preview && <><StoreCartDrawer isOpen={isCartOpen} onClose={onCloseCart} shop={shop} cartItems={cartItems} onUpdateQuantity={onUpdateCartQuantity} onRemoveItem={onRemoveCartItem} onClearCart={onClearCart} onOpenListing={onOpenListing} /><StoreInfoPanel isOpen={false} onClose={() => {}} shop={shop} onMessageSeller={onMessageSeller} /></>}
