@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabaseClient'
 import { getFunctionErrorMessage } from '../utils/functionError'
 import { StorePoliciesEditor } from '../components/StorePoliciesEditor'
 import { normalizeStorePolicies, validateStorePolicies } from '../utils/storePolicies'
+import { getStoreTemplateImageUrl } from '../features/store-templates/storeTemplateAssets'
 
 // ---------------- STORE SETUP PAGE ----------------
 type StoreSetupPageProps = {
@@ -21,7 +22,10 @@ export function StoreSetupPage({ userId, businessProfile, onSave, onCancel }: St
     const [operationType, setOperationType] = useState<'online' | 'physical' | 'omnichannel'>(businessProfile?.operationType || 'omnichannel')
     const [address, setAddress] = useState(businessProfile?.address || '')
     const [logo, setLogo] = useState(businessProfile?.logo || '')
-    const [cover, setCover] = useState(businessProfile?.cover || '')
+    const templateBanner = businessProfile?.templateContent?.['boutique-grid']?.bannerImage
+    const [cover, setCover] = useState(
+        businessProfile?.cover || (templateBanner ? getStoreTemplateImageUrl(templateBanner) : '')
+    )
 
     const [accentColor, setAccentColor] = useState(businessProfile?.accentColor || '#2563eb')
     const [announcementBar, setAnnouncementBar] = useState(businessProfile?.announcementBar || '')

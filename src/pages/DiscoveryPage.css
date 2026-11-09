@@ -29,22 +29,25 @@
 
 .discovery-featured-store::after {
   position: absolute;
-  z-index: -1;
+  z-index: 1;
   background: linear-gradient(0deg, rgba(17, 24, 39, .94), rgba(17, 24, 39, .04) 82%);
   content: '';
   inset: 0;
+  pointer-events: none;
 }
 
-.discovery-featured-store img {
+.discovery-featured-store > img {
   position: absolute;
-  z-index: -2;
+  z-index: 0;
   width: 100%;
   height: 100%;
   inset: 0;
   object-fit: cover;
 }
 
-.discovery-featured-store span {
+.discovery-featured-store > span:not(.discovery-store-logo) {
+  position: relative;
+  z-index: 2;
   color: #fbbf24;
   font-size: .76rem;
   font-weight: 800;
@@ -52,7 +55,54 @@
 }
 
 .discovery-featured-store strong {
+  position: relative;
+  z-index: 2;
   font-size: 1.2rem;
+}
+
+.discovery-store-logo {
+  position: absolute;
+  z-index: 2;
+  top: 14px;
+  left: 14px;
+  display: grid;
+  width: 52px;
+  height: 52px;
+  overflow: hidden;
+  place-items: center;
+  border: 2px solid rgba(255, 255, 255, .9);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 3px 12px rgba(15, 23, 42, .24);
+  color: #1e293b;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.discovery-store-logo img {
+  position: static;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.discovery-store-image > .discovery-store-logo {
+  top: 12px;
+  left: 12px;
+  width: 48px;
+  height: 48px;
+}
+
+.discovery-featured-store > .sponsored-badge,
+.discovery-store-image > .sponsored-badge {
+  position: absolute;
+  z-index: 3;
+  top: 12px;
+  right: 12px;
+}
+
+.discovery-store-image > .discovery-store-rating {
+  z-index: 3;
 }
 
 .discovery-featured-store-0 {

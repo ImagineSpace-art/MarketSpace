@@ -111,10 +111,13 @@ export function BoutiqueGridTemplate({
   const catalogPageCount = Math.max(1, Math.ceil(allCatalogListings.length / catalogPageSize))
   const catalogListings = allCatalogListings.slice((catalogPage - 1) * catalogPageSize, catalogPage * catalogPageSize)
 
-  const bannerImage = safeImageUrl(content.bannerImage, DEFAULT_BANNER_IMAGE)
-  const logoImage = content.logoImage
-    ? safeImageUrl(content.logoImage, DEFAULT_LOGO_IMAGE)
-    : shop.logo || DEFAULT_LOGO_IMAGE
+  const bannerImage = safeImageUrl(
+    preview ? content.bannerImage || shop.cover : shop.cover || content.bannerImage,
+    DEFAULT_BANNER_IMAGE,
+  )
+  const logoImage = shop.logo
+    ? safeImageUrl(shop.logo, DEFAULT_LOGO_IMAGE)
+    : safeImageUrl(content.logoImage, DEFAULT_LOGO_IMAGE)
   const accent = content.accentColor || STORE_ACCENT_PALETTE[0]
   const averageRating = reviews.length
     ? (reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length).toFixed(1)

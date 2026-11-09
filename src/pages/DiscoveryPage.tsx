@@ -5,6 +5,7 @@ import type { BusinessProfile, Listing, StoreReview } from '../types'
 import { Listing as ListingView } from '../components/Listing'
 import { getStoreUrl } from '../utils/storeUrl'
 import { BoostTrackedLink } from '../components/BoostTrackedLink'
+import { getStoreTemplateImageUrl } from '../features/store-templates/storeTemplateAssets'
 
 type DiscoveryPageProps = {
   allBusinesses?: Record<string, BusinessProfile>
@@ -12,6 +13,33 @@ type DiscoveryPageProps = {
   storeReviews?: StoreReview[]
   addStoreReview?: (storeId: string | null, rating: number, comment: string, targetUserId?: string | null) => void
   isSignedIn?: boolean
+}
+
+function getStoreLogoUrl(store: BusinessProfile) {
+  const templateLogo = store.templateContent?.['boutique-grid']?.logoImage
+  const logo = store.logo || templateLogo
+  if (!logo || /^(https?:\/\/|data:image\/)/i.test(logo)) return logo || ''
+  return getStoreTemplateImageUrl(logo)
+}
+
+function getStoreBannerUrl(store: BusinessProfile) {
+  const templateBanner = store.templateContent?.['boutique-grid']?.bannerImage
+  const banner = store.cover || templateBanner
+  if (!banner || /^(https?:\/\/|data:image\/)/i.test(banner)) return banner || ''
+  return getStoreTemplateImageUrl(banner)
+}
+
+function StoreLogo({ store }: { store: BusinessProfile }) {
+  const [imageFailed, setImageFailed] = useState(false)
+  const logoUrl = getStoreLogoUrl(store)
+
+  return (
+    <span className="discovery-store-logo" aria-hidden="true">
+      {logoUrl && !imageFailed
+        ? <img src={logoUrl} alt="" onError={() => setImageFailed(true)} />
+        : store.shopName.slice(0, 1).toUpperCase()}
+    </span>
+  )
 }
 
 export function DiscoveryPage({
@@ -220,10 +248,21 @@ export function DiscoveryPage({
                 boostId={store.promoted ? store.boost_id : undefined}
                 className={`discovery-featured-store discovery-featured-store-${index}`}
               >
-                {store.cover || store.logo ? <img src={store.cover || store.logo} alt="" /> : null}
+                <img
+                  src={getStoreBannerUrl(store)
+                    || availableListings.find((listing) => listing.user_id === store.userId)?.images?.[0]
+                    || '/banners/store_banner_apparel.png'}
+                  alt=""
+                  onError={(event) => {
+                    if (!event.currentTarget.src.endsWith('/banners/store_banner_apparel.png')) {
+                      event.currentTarget.src = '/banners/store_banner_apparel.png'
+                    }
+                  }}
+                />
                 {store.promoted && <span className="sponsored-badge">Promoted</span>}
                 <span>{store.category || 'Independent storefront'}</span>
                 <strong>{store.shopName}</strong>
+                <StoreLogo store={store} />
               </BoostTrackedLink>
             ))}
           </div>}
@@ -296,12 +335,24 @@ export function DiscoveryPage({
               ? (reviews.reduce((total, review) => total + review.rating, 0) / reviews.length).toFixed(1)
               : null
             const itemCount = availableListings.filter((listing) => listing.user_id === store.userId).length
+            const storeImage = getStoreBannerUrl(store)
+              || availableListings.find((listing) => listing.user_id === store.userId)?.images?.[0]
+              || '/banners/store_banner_apparel.png'
             return (
               <BoostTrackedLink key={store.userId} href={getStoreUrl(store.userId, store.subdomain)} boostId={store.promoted ? store.boost_id : undefined} className="discovery-store-card">
                 <div className="discovery-store-image">
-                  {store.cover || store.logo ? <img src={store.cover || store.logo} alt="" /> : <span>{store.shopName}</span>}
+                  <img
+                    src={storeImage}
+                    alt=""
+                    onError={(event) => {
+                      if (!event.currentTarget.src.endsWith('/banners/store_banner_apparel.png')) {
+                        event.currentTarget.src = '/banners/store_banner_apparel.png'
+                      }
+                    }}
+                  />
                   {store.promoted && <span className="sponsored-badge">Promoted</span>}
                   {rating && <span className="discovery-store-rating">{rating} ★</span>}
+                  <StoreLogo store={store} />
                 </div>
                 <div className="discovery-store-details">
                   <h3>{store.shopName}</h3>

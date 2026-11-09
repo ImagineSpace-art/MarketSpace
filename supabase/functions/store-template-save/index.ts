@@ -65,7 +65,7 @@ Deno.serve(async (request: Request) => {
     })
     const { data: store, error: storeError } = await admin
       .from('stores')
-      .select('user_id, shop_name, template_id, template_content, template_changed_at, collections')
+      .select('user_id, shop_name, logo, cover, template_id, template_content, template_changed_at, collections')
       .eq('user_id', userId)
       .eq('status', 'approved')
       .maybeSingle()
@@ -107,16 +107,42 @@ Deno.serve(async (request: Request) => {
       && !Array.isArray(store.template_content)
       ? store.template_content as Record<string, unknown>
       : {}
+    const existingBoutiqueContent = existingContent['boutique-grid']
+    const existingBoutiqueLogo = existingBoutiqueContent && typeof existingBoutiqueContent === 'object'
+      && !Array.isArray(existingBoutiqueContent)
+      ? (existingBoutiqueContent as Record<string, unknown>).logoImage
+      : undefined
+    const existingBoutiqueBanner = existingBoutiqueContent && typeof existingBoutiqueContent === 'object'
+      && !Array.isArray(existingBoutiqueContent)
+      ? (existingBoutiqueContent as Record<string, unknown>).bannerImage
+      : undefined
+    const templateLogo = templateId === 'boutique-grid' ? validated.content.logoImage : undefined
+    const templateBanner = templateId === 'boutique-grid' ? validated.content.bannerImage : undefined
+    const shouldSyncStoreLogo = Boolean(templateLogo) && (
+      !store.logo || existingBoutiqueLogo !== templateLogo
+    )
+    const shouldSyncStoreCover = Boolean(templateBanner) && (
+      !store.cover || existingBoutiqueBanner !== templateBanner
+    )
+    const nextStoreLogo = shouldSyncStoreLogo && templateLogo
+      ? admin.storage.from('store-assets').getPublicUrl(templateLogo).data.publicUrl
+      : store.logo
+    const nextStoreCover = shouldSyncStoreCover && templateBanner
+      ? admin.storage.from('store-assets').getPublicUrl(templateBanner).data.publicUrl
+      : store.cover
+
     const { data: updatedStore, error: updateError } = await admin
       .from('stores')
       .update({
         template_id: templateId,
         template_content: { ...existingContent, [templateId]: validated.content },
         collections: nextCollections,
+        ...(shouldSyncStoreLogo ? { logo: nextStoreLogo } : {}),
+        ...(shouldSyncStoreCover ? { cover: nextStoreCover } : {}),
       })
       .eq('user_id', userId)
       .eq('status', 'approved')
-      .select('template_changed_at')
+      .select('template_changed_at, logo, cover')
       .single()
     if (updateError) {
       if (updateError.message.includes('once every six months')) {
@@ -131,6 +157,8 @@ Deno.serve(async (request: Request) => {
       content: validated.content,
       departments: nextCollections,
       templateChangedAt: updatedStore.template_changed_at || store.template_changed_at,
+      logo: updatedStore.logo,
+      cover: updatedStore.cover,
     })
   } catch (error) {
     console.error('Store template save failed:', error)

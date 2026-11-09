@@ -323,6 +323,9 @@ subdomain, store-type, or storefront-coordinate fields.
 Store support phone numbers are stored in `customer_care.phone`; the
 `202611050001_remove_whatsapp.sql` migration preserves existing support numbers,
 cleans saved contact settings, and removes the old store contact column.
+The store dashboard's `stores.cover` value is the shared storefront banner.
+Saving a Boutique Grid template synchronizes its banner image to `stores.cover`,
+and the dashboard uses the saved template banner when no dashboard cover exists.
 
 ### Manual store-registration test
 

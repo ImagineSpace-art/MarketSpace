@@ -1986,6 +1986,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       content?: Record<string, string>
       departments?: StoreCollection[]
       templateChangedAt?: string
+      logo?: string | null
+      cover?: string | null
       error?: string
     }>('store-template-save', {
       body: { templateId, content, ...(departments ? { departments } : {}) },
@@ -2006,6 +2008,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       templateId: data.templateId,
       templateChangedAt: data.templateChangedAt || existing.templateChangedAt,
       templateContent,
+      ...(data.logo ? { logo: data.logo } : {}),
+      ...(data.cover ? { cover: data.cover } : {}),
       ...(data.departments ? { collections: data.departments } : {}),
     }
     const nextAll = { ...allBusinesses, [targetUserId]: updated }
