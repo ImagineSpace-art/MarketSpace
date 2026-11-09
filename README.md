@@ -95,7 +95,6 @@ The application also needs these Supabase Edge Function secrets:
   `production` (fail-closed when this secret is missing); set it to `development`
   only for local/test environments where CAPTCHA is intentionally bypassed.
 - `ALLOWED_ORIGIN`: deployed MarketSpace origin.
-- `PROBATION_MAX_ORDER_VALUE_ZMW`: probation order cap; currently defaults to `5000`.
 - `RESEND_API_KEY` and `EMAIL_FROM`: required for application, approval, and rejection emails. Configure a verified sender in Resend.
 - `PURGE_JOB_SECRET`: random secret sent as the `x-purge-secret` header by the scheduled identity-image cleanup request.
 
@@ -151,16 +150,24 @@ supabase db push
 supabase functions deploy listing-review
 ```
 
+`202611090001_store_probation_listing_threshold.sql` graduates a probation store
+after five distinct listings receive moderator approval. Apply this migration
+and redeploy `store-registration` so new store applications no longer write the
+removed order-value cap field.
+
 The migration backfills existing listings as approved. New listings are assigned
 to the caller's approved store by a database trigger; any client-provided
 `store_id` is ignored. Listings from sellers without an approved store, stores
 in probation, and sellers with any upheld store report enter the pending queue.
 New listings from trusted stores without upheld reports are auto-approved.
+After five distinct listings have been approved by moderators, a probation
+store becomes trusted and can publish up to the database's maximum listing cap.
+Stores with upheld reports still require moderation regardless of trust state.
 Public listing queries are restricted by RLS; owners and moderators may also
 read listings awaiting review. Editing an approved listing's title, description,
 price, category, images, or type sends it back to review. Moderation decisions,
-audit records, seller notifications, probation limits, and expiration are
-handled server-side.
+audit records, seller notifications, probation graduation, listing limits, and
+expiration are handled server-side.
 
 Notification and inbox actions use
 `202610310004_notification_and_chat_actions.sql`. Apply pending migrations with
@@ -277,9 +284,8 @@ HAVING COUNT(l.id) > s.active_listing_limit;
    The migration intentionally provides no client-side way to grant moderator
    access.
 5. Schedule `purge-store-identity-images` to run daily with the `x-purge-secret`
-   header. Schedule `SELECT public.promote_trusted_stores();` daily using Supabase
-   Cron. The cleanup function deletes verification photos 30 days after a review;
-   reviewed store owners can delete them sooner from their store settings.
+   header. The cleanup function deletes verification photos 30 days after a
+   review; reviewed store owners can delete them sooner from their store settings.
 6. Publish legally reviewed MarketSpace terms from the admin terms page and
    review the prohibited-items list before launch. Store owners define their own
    customer-facing policies during registration and can edit them in store setup;
@@ -288,19 +294,6 @@ HAVING COUNT(l.id) > s.active_listing_limit;
    hosting/custom-domain routing for store subdomains. Set `VITE_STORE_DOMAIN` to
    the platform's real domain; the app resolves a registered subdomain to its
    approved storefront. The project cannot provision DNS or hosting settings.
-
-To schedule trusted-store promotion with `pg_cron`, first enable the extension
-in the Supabase dashboard, then run:
-
-```sql
--- Requires the pg_cron extension to be enabled in the Supabase dashboard.
--- Runs trusted-store promotion every day at 02:00 UTC.
-SELECT cron.schedule(
-  'promote-trusted-stores-daily',
-  '0 2 * * *',
-  $$SELECT public.promote_trusted_stores();$$
-);
-```
 
 The profile's Delete Account action invokes the `account-deletion` Edge Function.
 It prepares the caller's data through the service-role-only
@@ -349,13 +342,10 @@ and the dashboard uses the saved template banner when no dashboard cover exists.
 
 ### Current platform limits
 
-The existing app has no persisted orders/checkout or disputes. Probation order
-limits are not checked at order creation, and completed order counts are not
-incremented. The migration's `store_can_accept_order` helper and configured
-probation fields are not wired into those flows. Trusted-store promotion reads
-`completed_order_count`, which must be incremented by the eventual order-completion
-workflow. These remain integration work when those flows exist; listing statuses
-and the existing database-level active-listing limit are unchanged.
+The existing app has no persisted orders/checkout or disputes, so probation
+graduation does not depend on buyer transactions or optional ratings. Stores
+graduate after five distinct listings are approved by moderators. Listings
+from sellers with upheld store reports continue to require moderation.
 
 Run the development server:
 

@@ -453,7 +453,6 @@ async function submitApplication(context: HandlerContext, body: Json) {
     status: 'pending_review',
     probation_state: 'probation',
     active_listing_limit: 10,
-    max_order_value_zmw: Number(Deno.env.get('PROBATION_MAX_ORDER_VALUE_ZMW') || '5000'),
   }
   const { data: savedStore, error: storeError } = await context.admin
     .from('stores')
@@ -604,7 +603,6 @@ async function reviewApplication(context: HandlerContext, body: Json) {
     registered_business: approved && body.registeredBusiness === true,
     probation_state: 'probation',
     active_listing_limit: 10,
-    max_order_value_zmw: Number(Deno.env.get('PROBATION_MAX_ORDER_VALUE_ZMW') || '5000'),
   }).eq('id', store.id)
   if (updateError) throw new Error('The review decision could not be saved.')
 
