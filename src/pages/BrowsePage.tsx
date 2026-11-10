@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import type { Listing, BusinessProfile, BusinessAd } from '../types'
@@ -152,6 +152,86 @@ export function BrowsePage({
   const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory)
   const [sortBy, setSortBy] = useState('featured')
   const [quickViewListing, setQuickViewListing] = useState<Listing | null>(null)
+  const [isHeroExpanded, setIsHeroExpanded] = useState(false)
+  const [headerOffset, setHeaderOffset] = useState(0)
+  const heroExpandedRef = useRef(isHeroExpanded)
+
+  useEffect(() => {
+    heroExpandedRef.current = isHeroExpanded
+  }, [isHeroExpanded])
+
+  useEffect(() => {
+    const header = document.querySelector('.site-header-bar')
+    if (!header) return
+
+    const updateHeaderOffset = () => setHeaderOffset(Math.ceil(header.getBoundingClientRect().height))
+    updateHeaderOffset()
+
+    const observer = new ResizeObserver(updateHeaderOffset)
+    observer.observe(header)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    let touchStartY: number | null = null
+    let touchStartExpanded = false
+    const scrollTop = () => window.scrollY <= 1
+    const updateHero = (expanded: boolean) => {
+      heroExpandedRef.current = expanded
+      setIsHeroExpanded(expanded)
+    }
+
+    const handleWheel = (event: WheelEvent) => {
+      if (event.ctrlKey || event.metaKey || Math.abs(event.deltaY) < 12 || !scrollTop()) return
+
+      if (event.deltaY < 0 && !heroExpandedRef.current) {
+        event.preventDefault()
+        updateHero(true)
+      } else if (event.deltaY > 0 && heroExpandedRef.current) {
+        event.preventDefault()
+        updateHero(false)
+      }
+    }
+
+    const handleTouchStart = (event: TouchEvent) => {
+      touchStartY = scrollTop() ? event.touches[0]?.clientY ?? null : null
+      touchStartExpanded = heroExpandedRef.current
+    }
+
+    const handleTouchMove = (event: TouchEvent) => {
+      if (touchStartY === null || !scrollTop()) return
+      const currentY = event.touches[0]?.clientY
+      if (currentY === undefined) return
+      const deltaY = currentY - touchStartY
+
+      if (touchStartExpanded && deltaY <= -1) {
+        event.preventDefault()
+        if (deltaY <= -36 && heroExpandedRef.current) updateHero(false)
+      } else if (!touchStartExpanded && deltaY >= 1) {
+        event.preventDefault()
+        if (deltaY >= 36 && !heroExpandedRef.current) updateHero(true)
+      }
+    }
+
+    const clearTouchStart = () => {
+      touchStartY = null
+      touchStartExpanded = false
+    }
+
+    window.addEventListener('wheel', handleWheel, { passive: false })
+    window.addEventListener('touchstart', handleTouchStart, { passive: true })
+    window.addEventListener('touchmove', handleTouchMove, { passive: false })
+    window.addEventListener('touchend', clearTouchStart, { passive: true })
+    window.addEventListener('touchcancel', clearTouchStart, { passive: true })
+
+    return () => {
+      window.removeEventListener('wheel', handleWheel)
+      window.removeEventListener('touchstart', handleTouchStart)
+      window.removeEventListener('touchmove', handleTouchMove)
+      window.removeEventListener('touchend', clearTouchStart)
+      window.removeEventListener('touchcancel', clearTouchStart)
+    }
+  }, [])
 
   const categories = [
     {
@@ -298,19 +378,33 @@ export function BrowsePage({
     >
       {/* ---------------- 1. HERO SECTION (NovaTrend Style) ---------------- */}
       <section
-        style={{
-          maxWidth: '1280px',
-          // margin: '24px auto 48px',
-          margin: '2px auto',
-          padding: '0 24px',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
-          gap: '40px',
-          alignItems: 'center',
-        }}
+        className={`browse-hero${isHeroExpanded ? ' is-expanded' : ' is-compact'}`}
+        style={{ top: `${headerOffset}px` }}
+        aria-label="Browse page introduction"
       >
-        {/* Left Text & CTA */}
-        <div>
+        <div className="browse-hero-compact-bar">
+          <strong>Discover Products You&apos;ll Love</strong>
+          <button
+            type="button"
+            className="browse-hero-toggle"
+            aria-expanded={isHeroExpanded}
+            aria-controls="browse-hero-details"
+            onClick={() => setIsHeroExpanded((expanded) => !expanded)}
+          >
+            <span>{isHeroExpanded ? 'Hide banner' : 'Show full banner'}</span>
+            <span className="material-icons" aria-hidden="true">
+              {isHeroExpanded ? 'expand_less' : 'expand_more'}
+            </span>
+          </button>
+        </div>
+        <div
+          id="browse-hero-details"
+          className="browse-hero-details"
+          aria-hidden={!isHeroExpanded}
+          inert={!isHeroExpanded}
+        >
+          <div className="browse-hero-details-inner">
+        <div className="browse-hero-copy">
           <span
             style={{
               display: 'inline-block',
@@ -427,7 +521,7 @@ export function BrowsePage({
         </div>
 
         {/* Right Hero Visual */}
-        <div style={{ position: 'relative', minHeight: '440px', display: 'flex', justifyContent: 'center' }}>
+        <div className="browse-hero-visual" style={{ position: 'relative', minHeight: '440px', display: 'flex', justifyContent: 'center' }}>
           {/* Image */}
           <div
             style={{
@@ -447,7 +541,18 @@ export function BrowsePage({
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
           </div>
-
+        </div>
+          <button
+            type="button"
+            className="browse-hero-toggle browse-hero-collapse"
+            aria-expanded={isHeroExpanded}
+            aria-controls="browse-hero-details"
+            onClick={() => setIsHeroExpanded(false)}
+          >
+            <span>Collapse banner</span>
+            <span className="material-icons" aria-hidden="true">expand_less</span>
+          </button>
+          </div>
         </div>
       </section>
 
@@ -497,7 +602,7 @@ export function BrowsePage({
         </div>
       </section> */}
 
-      <section id="browse-store-listings" style={{ maxWidth: '1280px', margin: '48px auto 40px', padding: '0 24px' }}>
+      <section id="browse-store-listings" className="browse-store-listings-section" style={{ maxWidth: '1280px', margin: '12px auto 40px', padding: '0 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '18px' }}>
           <div>
             <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: '#0f172a' }}>Store Listings</h2>
