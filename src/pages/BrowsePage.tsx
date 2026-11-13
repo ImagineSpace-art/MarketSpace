@@ -3,10 +3,12 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import type { Listing, BusinessProfile, BusinessAd } from '../types'
 import { Listing as ListingView } from '../components/Listing'
-import { getBrowseListings, isBestSeller, isNewArrival } from '../utils/listingSections'
+import { getBrowseListings, groupNewArrivalsIntoRows, isBestSeller, isNewArrival } from '../utils/listingSections'
 import { supabase } from '../lib/supabaseClient'
 import { recordBoostEvent } from '../utils/visibilityBoosts'
 import { useTopScrollExpandableHero } from '../hooks/useTopScrollExpandableHero'
+import { CATEGORY_OPTIONS, CONDITION_OPTIONS } from '../features/marketplace/constants'
+import { filterBrowseListings, getBrowseListingLocation, getBrowseSellerOptions, type BrowseFilters } from '../utils/browseFilters'
 
 type BrowsePageProps = {
   listings: Listing[]
@@ -154,7 +156,16 @@ export function BrowsePage({
   const [searchParams] = useSearchParams()
   const initialFilter = searchParams.get('category') || searchParams.get('filter')
   const initialCategory = initialFilter === 'new' || initialFilter === 'bestseller' ? 'All' : initialFilter || 'All'
-  const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory)
+  const [filters, setFilters] = useState<BrowseFilters>({
+    categories: initialCategory === 'All' ? [] : [initialCategory],
+    locations: [],
+    conditions: [],
+    sellers: [],
+    ratings: [],
+    minPrice: '',
+    maxPrice: '',
+  })
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const [sortBy, setSortBy] = useState('featured')
   const [quickViewListing, setQuickViewListing] = useState<Listing | null>(null)
   const [categoryLoopCopies, setCategoryLoopCopies] = useState(2)
@@ -165,6 +176,7 @@ export function BrowsePage({
     {
       id: 'fashion',
       name: 'Fashion',
+      filterCategory: 'Fashion',
       title: 'Fashion & Apparel',
       image: '/illustrations/cat_fashion.jpg',
       count: '1,240+ Items',
@@ -172,6 +184,7 @@ export function BrowsePage({
     {
       id: 'electronics',
       name: 'Electronics',
+      filterCategory: 'Electronics',
       title: 'Audio & Tech',
       image: '/illustrations/cat_electronics.jpg',
       count: '820+ Items',
@@ -179,6 +192,7 @@ export function BrowsePage({
     {
       id: 'beauty',
       name: 'Beauty',
+      filterCategory: 'Beauty',
       title: 'Beauty & Skincare',
       image: '/illustrations/cat_beauty.jpg',
       count: '340+ Items',
@@ -186,6 +200,7 @@ export function BrowsePage({
     {
       id: 'fitness',
       name: 'Fitness',
+      filterCategory: 'Sports',
       title: 'Fitness & Sports',
       image: '/illustrations/banner_summer_collection.jpg',
       count: '490+ Items',
@@ -193,6 +208,7 @@ export function BrowsePage({
     {
       id: 'homedecor',
       name: 'Home Decor',
+      filterCategory: 'Home & Garden',
       title: 'Home & Living',
       image: '/illustrations/cat_homedecor.jpg',
       count: '610+ Items',
@@ -200,6 +216,7 @@ export function BrowsePage({
     {
       id: 'accessories',
       name: 'Accessories',
+      filterCategory: 'Fashion',
       title: 'Watches & Accessories',
       image: '/illustrations/cat_accessories.jpg',
       count: '430+ Items',
@@ -244,60 +261,58 @@ export function BrowsePage({
     [globalRenewalDay, globalRenewalFrequency, listings]
   )
 
+  useEffect(() => {
+    if (!isFiltersOpen) return
+    const previousOverflow = document.body.style.overflow
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsFiltersOpen(false)
+    }
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [isFiltersOpen])
+
+  const locationOptions = useMemo(
+    () => [...new Set(browseListings.map(listing => getBrowseListingLocation(listing, allBusinesses)).filter((location): location is string => Boolean(location)))].sort(),
+    [allBusinesses, browseListings]
+  )
+
+  const sellerOptions = useMemo(
+    () => getBrowseSellerOptions(browseListings, allBusinesses),
+    [allBusinesses, browseListings]
+  )
+
+  const filteredCatalog = useMemo(
+    () => filterBrowseListings(browseListings, allBusinesses, filters, searchQuery),
+    [allBusinesses, browseListings, filters, searchQuery]
+  )
+
   const newArrivals = useMemo(
-    () => browseListings
+    () => filteredCatalog
       .filter((listing) => isNewArrival(listing))
       .sort((a, b) => Date.parse(b.created_at!) - Date.parse(a.created_at!)),
-    [browseListings]
+    [filteredCatalog]
   )
+
+  const newArrivalRows = useMemo(() => groupNewArrivalsIntoRows(newArrivals), [newArrivals])
 
   const bestSellers = useMemo(
-    () => browseListings
+    () => filteredCatalog
       .filter((listing) => isBestSeller(listing))
       .sort((a, b) => Number(b.rating ?? 0) - Number(a.rating ?? 0)),
-    [browseListings]
+    [filteredCatalog]
   )
 
-  const storeListingCategories = ['All', 'Electronics', 'Fashion', 'Home & Garden', 'Vehicles', 'Sports', 'Services']
-  const storeListings = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase()
-    return browseListings.filter((listing) => {
-      if (!listing.user_id || !allBusinesses[listing.user_id]?.shopName) return false
-      if (selectedCategory !== 'All' && listing.category !== selectedCategory) return false
-      if (!query) return true
-      return listing.title.toLowerCase().includes(query) ||
-        (listing.category || '').toLowerCase().includes(query) ||
-        allBusinesses[listing.user_id].shopName.toLowerCase().includes(query)
-    })
-  }, [allBusinesses, browseListings, searchQuery, selectedCategory])
+  const storeListings = useMemo(
+    () => filteredCatalog.filter(listing => Boolean(listing.user_id && allBusinesses[listing.user_id]?.shopName)),
+    [allBusinesses, filteredCatalog]
+  )
 
-  const newArrivalCards = newArrivals.map((listing) => ({
-    ...listing,
-    image: listing.images?.[0],
-    storeName: (listing.user_id && allBusinesses[listing.user_id]?.shopName) || listing.seller_name || 'Independent Seller',
-  }))
-
-  // Filter listings
-  const filteredCatalog = useMemo(() => {
-    let result = browseListings.length > 0 ? [...browseListings] : []
-
-    if (selectedCategory && selectedCategory !== 'All') {
-      result = result.filter((item) =>
-        item.category?.toLowerCase().includes(selectedCategory.toLowerCase())
-      )
-    }
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
-      result = result.filter(
-        (item) =>
-          item.title?.toLowerCase().includes(q) ||
-          item.description?.toLowerCase().includes(q) ||
-          item.category?.toLowerCase().includes(q)
-      )
-    }
-
-    return result.sort((a, b) => {
+  const sortedCatalog = useMemo(() => {
+    return [...filteredCatalog].sort((a, b) => {
       const promotedOrder = Number(Boolean(b.promoted)) - Number(Boolean(a.promoted))
       if (promotedOrder) return promotedOrder
       if (sortBy === 'price-low') return Number(a.price) - Number(b.price)
@@ -305,7 +320,34 @@ export function BrowsePage({
       if (sortBy === 'latest') return Number(b.id) - Number(a.id)
       return 0
     })
-  }, [browseListings, selectedCategory, searchQuery, sortBy])
+  }, [filteredCatalog, sortBy])
+
+  const activeFilterCount = filters.categories.length
+    + filters.locations.length
+    + filters.conditions.length
+    + filters.sellers.length
+    + filters.ratings.length
+    + Number(filters.minPrice !== '')
+    + Number(filters.maxPrice !== '')
+
+  const toggleFilterOption = (key: 'categories' | 'locations' | 'conditions' | 'sellers' | 'ratings', value: string) => {
+    setFilters(current => ({
+      ...current,
+      [key]: current[key].includes(value)
+        ? current[key].filter(item => item !== value)
+        : [...current[key], value],
+    }))
+  }
+
+  const clearFilters = () => setFilters({
+    categories: [],
+    locations: [],
+    conditions: [],
+    sellers: [],
+    ratings: [],
+    minPrice: '',
+    maxPrice: '',
+  })
 
   const scrollToCatalog = () => {
     const el = document.getElementById('marketplace-catalog')
@@ -322,6 +364,19 @@ export function BrowsePage({
         fontFamily: 'inherit, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
       }}
     >
+      <button
+        type="button"
+        className="browse-floating-filter-trigger"
+        onClick={() => setIsFiltersOpen(true)}
+        aria-haspopup="dialog"
+        aria-expanded={isFiltersOpen}
+        aria-label={`Open filters${activeFilterCount > 0 ? `, ${activeFilterCount} active` : ''}`}
+      >
+        <span className="material-icons" aria-hidden="true">tune</span>
+        <span>Filters</span>
+        {activeFilterCount > 0 && <span className="browse-filter-count">{activeFilterCount}</span>}
+      </button>
+
       {/* ---------------- 1. HERO SECTION (NovaTrend Style) ---------------- */}
       <section
         className={`browse-hero${isHeroExpanded ? ' is-expanded' : ' is-compact'}`}
@@ -556,19 +611,6 @@ export function BrowsePage({
           </div>
           <button type="button" onClick={scrollToCatalog} className="secondary-btn">Browse all listings</button>
         </div>
-        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '12px', WebkitOverflowScrolling: 'touch' }}>
-          {storeListingCategories.map((category) => (
-            <button
-              key={category}
-              type="button"
-              onClick={() => setSelectedCategory(category)}
-              className={selectedCategory === category ? 'primary-btn compact-btn' : 'secondary-btn compact-btn'}
-              style={{ whiteSpace: 'nowrap' }}
-            >
-              {category}
-            </button>
-          ))}
-        </div>
         {storeListings.length === 0 ? (
           <div className="section-card" style={{ textAlign: 'center' }}>
             <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
@@ -600,7 +642,7 @@ export function BrowsePage({
           <button
             type="button"
             onClick={() => {
-              setSelectedCategory('All')
+              setFilters(current => ({ ...current, categories: [] }))
               scrollToCatalog()
             }}
             style={{
@@ -642,7 +684,7 @@ export function BrowsePage({
                         type="button"
                         className="shop-category-card"
                         onClick={() => {
-                          setSelectedCategory(cat.name)
+                          setFilters(current => ({ ...current, categories: [cat.filterCategory] }))
                           scrollToCatalog()
                         }}
                         style={{ padding: 0, cursor: 'pointer', textAlign: 'left' }}
@@ -666,7 +708,7 @@ export function BrowsePage({
         </div>
       </section>
 
-      {newArrivals.length > 0 && <section id="new-arrivals" style={{ maxWidth: '1280px', margin: '54px auto 40px', padding: '0 24px' }}>
+      {newArrivals.length > 0 && <section id="new-arrivals" className="new-arrivals-section" style={{ maxWidth: '1280px', margin: '54px auto 40px', padding: '0 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 900, margin: 0, color: '#0f172a', letterSpacing: '-0.02em' }}>
             New Arrivals
@@ -691,141 +733,25 @@ export function BrowsePage({
           </button>
         </div>
 
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: '20px',
-          }}
-        >
-          {newArrivalCards.slice(0, 4).map((prod) => (
+        <div className="new-arrivals-rows">
+          {newArrivalRows.map((row, rowIndex) => (
             <div
-              key={prod.id}
-              style={{
-                borderRadius: '20px',
-                border: '1px solid #f1f5f9',
-                backgroundColor: '#ffffff',
-                overflow: 'hidden',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.04)',
-                position: 'relative',
-                display: 'flex',
-                flexDirection: 'column',
-              }}
+              key={rowIndex}
+              className="new-arrivals-row"
+              role="region"
+              aria-label={`New arrivals, row ${rowIndex + 1}`}
+              tabIndex={0}
             >
-              {/* Image & Badges */}
-              <div style={{ height: '220px', position: 'relative', backgroundColor: '#f8fafc', overflow: 'hidden' }}>
-                {prod.image ? (
-                  <img src={prod.image} alt={prod.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  <div style={{ height: '100%', display: 'grid', placeItems: 'center', color: '#94a3b8' }}>
-                    <span className="material-icons" style={{ fontSize: '48px' }}>inventory_2</span>
-                  </div>
-                )}
-
-                <span
-                  style={{
-                    position: 'absolute',
-                    top: '12px',
-                    left: '12px',
-                    backgroundColor: '#0f172a',
-                    color: '#ffffff',
-                    padding: '3px 10px',
-                    borderRadius: '12px',
-                    fontSize: '0.72rem',
-                    fontWeight: 800,
-                  }}
-                >
-                  New
-                </span>
-
-                <button
-                  type="button"
-                  onClick={() => onToggleSave(Number(prod.id))}
-                  style={{
-                    position: 'absolute',
-                    top: '10px',
-                    right: '10px',
-                    backgroundColor: '#ffffff',
-                    border: 'none',
-                    borderRadius: '50%',
-                    width: '32px',
-                    height: '32px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                    color: savedIds.includes(String(prod.id)) ? '#ef4444' : '#64748b',
-                  }}
-                  title="Save to Wishlist"
-                >
-                  <span className="material-icons" style={{ fontSize: '18px' }}>
-                    {savedIds.includes(String(prod.id)) ? 'favorite' : 'favorite_border'}
-                  </span>
-                </button>
-              </div>
-
-              {/* Product Info */}
-              <div style={{ padding: '16px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                <div>
-                  <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>{prod.storeName}</span>
-                  <h3
-                    style={{
-                      margin: '4px 0 8px',
-                      fontSize: '0.94rem',
-                      fontWeight: 800,
-                      color: '#0f172a',
-                      lineHeight: 1.35,
-                    }}
-                  >
-                    {prod.title}
-                  </h3>
-
-                  {prod.rating !== undefined && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-                      <span style={{ color: '#f59e0b', fontSize: '0.85rem' }}>★ {prod.rating}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
-                  <div>
-                    <strong style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
-                      K{prod.price.toFixed(2)}
-                    </strong>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onAddToCart({
-                        id: prod.id,
-                        title: prod.title,
-                        price: prod.price,
-                        image: prod.image,
-                        sellerName: prod.storeName,
-                        sellerUserId: prod.user_id,
-                      })
-                    }
-                    style={{
-                      backgroundColor: '#0f172a',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '50%',
-                      width: '36px',
-                      height: '36px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 10px rgba(15, 23, 42, 0.2)',
-                    }}
-                    title="Add to Bag"
-                  >
-                    <span className="material-icons" style={{ fontSize: '18px' }}>shopping_bag</span>
-                  </button>
-                </div>
-              </div>
+              {row.map((listing) => (
+                <ListingView
+                  key={listing.id}
+                  listing={listing}
+                  saved={savedIds.includes(String(listing.id))}
+                  onOpen={onOpenListing}
+                  onToggleSave={onToggleSave}
+                  allBusinesses={allBusinesses}
+                />
+              ))}
             </div>
           ))}
         </div>
@@ -884,7 +810,7 @@ export function BrowsePage({
               Explore All Marketplace Listings
             </h2>
             <span style={{ fontSize: '0.86rem', color: '#64748b' }}>
-              Showing {filteredCatalog.length} active items & services across stores
+              Showing {sortedCatalog.length} active items & services across stores
             </span>
           </div>
 
@@ -912,32 +838,8 @@ export function BrowsePage({
           </div>
         </div>
 
-        {/* Category Filter Pills */}
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '32px' }}>
-          {['All', 'Fashion', 'Electronics', 'Home Decor', 'Beauty', 'Fitness', 'Accessories'].map((cat) => (
-            <button
-              key={cat}
-              type="button"
-              onClick={() => setSelectedCategory(cat)}
-              style={{
-                padding: '6px 16px',
-                borderRadius: '999px',
-                border: '1px solid',
-                borderColor: selectedCategory.toLowerCase() === cat.toLowerCase() ? '#0f172a' : '#e2e8f0',
-                backgroundColor: selectedCategory.toLowerCase() === cat.toLowerCase() ? '#0f172a' : '#ffffff',
-                color: selectedCategory.toLowerCase() === cat.toLowerCase() ? '#ffffff' : '#475569',
-                fontSize: '0.82rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-
         {/* Listings Grid */}
-        {filteredCatalog.length === 0 ? (
+        {sortedCatalog.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', backgroundColor: '#f8fafc', borderRadius: '24px' }}>
             <span className="material-icons" style={{ fontSize: '48px', color: '#94a3b8', marginBottom: '12px' }}>
               search_off
@@ -949,7 +851,7 @@ export function BrowsePage({
             <button
               type="button"
               onClick={() => {
-                setSelectedCategory('All')
+                clearFilters()
                 onSearchQueryChange('')
               }}
               style={{
@@ -967,7 +869,7 @@ export function BrowsePage({
           </div>
         ) : (
           <div className="marketplace-listing-grid">
-            {filteredCatalog.map((item) => {
+            {sortedCatalog.map((item) => {
               return (
                 <ListingView
                   key={item.id}
@@ -982,6 +884,107 @@ export function BrowsePage({
           </div>
         )}
       </section>
+
+      {isFiltersOpen && (
+        <div className="browse-filter-backdrop" onClick={() => setIsFiltersOpen(false)}>
+          <aside
+            className="browse-filter-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="browse-filter-title"
+            onClick={event => event.stopPropagation()}
+          >
+            <header className="browse-filter-header">
+              <div>
+                <h2 id="browse-filter-title">Filter results</h2>
+                <p>Filters apply to all listing sections.</p>
+              </div>
+              <button type="button" className="browse-filter-close" aria-label="Close filters" onClick={() => setIsFiltersOpen(false)}>
+                <span className="material-icons" aria-hidden="true">close</span>
+              </button>
+            </header>
+
+            <div className="browse-filter-content">
+              <fieldset className="browse-filter-group">
+                <legend>Categories</legend>
+                <p className="browse-filter-hint">Choose one or more. Leave all unchecked to search every category.</p>
+                {CATEGORY_OPTIONS.filter(category => category !== 'All').map(category => (
+                  <label className="browse-filter-option" key={category}>
+                    <input type="checkbox" checked={filters.categories.includes(category)} onChange={() => toggleFilterOption('categories', category)} />
+                    <span>{category}</span>
+                  </label>
+                ))}
+              </fieldset>
+
+              <fieldset className="browse-filter-group">
+                <legend>Location</legend>
+                {locationOptions.length > 0
+                  ? locationOptions.map(location => (
+                    <label className="browse-filter-option" key={location}>
+                      <input type="checkbox" checked={filters.locations.includes(location)} onChange={() => toggleFilterOption('locations', location)} />
+                      <span>{location}</span>
+                    </label>
+                  ))
+                  : <p className="browse-filter-hint">No listing locations are currently available.</p>}
+              </fieldset>
+
+              <fieldset className="browse-filter-group">
+                <legend>Condition</legend>
+                {CONDITION_OPTIONS.map(condition => (
+                  <label className="browse-filter-option" key={condition}>
+                    <input type="checkbox" checked={filters.conditions.includes(condition)} onChange={() => toggleFilterOption('conditions', condition)} />
+                    <span>{condition}</span>
+                  </label>
+                ))}
+              </fieldset>
+
+              <fieldset className="browse-filter-group">
+                <legend>Seller / Store</legend>
+                {sellerOptions.map(seller => (
+                  <label className="browse-filter-option" key={seller.id}>
+                    <input type="checkbox" checked={filters.sellers.includes(seller.id)} onChange={() => toggleFilterOption('sellers', seller.id)} />
+                    <span>{seller.label}</span>
+                  </label>
+                ))}
+              </fieldset>
+
+              <fieldset className="browse-filter-group">
+                <legend>Price</legend>
+                <div className="browse-filter-price-fields">
+                  <label>
+                    <span>Minimum</span>
+                    <input type="number" min="0" step="any" value={filters.minPrice} onChange={event => setFilters(current => ({ ...current, minPrice: event.target.value }))} placeholder="No minimum" />
+                  </label>
+                  <label>
+                    <span>Maximum</span>
+                    <input type="number" min="0" step="any" value={filters.maxPrice} onChange={event => setFilters(current => ({ ...current, maxPrice: event.target.value }))} placeholder="No maximum" />
+                  </label>
+                </div>
+              </fieldset>
+
+              <fieldset className="browse-filter-group">
+                <legend>Rating</legend>
+                <p className="browse-filter-hint">If multiple ratings are checked, the highest minimum applies.</p>
+                {[
+                  { value: '3', label: '3 stars & up' },
+                  { value: '4', label: '4 stars & up' },
+                  { value: '4.5', label: '4.5 stars & up' },
+                ].map(rating => (
+                  <label className="browse-filter-option" key={rating.value}>
+                    <input type="checkbox" checked={filters.ratings.includes(rating.value)} onChange={() => toggleFilterOption('ratings', rating.value)} />
+                    <span>{rating.label}</span>
+                  </label>
+                ))}
+              </fieldset>
+            </div>
+
+            <footer className="browse-filter-footer">
+              <button type="button" className="browse-filter-reset" onClick={clearFilters}>Reset filters</button>
+              <button type="button" className="browse-filter-show" onClick={() => setIsFiltersOpen(false)}>Show {sortedCatalog.length} results</button>
+            </footer>
+          </aside>
+        </div>
+      )}
 
       {/* ---------------- 7. BOTTOM TRUST & QUALITY BAR ---------------- */}
       <section style={{ backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', padding: '36px 0' }}>

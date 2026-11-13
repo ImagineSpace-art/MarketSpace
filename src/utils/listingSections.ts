@@ -3,6 +3,14 @@ import { isListingExpired } from '../features/marketplace/listingExpiry'
 
 const NEW_ARRIVAL_WINDOW_MS = 14 * 24 * 60 * 60 * 1000
 
+export function groupNewArrivalsIntoRows(listings: Listing[]): Listing[][] {
+  const rows: Listing[][] = []
+  for (let index = 0; index < listings.length; index += 10) {
+    rows.push(listings.slice(index, index + 10))
+  }
+  return rows
+}
+
 export function isNewArrival(listing: Listing, now = Date.now()): boolean {
   if (!listing.created_at) return false
 

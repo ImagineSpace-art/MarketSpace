@@ -321,27 +321,6 @@ export function Shell({
           </form>
 
           <div className="header-actions-group">
-            {/* Mobile Categories & Filters Button */}
-            {isCategoryPage && (
-              <button
-                type="button"
-                className="header-mobile-filters-btn"
-                onClick={() => setIsMobileCategoryDrawerOpen(true)}
-                title="Categories & Filters"
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: '#4b5563',
-                  padding: '6px',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                <span className="material-icons" style={{ fontSize: '24px' }}>tune</span>
-              </button>
-            )}
-
             <Link to="/profile/saved-listings" className="header-icon-link" title="Favorites" style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
               <span className="material-icons">favorite_border</span>
               {savedCount > 0 && (
@@ -493,7 +472,7 @@ export function Shell({
         </div>
 
         {/* Row 3: Center-Aligned Category & Store Department Bar with Highlights */}
-        {isCategoryPage && (
+        {isCategoryPage && storeContext && (
           <>
             <nav className="category-mega-bar" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', gap: '8px', padding: '6px 16px' }}>
           {storeContext ? (() => {
