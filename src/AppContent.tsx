@@ -155,6 +155,29 @@ function SlowlyFlashingMarketSpaceTemplate({ message = 'Loading MarketSpace...' 
   )
 }
 
+function MessagesPopup({
+  isOpen,
+  onClose,
+  ...messagesProps
+}: ComponentProps<typeof MessagesPage> & { isOpen: boolean; onClose: () => void }) {
+  if (!isOpen) return null
+  return (
+    <div className="messages-popup-backdrop">
+      <section className="messages-popup-window" role="dialog" aria-modal="true" aria-label="Messages">
+        <header className="messages-popup-header">
+          <h2>Messages</h2>
+          <button type="button" onClick={onClose} aria-label="Close messages">
+            <span className="material-icons" aria-hidden="true">close</span>
+          </button>
+        </header>
+        <div className="messages-popup-content">
+          <MessagesPage {...messagesProps} />
+        </div>
+      </section>
+    </div>
+  )
+}
+
 export function AppContent() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -285,6 +308,30 @@ export function AppContent() {
   } = app
 
   const cart = useCart()
+  const messagesPopup = session ? (
+    <MessagesPopup
+      isOpen={app.isChatPopupOpen}
+      onClose={app.closeChatPopup}
+      chatThreads={chatThreads}
+      activeChatId={activeChatId}
+      canMessage={canMessage}
+      chatDraft={chatDraft}
+      onSelectThread={(threadId) => {
+        setActiveChatId(threadId || null)
+        if (threadId && chatThreads.find(thread => thread.id === threadId)?.unread) {
+          app.setChatUnread(threadId, false)
+        }
+      }}
+      onToggleMute={() => setCanMessage(value => !value)}
+      onDraftChange={setChatDraft}
+      onSendMessage={sendInboxMessage}
+      onTogglePinChat={app.togglePinChat}
+      onToggleFavoriteChat={app.toggleFavoriteChat}
+      onToggleArchiveChat={app.toggleArchiveChat}
+      onDeleteChat={app.deleteChat}
+      onToggleUnreadChat={app.toggleUnreadChat}
+    />
+  ) : null
 
   if (location.pathname.startsWith('/admin')) {
     return (
@@ -394,6 +441,7 @@ export function AppContent() {
             <span className="material-icons" style={{ fontSize: '24px' }}>arrow_upward</span>
           </button>
         )}
+        {messagesPopup}
       </div>
     )
   }
@@ -905,6 +953,7 @@ export function AppContent() {
           />
         </Routes>
       </Shell>
+      {messagesPopup}
       {showScrollTop && (
         <button
           onClick={scrollToTop}
@@ -987,7 +1036,7 @@ function ListingDetailRoute({ listings, loading, session, navigate, handleStartC
       session={session}
       onBack={() => navigate('/')}
       onMessageSeller={(customMessage?: string) => {
-        void handleStartChat(listing, customMessage)
+        void handleStartChat(listing, customMessage, Boolean(customMessage?.startsWith('[INQUIRY_CARD]')))
       }}
       onToggleSave={toggleSave}
       onEditListing={openEditListing}

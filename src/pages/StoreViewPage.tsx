@@ -56,7 +56,6 @@ export function StoreViewPage({
   const isNotified = notifyStoreIds.includes(shop.userId)
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [isInfoOpen, setIsInfoOpen] = useState(false)
-  const [isMessageOpen, setIsMessageOpen] = useState(false)
   const [cartItems, setCartItems] = useState<StoreCartItem[]>(() => {
     try {
       const saved = localStorage.getItem(`marketspace_cart_${shop.userId}`)
@@ -147,7 +146,6 @@ export function StoreViewPage({
 
   const startStoreMessage = (message?: string) => {
     if (isOwner) return
-    setIsMessageOpen(true)
     onMessageSeller(message)
   }
 
@@ -170,7 +168,6 @@ export function StoreViewPage({
           onEditListing={onEditListing}
           onRenewListing={onRenewListing}
         />
-        {isMessageOpen && <StoreMessageConfirmation onClose={() => setIsMessageOpen(false)} onOpenInbox={() => navigate('/inbox')} />}
       </>
     )
   }
@@ -210,21 +207,6 @@ export function StoreViewPage({
       {templateId === 'storefront-landing'
         ? <StorefrontLandingTemplate {...templateProps} />
         : <BoutiqueGridTemplate {...templateProps} />}
-      {isMessageOpen && <StoreMessageConfirmation onClose={() => setIsMessageOpen(false)} onOpenInbox={() => navigate('/inbox')} />}
     </>
-  )
-}
-
-function StoreMessageConfirmation({ onClose, onOpenInbox }: { onClose: () => void; onOpenInbox: () => void }) {
-  return (
-    <div className="store-inquiry-panel" role="dialog" aria-label="Store messages">
-      <button type="button" className="store-inquiry-close" onClick={onClose} aria-label="Close messages">
-        <span className="material-icons">close</span>
-      </button>
-      <span className="store-inquiry-icon"><span className="material-icons">chat_bubble_outline</span></span>
-      <h2>Message started</h2>
-      <p>Your conversation is ready. Continue chatting with the seller in your inbox.</p>
-      <button type="button" onClick={onOpenInbox}>Open conversation</button>
-    </div>
   )
 }

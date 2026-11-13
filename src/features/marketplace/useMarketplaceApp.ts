@@ -95,6 +95,8 @@ export interface MarketplaceAppModel {
   setChatThreads: Dispatch<SetStateAction<ChatThread[]>>
   activeChatId: number | null
   setActiveChatId: Dispatch<SetStateAction<number | null>>
+  isChatPopupOpen: boolean
+  closeChatPopup: () => void
   chatDraft: string
   setChatDraft: Dispatch<SetStateAction<string>>
   title: string
@@ -389,6 +391,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
 
   const [chatThreads, setChatThreads] = useState<ChatThread[]>([])
   const [activeChatId, setActiveChatId] = useState<number | null>(1)
+  const [isChatPopupOpen, setIsChatPopupOpen] = useState(false)
   const [chatDraft, setChatDraft] = useState('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -1691,11 +1694,12 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       }
 
       if (customMessage) {
-        await supabase.from('messages').insert({
+        const { error: messageError } = await supabase.from('messages').insert({
           chat_id: chatId,
           sender_id: session.user.id,
           content: customMessage
         })
+        if (messageError) throw messageError
       }
 
       await fetchChatThreads()
@@ -1706,7 +1710,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
         listing_id: listing.id,
         actor_id: session.user.id
       })
-      if (!stayInCurrentPage) navigate('/inbox')
+      if (stayInCurrentPage) setIsChatPopupOpen(true)
+      else navigate('/inbox')
     } catch (err: any) {
       setMessage(err.message || 'Failed to start chat')
     } finally {
@@ -2232,6 +2237,8 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setChatThreads,
     activeChatId,
     setActiveChatId,
+    isChatPopupOpen,
+    closeChatPopup: () => setIsChatPopupOpen(false),
     chatDraft,
     setChatDraft,
     title,
