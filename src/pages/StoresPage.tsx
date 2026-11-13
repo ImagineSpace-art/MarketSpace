@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { Fragment, useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import type { BusinessProfile, Listing } from '../types'
 import { STORE_MARKET_LOCATIONS, groupStoreLocation } from '../features/marketplace/storeLocations'
 import { recordBoostEvent } from '../utils/visibilityBoosts'
+import { useTopScrollExpandableHero } from '../hooks/useTopScrollExpandableHero'
 
 // ---------------- STORES & STORE LISTINGS PAGE ----------------
 type StoresPageProps = {
@@ -13,6 +14,13 @@ type StoresPageProps = {
   searchQuery: string
   onSearchQueryChange: (query: string) => void
 }
+
+const STORE_CATEGORIES = [
+  { name: 'Electronics', image: '/banners/store_banner_electronics.png', description: 'Tech and accessories' },
+  { name: 'Home & Garden', image: '/illustrations/cat_homedecor.jpg', description: 'Make yourself at home' },
+  { name: 'Fashion', image: '/banners/store_banner_apparel.png', description: 'Style from local boutiques' },
+  { name: 'Sports', image: '/illustrations/banner_summer_collection.jpg', description: 'Gear for active days' },
+]
 
 export function StoresPage({
   allBusinesses,
@@ -28,6 +36,9 @@ export function StoresPage({
   const [currentSlide, setCurrentSlide] = useState(0)
   const [selectedStoreCategory, setSelectedStoreCategory] = useState('All')
   const [selectedLocation, setSelectedLocation] = useState('All')
+  const [categoryLoopCopies, setCategoryLoopCopies] = useState(2)
+  const categoryRailRef = useRef<HTMLDivElement>(null)
+  const { isExpanded: isHeroExpanded, setIsExpanded: setIsHeroExpanded, headerOffset } = useTopScrollExpandableHero()
   const normalizedSearchQuery = searchQuery.trim().toLowerCase()
 
   const slides = [
@@ -82,12 +93,18 @@ export function StoresPage({
     })
   }, [visibleBoostIds])
 
-  const storeCategories = [
-    { name: 'Electronics', image: slides[2], description: 'Tech and accessories' },
-    { name: 'Home & Garden', image: '/illustrations/cat_homedecor.jpg', description: 'Make yourself at home' },
-    { name: 'Fashion', image: slides[1], description: 'Style from local boutiques' },
-    { name: 'Sports', image: '/illustrations/banner_summer_collection.jpg', description: 'Gear for active days' },
-  ]
+  useEffect(() => {
+    const rail = categoryRailRef.current
+    if (!rail) return
+    const updateCopies = () => {
+      const minimumGroupWidth = (190 + 14) * STORE_CATEGORIES.length
+      setCategoryLoopCopies(Math.max(2, Math.ceil(rail.clientWidth / minimumGroupWidth) + 1))
+    }
+    updateCopies()
+    const observer = new ResizeObserver(updateCopies)
+    observer.observe(rail)
+    return () => observer.disconnect()
+  }, [])
 
   const scrollToCatalog = () => {
     document.getElementById('stores-catalog')?.scrollIntoView({ behavior: 'smooth' })
@@ -105,62 +122,86 @@ export function StoresPage({
       }}
     >
       <section
-        style={{
-          maxWidth: '1280px',
-          margin: '24px auto 48px',
-          padding: '0 24px',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
-          gap: '40px',
-          alignItems: 'center',
-        }}
+        className={`browse-hero stores-hero${isHeroExpanded ? ' is-expanded' : ' is-compact'}`}
+        style={{ top: `${headerOffset}px` }}
+        aria-label="Stores page introduction"
       >
-        <div>
-          <span style={{ display: 'inline-block', color: '#ea580c', fontWeight: 800, fontSize: '0.78rem', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '12px' }}>
-            Shop Local, Shop Verified
-          </span>
-          <h1 style={{ fontSize: 'clamp(2.4rem, 4.8vw, 3.8rem)', fontWeight: 900, lineHeight: 1.12, letterSpacing: '-0.03em', margin: '0 0 16px', color: '#0f172a' }}>
-            Discover Stores You’ll Love
-          </h1>
-          <p style={{ fontSize: '1rem', lineHeight: 1.6, color: '#64748b', margin: '0 0 28px', maxWidth: '480px' }}>
-            Explore Zambia’s independent businesses, browse their latest products, and shop directly from verified local merchants.
-          </p>
-          <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginBottom: '32px' }}>
+        <div className="browse-hero-compact-bar">
+          <strong>Discover Stores You’ll Love</strong>
+          <button
+            type="button"
+            className="browse-hero-toggle"
+            aria-expanded={isHeroExpanded}
+            aria-controls="stores-hero-details"
+            onClick={() => setIsHeroExpanded((expanded) => !expanded)}
+          >
+            <span>{isHeroExpanded ? 'Hide banner' : 'Show full banner'}</span>
+            <span className="material-icons" aria-hidden="true">{isHeroExpanded ? 'expand_less' : 'expand_more'}</span>
+          </button>
+        </div>
+        <div
+          id="stores-hero-details"
+          className="browse-hero-details"
+          aria-hidden={!isHeroExpanded}
+          inert={!isHeroExpanded}
+        >
+          <div className="browse-hero-details-inner">
+            <div className="browse-hero-copy">
+              <span style={{ display: 'inline-block', color: '#ea580c', fontWeight: 800, fontSize: '0.78rem', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '12px' }}>
+                Shop Local, Shop Verified
+              </span>
+              <h1 style={{ fontSize: 'clamp(2.4rem, 4.8vw, 3.8rem)', fontWeight: 900, lineHeight: 1.12, letterSpacing: '-0.03em', margin: '0 0 16px', color: '#0f172a' }}>
+                Discover Stores You’ll Love
+              </h1>
+              <p style={{ fontSize: '1rem', lineHeight: 1.6, color: '#64748b', margin: '0 0 28px', maxWidth: '480px' }}>
+                Explore Zambia’s independent businesses, browse their latest products, and shop directly from verified local merchants.
+              </p>
+              <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginBottom: '32px' }}>
+                <button
+                  type="button"
+                  onClick={() => { setSelectedStoreCategory('All'); scrollToCatalog() }}
+                  style={{ backgroundColor: '#0f172a', color: '#ffffff', border: 'none', borderRadius: '999px', padding: '13px 26px', fontSize: '0.94rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                >
+                  Explore Stores <span className="material-icons" style={{ fontSize: '18px' }}>arrow_forward</span>
+                </button>
+                <Link
+                  to="/browse#browse-store-listings"
+                  style={{ backgroundColor: '#ffffff', color: '#0f172a', border: '1px solid #e2e8f0', borderRadius: '999px', padding: '12px 24px', fontSize: '0.94rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Shop Store Products
+                </Link>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#64748b', fontSize: '0.84rem', fontWeight: 600 }}>
+                <span className="material-icons" style={{ color: '#2563eb', fontSize: '20px' }}>verified</span>
+                Trusted local businesses, all in one place
+              </div>
+            </div>
+            <div className="browse-hero-visual" style={{ position: 'relative', minHeight: '360px', display: 'flex', justifyContent: 'center' }}>
+              <div style={{ width: '100%', maxWidth: '560px', height: '380px', borderRadius: '32px', overflow: 'hidden', backgroundColor: '#f8fafc', boxShadow: '0 20px 50px rgba(15, 23, 42, 0.08)' }}>
+                <img src={slides[currentSlide]} alt="Local stores and their products" style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'opacity 0.4s ease' }} />
+              </div>
+              <div style={{ position: 'absolute', left: '8px', bottom: '28px', backgroundColor: '#ffffff', borderRadius: '16px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}>
+                <span className="material-icons" style={{ color: '#2563eb', fontSize: '24px' }}>storefront</span>
+                <div>
+                  <strong style={{ display: 'block', fontSize: '0.84rem', color: '#0f172a' }}>Made for local shopping</strong>
+                  <span style={{ fontSize: '0.76rem', color: '#64748b' }}>Discover independent merchants</span>
+                </div>
+              </div>
+              <div style={{ position: 'absolute', right: '8px', top: '24px', backgroundColor: '#ffffff', borderRadius: '16px', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}>
+                <span className="material-icons" style={{ color: '#16a34a', fontSize: '20px' }}>verified</span>
+                <strong style={{ fontSize: '0.8rem', color: '#0f172a' }}>Verified stores</strong>
+              </div>
+            </div>
             <button
               type="button"
-              onClick={() => { setSelectedStoreCategory('All'); scrollToCatalog() }}
-              style={{ backgroundColor: '#0f172a', color: '#ffffff', border: 'none', borderRadius: '999px', padding: '13px 26px', fontSize: '0.94rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+              className="browse-hero-toggle browse-hero-collapse"
+              aria-expanded={isHeroExpanded}
+              aria-controls="stores-hero-details"
+              onClick={() => setIsHeroExpanded(false)}
             >
-              Explore Stores
-              <span className="material-icons" style={{ fontSize: '18px' }}>arrow_forward</span>
+              <span>Collapse banner</span>
+              <span className="material-icons" aria-hidden="true">expand_less</span>
             </button>
-            <Link
-              to="/browse#browse-store-listings"
-              style={{ backgroundColor: '#ffffff', color: '#0f172a', border: '1px solid #e2e8f0', borderRadius: '999px', padding: '12px 24px', fontSize: '0.94rem', fontWeight: 700, cursor: 'pointer' }}
-            >
-              Shop Store Products
-            </Link>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#64748b', fontSize: '0.84rem', fontWeight: 600 }}>
-            <span className="material-icons" style={{ color: '#2563eb', fontSize: '20px' }}>verified</span>
-            Trusted local businesses, all in one place
-          </div>
-        </div>
-
-        <div style={{ position: 'relative', minHeight: '360px', display: 'flex', justifyContent: 'center' }}>
-          <div style={{ width: '100%', maxWidth: '560px', height: '380px', borderRadius: '32px', overflow: 'hidden', backgroundColor: '#f8fafc', boxShadow: '0 20px 50px rgba(15, 23, 42, 0.08)' }}>
-            <img src={slides[currentSlide]} alt="Local stores and their products" style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'opacity 0.4s ease' }} />
-          </div>
-          <div style={{ position: 'absolute', left: '8px', bottom: '28px', backgroundColor: '#ffffff', borderRadius: '16px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}>
-            <span className="material-icons" style={{ color: '#2563eb', fontSize: '24px' }}>storefront</span>
-            <div>
-              <strong style={{ display: 'block', fontSize: '0.84rem', color: '#0f172a' }}>Made for local shopping</strong>
-              <span style={{ fontSize: '0.76rem', color: '#64748b' }}>Discover independent merchants</span>
-            </div>
-          </div>
-          <div style={{ position: 'absolute', right: '8px', top: '24px', backgroundColor: '#ffffff', borderRadius: '16px', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}>
-            <span className="material-icons" style={{ color: '#16a34a', fontSize: '20px' }}>verified</span>
-            <strong style={{ fontSize: '0.8rem', color: '#0f172a' }}>Verified stores</strong>
           </div>
         </div>
       </section>
@@ -194,22 +235,42 @@ export function StoresPage({
             View all stores <span className="material-icons" style={{ fontSize: '16px' }}>arrow_forward</span>
           </button>
         </div>
-        <div className="shop-category-rail">
-          {storeCategories.map((category) => (
-            <button
-              key={category.name}
-              type="button"
-              className="shop-category-card"
-              onClick={() => { onSearchQueryChange(''); setSelectedStoreCategory(category.name); scrollToCatalog() }}
-              style={{ padding: 0, cursor: 'pointer', textAlign: 'center' }}
-            >
-              <div className="shop-category-image">
-                <img src={category.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        <div className="shop-category-rail" ref={categoryRailRef}>
+          <div className="shop-category-track">
+            {[0, 1].map(groupIndex => (
+              <div
+                key={groupIndex}
+                className="shop-category-track-group"
+                aria-hidden={groupIndex > 0}
+                inert={groupIndex > 0}
+              >
+                {Array.from({ length: categoryLoopCopies }, (_, cycleIndex) => (
+                  <div
+                    key={cycleIndex}
+                    className="shop-category-track-cycle"
+                    aria-hidden={cycleIndex > 0}
+                    inert={cycleIndex > 0}
+                  >
+                    {STORE_CATEGORIES.map(category => (
+                      <button
+                        key={category.name}
+                        type="button"
+                        className="shop-category-card"
+                        onClick={() => { onSearchQueryChange(''); setSelectedStoreCategory(category.name); scrollToCatalog() }}
+                        style={{ padding: 0, cursor: 'pointer', textAlign: 'center' }}
+                      >
+                        <div className="shop-category-image">
+                          <img src={category.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </div>
+                        <span className="shop-category-title">{category.name}</span>
+                        <span className="shop-category-description">{category.description}</span>
+                      </button>
+                    ))}
+                  </div>
+                ))}
               </div>
-              <span className="shop-category-title">{category.name}</span>
-              <span className="shop-category-description">{category.description}</span>
-            </button>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
 
@@ -227,7 +288,7 @@ export function StoresPage({
               </select>
               <select aria-label="Filter stores by category" value={selectedStoreCategory} onChange={event => setSelectedStoreCategory(event.target.value)} style={{ minWidth: 160, borderRadius: 999, border: '1px solid #e2e8f0', padding: '9px 14px', background: '#fff' }}>
                 <option value="All">All categories</option>
-                {storeCategories.map(category => <option key={category.name} value={category.name}>{category.name}</option>)}
+                {STORE_CATEGORIES.map(category => <option key={category.name} value={category.name}>{category.name}</option>)}
               </select>
             </div>
           </div>
@@ -250,10 +311,9 @@ export function StoresPage({
                     const shopLocation = groupStoreLocation(shop.address, shop.locationName)
                     const previousLocation = index > 0 ? groupStoreLocation(filteredShops[index - 1].address, filteredShops[index - 1].locationName) : null
                     return (
-                      <>
+                      <Fragment key={shop.userId}>
                         {shopLocation !== previousLocation && <h3 style={{ gridColumn: '1 / -1', margin: '8px 0 0', paddingTop: 12, fontSize: '1rem', color: '#334155', borderTop: index ? '1px solid #e2e8f0' : undefined }}>{shopLocation}</h3>}
                         <article
-                        key={shop.userId}
                         style={{
                           borderRadius: '20px',
                           border: '1px solid #f1f5f9',
@@ -341,7 +401,7 @@ export function StoresPage({
                           </div>
                         </div>
                       </article>
-                      </>
+                      </Fragment>
                     )
                   })}
                 </div>

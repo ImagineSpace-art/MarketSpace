@@ -1,4 +1,5 @@
 import type { Listing } from '../types'
+import { isListingExpired } from '../features/marketplace/listingExpiry'
 
 const NEW_ARRIVAL_WINDOW_MS = 14 * 24 * 60 * 60 * 1000
 
@@ -12,4 +13,17 @@ export function isNewArrival(listing: Listing, now = Date.now()): boolean {
 
 export function isBestSeller(listing: Listing): boolean {
   return Boolean(listing.sponsored) || (listing.rating !== undefined && listing.rating >= 4.5)
+}
+
+export function getBrowseListings(
+  listings: Listing[],
+  globalFrequency: 'daily' | 'weekly' | 'biweekly' | 'monthly' = 'weekly',
+  globalDay = 'Monday',
+  now = Date.now(),
+): Listing[] {
+  return listings.filter((listing) => {
+    const status = listing.status?.toLowerCase()
+    return (!status || ['active', 'available'].includes(status))
+      && !isListingExpired(listing, globalFrequency, globalDay, now)
+  })
 }

@@ -708,7 +708,7 @@ export function SettingsPage({
                             : destructiveAction === 'restore-store'
                                 ? 'Your storefront and approved content will become visible again. Pending or rejected listings and ads keep their current moderation status.'
                                 : destructiveAction === 'delete-store'
-                                    ? 'This permanently deletes the store and its store-owned listings, reviews, catalog, and ad campaigns. Your account and profile remain. This cannot be undone.'
+                                   ? 'This permanently deletes the store, its listings, reviews, ads, followers, analytics, registration data, and uploaded store media. The store address becomes available again. Your account and profile remain. Moderation audit records may be retained; only a moderator fraud or abuse removal blocks future store registration. This cannot be undone.'
                                     : 'This permanently deletes your account and associated data. This cannot be undone.'
                     }
                     confirmationText={

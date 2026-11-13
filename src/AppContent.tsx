@@ -23,6 +23,7 @@ import { isBestSeller, isNewArrival } from './utils/listingSections'
 import { getStoreSubdomain, getStoreUrl } from './utils/storeUrl'
 import { recordBoostEvent } from './utils/visibilityBoosts'
 import { supabase } from './lib/supabaseClient'
+import { SiteAnnouncementBar } from './components/SiteAnnouncementBar'
 
 function SlowlyFlashingMarketSpaceTemplate({ message = 'Loading MarketSpace...' }: { message?: string }) {
   return (
@@ -286,11 +287,21 @@ export function AppContent() {
   const cart = useCart()
 
   if (location.pathname.startsWith('/admin')) {
-    return <AdminArea />
+    return (
+      <>
+        <SiteAnnouncementBar />
+        <AdminArea />
+      </>
+    )
   }
 
   if (loading) {
-    return <SlowlyFlashingMarketSpaceTemplate message="Loading MarketSpace..." />
+    return (
+      <>
+        <SiteAnnouncementBar />
+        <SlowlyFlashingMarketSpaceTemplate message="Loading MarketSpace..." />
+      </>
+    )
   }
 
   const handleAuthSubmit = async (event: FormEvent<HTMLFormElement>, captchaToken?: string) => {
@@ -324,6 +335,7 @@ export function AppContent() {
   if (isStorePage) {
     return (
       <div className="standalone-store-site" style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+        <SiteAnnouncementBar />
         {message ? <div className="status-banner">{message}</div> : null}
         <Routes>
           <Route
@@ -406,6 +418,7 @@ export function AppContent() {
         savedCount={savedIds.length}
         unreadChatCount={app.chatThreads.filter((t) => t.unread).length}
         allBusinesses={allBusinesses}
+        hasOwnStore={Boolean(businessProfile || (session?.user.id && allBusinesses[session.user.id]))}
         searchQuery={app.searchQuery}
         onSearchQueryChange={app.setSearchQuery}
         hasNewArrivals={listings.some((listing) => isNewArrival(listing))}
@@ -460,6 +473,8 @@ export function AppContent() {
                 onAddToCart={(it) => cart.addToCart(it)}
                 onOpenListing={openListing}
                 session={session}
+                globalRenewalFrequency={app.globalRenewalFrequency}
+                globalRenewalDay={app.globalRenewalDay}
               />
             }
           />

@@ -1,4 +1,4 @@
-import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import type { Listing, Profile, BusinessProfile, BusinessAd, PaymentMethodItem, NotificationConfig } from '../types'
 import { SavedItemsPage, NotificationsPage } from './SavedNotificationsPage'
@@ -9,13 +9,20 @@ import { AdCreationPage } from './AdCreationPage'
 import { StoreInsightsView } from '../components/StoreInsightsView'
 import { StoreTemplateEditor } from './StoreTemplateEditor'
 import type { NotificationItem } from '../features/marketplace/useMarketplaceApp'
-import { uploadImageToSupabase } from '../features/marketplace/ImageUploader'
 import { fetchStoreAnalytics, type StoreAnalyticsData } from '../services/analytics'
 import { getListingTimeRemainingMs, isListingExpired } from '../features/marketplace/listingExpiry'
 import { DestructiveActionDialog } from '../components/DestructiveActionDialog'
 import { SellerVerificationSubmission } from '../components/SellerVerificationSubmission'
 import { getStoreUrl } from '../utils/storeUrl'
 import { BoostControl } from '../components/BoostControl'
+import { supabase } from '../lib/supabaseClient'
+
+type StoreFollower = {
+    user_id: string
+    created_at: string | null
+    username?: string | null
+    avatar_url?: string | null
+}
 
 // ---------------- PROFILE PAGE ----------------
 type ProfilePageProps = {
@@ -140,7 +147,7 @@ export function ProfilePage({
 }: ProfilePageProps) {
     const navigate = useNavigate()
 
-    const [storeTab, setStoreTab] = useState<'analytics' | 'catalog' | 'ads' | 'social' | 'customizer'>('analytics')
+    const [storeTab, setStoreTab] = useState<'analytics' | 'ads' | 'social' | 'customizer'>('analytics')
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search)
@@ -157,6 +164,52 @@ export function ProfilePage({
     const [perfTimeFilter, setPerfTimeFilter] = useState<'7d' | '14d' | '30d'>('7d')
     const [perfAnalyticsData, setPerfAnalyticsData] = useState<StoreAnalyticsData | null>(null)
 
+    const [socialFollowers, setSocialFollowers] = useState<StoreFollower[]>([])
+    const [socialFollowingIds, setSocialFollowingIds] = useState<string[]>([])
+    const [socialLoading, setSocialLoading] = useState(false)
+    const [socialError, setSocialError] = useState('')
+
+    useEffect(() => {
+        if (storeTab !== 'social' || !businessProfile?.userId) return
+        let isMounted = true
+        const loadSocialData = async () => {
+            setSocialLoading(true)
+            setSocialError('')
+            try {
+                const [followersResult, followingResult] = await Promise.all([
+                    supabase.from('store_followers').select('user_id,created_at').eq('store_id', businessProfile.userId),
+                    profile?.user_id
+                        ? supabase.from('store_followers').select('store_id').eq('user_id', profile.user_id)
+                        : Promise.resolve({ data: null, error: new Error('Your account profile could not be loaded.') }),
+                ])
+                if (followersResult.error) throw followersResult.error
+                if (followingResult.error) throw followingResult.error
+
+                const rows = (followersResult.data || []).filter(row => row.user_id)
+                const followerIds = rows.map(row => row.user_id as string)
+                const profilesResult = followerIds.length
+                    ? await supabase.from('public_profiles').select('user_id,username,avatar_url').in('user_id', followerIds)
+                    : { data: [], error: null }
+                if (profilesResult.error) throw profilesResult.error
+
+                const profilesById = new Map((profilesResult.data || []).map(user => [user.user_id, user]))
+                if (!isMounted) return
+                setSocialFollowers(rows.map(row => ({
+                    user_id: row.user_id as string,
+                    created_at: row.created_at,
+                    ...profilesById.get(row.user_id as string),
+                })))
+                setSocialFollowingIds((followingResult.data || []).map(row => row.store_id))
+            } catch (error) {
+                if (isMounted) setSocialError(error instanceof Error ? error.message : 'Followers and followed stores could not be loaded.')
+            } finally {
+                if (isMounted) setSocialLoading(false)
+            }
+        }
+        void loadSocialData()
+        return () => { isMounted = false }
+    }, [businessProfile?.userId, profile?.user_id, storeTab])
+
     useEffect(() => {
         if (!businessProfile?.userId || storeTab !== 'analytics') return
         let isMounted = true
@@ -169,66 +222,6 @@ export function ProfilePage({
             .catch(err => console.error('Error loading performance analytics:', err))
         return () => { isMounted = false }
     }, [businessProfile?.userId, storeTab, perfTimeFilter, myListings])
-
-    // Catalog Item creation states
-    const [catalogName, setCatName] = useState('')
-    const [catalogPrice, setCatPrice] = useState('')
-    const [catalogDescription, setCatDesc] = useState('')
-    const [catalogImage, setCatImage] = useState('')
-    const [catalogFormError, setCatalogFormError] = useState('')
-
-    const handleCatImageChange = async (e: ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            try {
-                const url = await uploadImageToSupabase(e.target.files[0], 'marketspace-media', 'catalog')
-                setCatImage(url)
-            } catch (err) {
-                console.error(err)
-            }
-        }
-    }
-
-    const handleAddCatalogItem = (e: FormEvent) => {
-        e.preventDefault()
-        const numericPrice = Number(catalogPrice)
-        setCatalogFormError('')
-        if (!businessProfile) return
-        if (!catalogName.trim() || catalogName.trim().length > 120) {
-            setCatalogFormError('Enter a product name between 1 and 120 characters.')
-            return
-        }
-        if (!Number.isFinite(numericPrice) || numericPrice <= 0 || numericPrice > 1_000_000_000) {
-            setCatalogFormError('Enter a price greater than zero and no more than ZMW 1,000,000,000.')
-            return
-        }
-        if (catalogDescription.length > 2000) {
-            setCatalogFormError('The description must be no more than 2,000 characters.')
-            return
-        }
-        const newItem = {
-            id: String(Date.now()),
-            name: catalogName.trim(),
-            price: String(numericPrice),
-            description: catalogDescription,
-            image: catalogImage
-        }
-        void storeSetupProps.onSave({
-            ...businessProfile,
-            catalog: [...(businessProfile.catalog || []), newItem]
-        })
-        setCatName('')
-        setCatPrice('')
-        setCatDesc('')
-        setCatImage('')
-    }
-
-    const handleRemoveCatalogItem = (itemId: string) => {
-        if (!businessProfile) return
-        void storeSetupProps.onSave({
-            ...businessProfile,
-            catalog: (businessProfile.catalog || []).filter(i => i.id !== itemId)
-        })
-    }
 
     const handleToggleAdStatus = (adId: string) => {
         if (!businessProfile) return
@@ -329,7 +322,6 @@ export function ProfilePage({
                             {/* Tab controls */}
                             <div style={{ display: 'flex', overflowX: 'auto', gap: '8px', paddingBottom: '8px', marginBottom: '16px', borderBottom: '1px solid var(--border)', WebkitOverflowScrolling: 'touch' }}>
                                 <button className={`dashboard-tab-btn ${storeTab === 'analytics' ? 'active' : ''}`} onClick={() => setStoreTab('analytics')}>Performance Dashboard</button>
-                                <button className={`dashboard-tab-btn ${storeTab === 'catalog' ? 'active' : ''}`} onClick={() => setStoreTab('catalog')}>Catalogs Manager</button>
                                 <button className={`dashboard-tab-btn ${storeTab === 'ads' ? 'active' : ''}`} onClick={() => setStoreTab('ads')}>Advertising Manager</button>
                                 <button className={`dashboard-tab-btn ${storeTab === 'social' ? 'active' : ''}`} onClick={() => setStoreTab('social')}>Followers & Following</button>
                                 <button className={`dashboard-tab-btn ${storeTab === 'customizer' ? 'active' : ''}`} onClick={() => setStoreTab('customizer')}>
@@ -441,15 +433,15 @@ export function ProfilePage({
 
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                                             <div className="sidebar-card" style={{ background: 'var(--panel)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                                                <h3 style={{ marginTop: 0 }}>Catalog Products Overview</h3>
+                                                <h3 style={{ marginTop: 0 }}>Store Listings ({myListings.length})</h3>
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '14px' }}>
-                                                    {(businessProfile.catalog || []).length === 0 ? (
-                                                        <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>No catalog items listed yet.</p>
+                                                    {myListings.length === 0 ? (
+                                                        <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>Your store listings will appear here.</p>
                                                     ) : (
-                                                        (businessProfile.catalog || []).map(item => (
-                                                            <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', paddingBottom: '6px', borderBottom: '1px solid var(--border)' }}>
-                                                                <span>{item.name}</span>
-                                                                <strong style={{ color: 'var(--primary)' }}>{item.price}</strong>
+                                                        myListings.slice(0, 5).map(listing => (
+                                                            <div key={listing.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', fontSize: '0.88rem', paddingBottom: '6px', borderBottom: '1px solid var(--border)' }}>
+                                                                <span>{listing.title}</span>
+                                                                <strong style={{ color: 'var(--primary)', whiteSpace: 'nowrap' }}>K{Number(listing.price).toLocaleString()}</strong>
                                                             </div>
                                                         ))
                                                     )}
@@ -477,71 +469,6 @@ export function ProfilePage({
                                     </div>
                                 )
                             })()}
-
-                            {/* CATALOGS TAB */}
-                            {storeTab === 'catalog' && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                    <div className="sidebar-card" style={{ background: 'var(--panel)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                                        <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <span className="material-icons">add_box</span> Add Product to Catalog
-                                        </h3>
-                                        <form onSubmit={handleAddCatalogItem} className="form-stack" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                            <label>
-                                                <span style={{ fontSize: '0.84rem', fontWeight: 600 }}>Product Image</span>
-                                                <div className="image-upload-zone" style={{ padding: '14px', marginTop: '4px', border: '2px dashed var(--border)', borderRadius: '8px' }}>
-                                                    <input type="file" accept="image/*" onChange={handleCatImageChange} style={{ display: 'none' }} id="catalog-image-input" />
-                                                    <label htmlFor="catalog-image-input" style={{ cursor: 'pointer', display: 'flex', gap: '10px', alignItems: 'center' }}>
-                                                        {catalogImage ? (
-                                                            <img src={catalogImage} alt="Product" style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'cover' }} />
-                                                        ) : (
-                                                            <div className="upload-icon"><span className="material-icons">add_a_photo</span></div>
-                                                        )}
-                                                        <span>Select Product Image</span>
-                                                    </label>
-                                                </div>
-                                            </label>
-
-                                            <input value={catalogName} onChange={e => setCatName(e.target.value)} placeholder="Product Name (e.g. Vanilla Wedding Cake)" maxLength={120} required style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
-                                            <input value={catalogPrice} onChange={e => setCatPrice(e.target.value)} type="number" inputMode="decimal" min="0.01" max="1000000000" step="0.01" placeholder="Price (e.g. ZMW 450)" required style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
-                                            <textarea value={catalogDescription} onChange={e => setCatDesc(e.target.value)} placeholder="Description (e.g. Double layered sponge with buttercream)" rows={2} maxLength={2000} style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit' }} />
-                                            {catalogFormError && <p role="alert" style={{ color: 'var(--danger)', margin: 0 }}>{catalogFormError}</p>}
-
-                                            <button className="primary-btn" type="submit" style={{ padding: '10px', borderRadius: '8px' }}>Add Product</button>
-                                        </form>
-                                    </div>
-
-                                    <div>
-                                        <h3>Current Catalog Products ({(businessProfile.catalog || []).length})</h3>
-                                        {(businessProfile.catalog || []).length === 0 ? (
-                                            <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>No catalog items yet. Add your first product to display it on your public shop profile.</p>
-                                        ) : (
-                                            <div className="catalog-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
-                                                {(businessProfile.catalog || []).map((item) => (
-                                                    <div key={item.id} className="catalog-card" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                                                        {item.image ? (
-                                                            <div className="catalog-img" style={{ backgroundImage: `url(${item.image})`, height: '140px', backgroundSize: 'cover', backgroundPosition: 'center' }} />
-                                                        ) : (
-                                                            <div className="catalog-img" style={{ background: 'linear-gradient(135deg, #ddd, #999)', height: '140px', display: 'grid', placeItems: 'center', color: '#666' }}>
-                                                                <span className="material-icons" style={{ fontSize: '32px' }}>photo_camera</span>
-                                                            </div>
-                                                        )}
-                                                        <div className="catalog-details" style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '6px', flexGrow: 1, justifyContent: 'space-between' }}>
-                                                            <div>
-                                                                <h4 style={{ margin: 0 }}>{item.name}</h4>
-                                                                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '4px 0' }}>{item.description || 'No description'}</p>
-                                                            </div>
-                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
-                                                                <strong>{item.price}</strong>
-                                                                <button className="ghost-btn compact-btn delete-btn" style={{ color: 'var(--danger)' }} onClick={() => handleRemoveCatalogItem(item.id)}>Remove</button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
 
                             {/* ADS TAB */}
                             {storeTab === 'ads' && (
@@ -590,57 +517,66 @@ export function ProfilePage({
 
                             {/* SOCIAL TAB */}
                             {storeTab === 'social' && (
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+                                    {socialError && <p role="alert" style={{ gridColumn: '1 / -1', color: 'var(--danger)' }}>{socialError}</p>}
                                     <div className="sidebar-card" style={{ background: 'var(--panel)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                                        <h3 style={{ marginTop: 0 }}>Followers (148)</h3>
-                                        <p style={{ color: 'var(--text-muted)', fontSize: '0.84rem' }}>Users receiving notifications about your listing & store updates.</p>
+                                        <h3 style={{ marginTop: 0 }}>Followers ({socialFollowers.length})</h3>
+                                        <p style={{ color: 'var(--text-muted)', fontSize: '0.84rem' }}>People who follow your store.</p>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#3b82f6', color: 'white', display: 'grid', placeItems: 'center', fontWeight: 600 }}>C</div>
-                                                <div>
-                                                    <strong style={{ fontSize: '0.88rem', display: 'block' }}>Caleb Ng'ambi</strong>
-                                                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Following since July 2026</span>
+                                            {socialLoading ? <p role="status">Loading followers…</p> : socialFollowers.length === 0 ? (
+                                                <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>No one is following your store yet.</p>
+                                            ) : socialFollowers.map(follower => (
+                                                <div key={follower.user_id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                    {follower.avatar_url ? (
+                                                        <img src={follower.avatar_url} alt="" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
+                                                    ) : (
+                                                        <div aria-hidden="true" style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--border)', color: 'var(--text)', display: 'grid', placeItems: 'center', fontWeight: 600 }}>
+                                                            {(follower.username || 'U').charAt(0).toUpperCase()}
+                                                        </div>
+                                                    )}
+                                                    <div>
+                                                        <strong style={{ fontSize: '0.88rem', display: 'block' }}>{follower.username || 'MarketSpace user'}</strong>
+                                                        {follower.created_at && (
+                                                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                                                Following since {new Date(follower.created_at).toLocaleDateString()}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#10b981', color: 'white', display: 'grid', placeItems: 'center', fontWeight: 600 }}>M</div>
-                                                <div>
-                                                    <strong style={{ fontSize: '0.88rem', display: 'block' }}>Mwansa K.</strong>
-                                                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Following since June 2026</span>
-                                                </div>
-                                            </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#f59e0b', color: 'white', display: 'grid', placeItems: 'center', fontWeight: 600 }}>A</div>
-                                                <div>
-                                                    <strong style={{ fontSize: '0.88rem', display: 'block' }}>Angela Z.</strong>
-                                                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Following since May 2026</span>
-                                                </div>
-                                            </div>
+                                            ))}
                                         </div>
                                     </div>
 
                                     <div className="sidebar-card" style={{ background: 'var(--panel)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                                        <h3 style={{ marginTop: 0 }}>Stores You Follow ({followingIds.length})</h3>
+                                        <h3 style={{ marginTop: 0 }}>Stores You Follow ({socialFollowingIds.length})</h3>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px' }}>
-                                            {followingIds.length === 0 ? (
-                                                <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>You aren't following any other stores yet.</p>
+                                            {socialLoading ? <p role="status">Loading followed stores…</p> : socialFollowingIds.length === 0 ? (
+                                                <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>You aren’t following any stores yet.</p>
                                             ) : (
-                                                followingIds.map(id => {
+                                                socialFollowingIds.map(id => {
                                                     const shopProfile = allBusinesses[id]
-                                                    if (!shopProfile) return null
                                                     return (
                                                         <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '6px', borderBottom: '1px solid var(--border)' }}>
                                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                {shopProfile.logo ? (
+                                                                {shopProfile?.logo ? (
                                                                     <img src={shopProfile.logo} alt="Logo" style={{ width: '28px', height: '28px', borderRadius: '6px', objectFit: 'cover' }} />
                                                                 ) : (
                                                                     <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: '#ccc', display: 'grid', placeItems: 'center', fontSize: '0.8rem' }}>
                                                                         <span className="material-icons" style={{ fontSize: '14px' }}>storefront</span>
                                                                     </div>
                                                                 )}
-                                                                <strong style={{ fontSize: '0.88rem' }}>{shopProfile.shopName}</strong>
+                                                                <strong style={{ fontSize: '0.88rem' }}>{shopProfile?.shopName || 'Store details unavailable'}</strong>
                                                             </div>
-                                                            <button className="ghost-btn compact-btn delete-btn" onClick={() => onToggleFollowStore(id)} style={{ color: 'var(--danger)' }}>Unfollow</button>
+                                                            <button
+                                                                className="ghost-btn compact-btn delete-btn"
+                                                                onClick={() => {
+                                                                    onToggleFollowStore(id)
+                                                                    setSocialFollowingIds(current => current.filter(storeId => storeId !== id))
+                                                                }}
+                                                                style={{ color: 'var(--danger)' }}
+                                                            >
+                                                                Unfollow
+                                                            </button>
                                                         </div>
                                                     )
                                                 })

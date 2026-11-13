@@ -1,0 +1,71 @@
+.admin-announcements-page {
+  display: grid;
+  gap: 20px;
+  width: min(100%, 900px);
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.admin-announcement-current,
+.admin-announcement-form {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.admin-announcement-current h3,
+.admin-announcement-form h3,
+.admin-announcement-current p,
+.admin-announcement-form p {
+  margin: 0;
+}
+
+.admin-announcement-current article {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.admin-announcement-current article p {
+  margin: 7px 0;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+
+.admin-announcement-current small {
+  color: var(--text-muted);
+}
+
+.admin-announcement-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: .88rem;
+  font-weight: 650;
+}
+
+.admin-announcement-form input,
+.admin-announcement-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.admin-announcement-form textarea {
+  resize: vertical;
+}
+
+@media (max-width: 600px) {
+  .admin-announcement-current article {
+    flex-direction: column;
+  }
+}

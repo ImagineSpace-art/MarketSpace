@@ -379,6 +379,7 @@ function AdminLayout({ role }: { role: 'moderator' | 'admin' }) {
       items: [
         { section: 'boosts', title: 'Visibility boosts', icon: 'trending_up' },
         { section: 'notifications', title: 'Notifications', icon: 'notifications' },
+        { section: 'announcements', title: 'Announcements', icon: 'campaign' },
         { section: 'audit', title: 'Audit history', icon: 'history' },
         ...(role === 'admin' ? [{ section: 'terms' as const, title: 'Platform terms', icon: 'description' }] : []),
       ],

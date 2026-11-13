@@ -37,28 +37,7 @@ export function StoreSetupPage({ userId, businessProfile, onSave, onCancel }: St
     const [privacyBusy, setPrivacyBusy] = useState(false)
     const [formError, setFormError] = useState('')
     
-    // Store Collections / Department state
-    const [collections, setCollections] = useState(businessProfile?.collections || [
-        { id: '1', name: 'New Arrivals' },
-        { id: '2', name: 'Best Sellers' }
-    ])
-    const [newColName, setNewColName] = useState('')
-
     const PRESET_ACCENTS = ['#2563eb', '#10b981', '#000000', '#be185d', '#ea580c', '#8b5cf6', '#1e293b']
-
-    const handleAddCollection = () => {
-        if (!newColName.trim()) return
-        const created = {
-            id: String(Date.now()),
-            name: newColName.trim()
-        }
-        setCollections(prev => [...prev, created])
-        setNewColName('')
-    }
-
-    const handleRemoveCollection = (colId: string) => {
-        setCollections(prev => prev.filter(c => c.id !== colId))
-    }
 
     const handleLogoChange = async (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -109,7 +88,7 @@ export function StoreSetupPage({ userId, businessProfile, onSave, onCancel }: St
             operationType,
             accentColor,
             announcementBar,
-            collections,
+            collections: businessProfile?.collections || [],
             customerCare: {
                 workingHours,
                 policies,
@@ -265,34 +244,9 @@ export function StoreSetupPage({ userId, businessProfile, onSave, onCancel }: St
                     </div>
                 </div>
 
-                {/* 3. Custom Store Departments & Sub-Pages */}
+                {/* 3. Customer Care & Store Policies */}
                 <div style={{ padding: '16px', background: 'var(--panel)', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                    <h3 style={{ marginTop: 0, fontSize: '1.05rem', color: 'var(--text)' }}>3. Custom Store Departments & Navigation Tabs</h3>
-                    <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginTop: '4px' }}>Create custom sub-pages for your store (e.g. Bags, Shoes, Laptops, Accessories).</p>
-
-                    <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                        <input
-                            value={newColName}
-                            onChange={(e) => setNewColName(e.target.value)}
-                            placeholder="New Department / Page Name (e.g. Handbags)"
-                            style={{ flex: 1, padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }}
-                        />
-                        <button type="button" className="secondary-btn" onClick={handleAddCollection} style={{ padding: '10px 16px' }}>+ Add Department</button>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
-                        {collections.map((col) => (
-                            <div key={col.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: 'var(--surface)', borderRadius: '20px', border: '1px solid var(--border)', fontSize: '0.85rem' }}>
-                                <span style={{ fontWeight: 600 }}>{col.name}</span>
-                                <button type="button" onClick={() => handleRemoveCollection(col.id)} style={{ border: 'none', background: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 'bold' }}>×</button>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* 4. Customer Care & Store Policies */}
-                <div style={{ padding: '16px', background: 'var(--panel)', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                    <h3 style={{ marginTop: 0, fontSize: '1.05rem', color: 'var(--text)' }}>4. Customer Care & Store Policies</h3>
+                    <h3 style={{ marginTop: 0, fontSize: '1.05rem', color: 'var(--text)' }}>3. Customer Care & Store Policies</h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
                         <input value={workingHours} onChange={(e) => setWorkingHours(e.target.value)} placeholder="Business Working Hours (e.g. Mon-Sat: 08:00 - 18:00)" style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
                         <StorePoliciesEditor policies={policies} onChange={setPolicies} />

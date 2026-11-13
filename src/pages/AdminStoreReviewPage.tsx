@@ -4,9 +4,10 @@ import { adminSupabase } from '../lib/adminSupabaseClient'
 import { getFunctionErrorMessage } from '../utils/functionError'
 import type { BusinessAd, Listing } from '../types'
 import { AdminOverview } from './AdminOverview'
+import { AdminAnnouncementsPage } from './AdminAnnouncementsPage'
 import { AdminTermsPage } from './AdminTermsPage'
 
-export type AdminSection = 'overview' | 'applications' | 'reports' | 'listings' | 'ads' | 'seller-verifications' | 'boosts' | 'notifications' | 'audit' | 'terms'
+export type AdminSection = 'overview' | 'applications' | 'reports' | 'listings' | 'ads' | 'seller-verifications' | 'boosts' | 'notifications' | 'announcements' | 'audit' | 'terms'
 
 type AdminOutletContext = {
   role: 'moderator' | 'admin'
@@ -74,6 +75,39 @@ type NotificationRecipient = {
   user_id: string
   username: string | null
 }
+
+const AUTOMATIC_NOTIFICATION_TEMPLATES = [
+  {
+    trigger: 'Listing expires',
+    title: 'Listing expired',
+    body: 'Your listing “[listing title]” has expired and is no longer visible to shoppers. Renew it from your seller dashboard when you are ready.',
+  },
+  {
+    trigger: 'Store application approved',
+    title: 'Store application approved',
+    body: 'Your store application for “[store name]” has been approved. Your store is now open on MarketSpace.',
+  },
+  {
+    trigger: 'Store application denied',
+    title: 'Store application not approved',
+    body: 'Your store application for “[store name]” was not approved. Review the feedback in your store dashboard and update your application to try again.',
+  },
+  {
+    trigger: 'Listing approved',
+    title: 'Listing approved',
+    body: 'Your listing “[listing title]” is now live.',
+  },
+  {
+    trigger: 'Listing rejected',
+    title: 'Listing rejected',
+    body: 'Your listing “[listing title]” was rejected. The moderation reason is included in your notification.',
+  },
+  {
+    trigger: 'Store ad reviewed',
+    title: 'Ad approved or rejected',
+    body: 'Store ad decisions include a notification with the ad title and, when rejected, the moderation reason.',
+  },
+]
 
 type AuditEvent = {
   created_at: string
@@ -440,6 +474,32 @@ export function AdminStoreReviewPage() {
     }
   }
 
+  const deleteReportedStoreForFraud = async (storeId: string, storeName: string) => {
+    if (!window.confirm(`Permanently remove "${storeName}" for confirmed fraud or abuse? The owner will be blocked from registering another store.`)) return
+    setError('')
+    setNotice('')
+    setWorkingId(storeId)
+    try {
+      const { data, error: invokeError } = await adminSupabase.functions.invoke<{ success?: boolean }>('store-deletion', {
+        body: {
+          action: 'delete_for_fraud',
+          storeId,
+          reason: 'Fraud or abuse confirmed by a MarketSpace moderator.',
+        },
+      })
+      if (invokeError) setError(await getFunctionErrorMessage(invokeError))
+      else if (!data?.success) setError('The reported store could not be removed.')
+      else {
+        setNotice('Store and store-owned data were removed. The owner and identity hashes are blocked from store re-registration.')
+        await loadReports()
+      }
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'The reported store could not be removed.')
+    } finally {
+      setWorkingId('')
+    }
+  }
+
   const reviewListing = async (listing: PendingListing, decision: 'approve' | 'reject') => {
     setError('')
     setNotice('')
@@ -539,6 +599,7 @@ export function AdminStoreReviewPage() {
 
   if (activeSection === 'overview') return <AdminOverview onNavigate={navigateToSection} />
   if (activeSection === 'terms') return <AdminTermsPage role={role} />
+  if (activeSection === 'announcements') return <AdminAnnouncementsPage />
   if (loading) return <section className="section-card"><p>Loading store applications…</p></section>
 
   if (activeSection === 'notifications') {
@@ -559,6 +620,21 @@ export function AdminStoreReviewPage() {
         </header>
         {error && <p role="alert" className="store-wizard-alert error">{error}</p>}
         {notice && <p role="status" className="store-wizard-alert notice">{notice}</p>}
+        <section className="admin-automatic-notification-templates" aria-labelledby="automatic-notifications-heading">
+          <div>
+            <h3 id="automatic-notifications-heading">Automatic notification templates</h3>
+            <p>These prewritten messages are sent by MarketSpace when the matching event occurs.</p>
+          </div>
+          <div className="admin-automatic-notification-grid">
+            {AUTOMATIC_NOTIFICATION_TEMPLATES.map(template => (
+              <article key={template.trigger}>
+                <strong>{template.trigger}</strong>
+                <span>{template.title}</span>
+                <p>{template.body}</p>
+              </article>
+            ))}
+          </div>
+        </section>
         <form className="admin-notification-form" onSubmit={event => void sendNotification(event)}>
           <label>
             <span>Title</span>
@@ -1014,7 +1090,19 @@ export function AdminStoreReviewPage() {
                     <h3 style={{ margin: 0 }}>{group.store?.shop_name || 'Unknown store'}</h3>
                     {group.store?.subdomain && <p style={{ margin: '4px 0 0', color: 'var(--text-secondary)' }}>{group.store.subdomain}</p>}
                   </div>
-                  <strong>{group.count} open {group.count === 1 ? 'report' : 'reports'}</strong>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <strong>{group.count} open {group.count === 1 ? 'report' : 'reports'}</strong>
+                    {group.store && (
+                      <button
+                        type="button"
+                        className="danger-btn compact-btn"
+                        disabled={workingId === group.store.id}
+                        onClick={() => void deleteReportedStoreForFraud(group.store!.id, group.store!.shop_name)}
+                      >
+                        {workingId === group.store.id ? 'Removing…' : 'Remove for fraud / abuse'}
+                      </button>
+                    )}
+                  </div>
                 </header>
                 <div style={{ display: 'grid', gap: 12 }}>
                   {group.reports.map(report => (

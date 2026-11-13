@@ -53,11 +53,12 @@ export function StorefrontLandingTemplate({
   const promoImage = fallback(content.promoImage, '/illustrations/banner_electronics.png')
   const storyImage = fallback(content.storyImage, '/illustrations/store_banner_electronics.png')
   const reviews = storeReviews.filter(review => review.storeId === shop.userId)
+  const announcement = preview ? content.announcementText || shop.announcementBar : shop.announcementBar
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
 
   return (
     <div className={`landing-store${preview ? ' landing-store-preview' : ''}`} style={{ '--landing-accent': accent } as CSSProperties}>
-      {content.announcementText && <div className="landing-announcement">{content.announcementText}</div>}
+      {announcement && <div className="landing-announcement">{announcement}</div>}
       <header className="landing-header" id="landing-top">
         <button className="landing-mobile-menu" type="button" aria-label="Toggle departments" onClick={() => setMenuOpen(value => !value)}><span className="material-icons">menu</span></button>
         <button className="landing-brand" type="button" onClick={() => scrollTo('landing-top')}>{shop.shopName}</button>

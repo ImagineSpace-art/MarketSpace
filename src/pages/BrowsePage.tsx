@@ -3,9 +3,10 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import type { Listing, BusinessProfile, BusinessAd } from '../types'
 import { Listing as ListingView } from '../components/Listing'
-import { isBestSeller, isNewArrival } from '../utils/listingSections'
+import { getBrowseListings, isBestSeller, isNewArrival } from '../utils/listingSections'
 import { supabase } from '../lib/supabaseClient'
 import { recordBoostEvent } from '../utils/visibilityBoosts'
+import { useTopScrollExpandableHero } from '../hooks/useTopScrollExpandableHero'
 
 type BrowsePageProps = {
   listings: Listing[]
@@ -17,6 +18,8 @@ type BrowsePageProps = {
   onAddToCart: (item: { id: number | string; title: string; price: number; image?: string; sellerName?: string; sellerUserId?: string }) => void
   onOpenListing: (listing: Listing) => void
   session?: Session | null
+  globalRenewalFrequency?: 'daily' | 'weekly' | 'biweekly' | 'monthly'
+  globalRenewalDay?: string
 }
 
 function MarketplaceAdCard({ ad, session }: { ad: BusinessAd & { sellerName: string; sellerUserId: string }, session?: Session | null }) {
@@ -145,6 +148,8 @@ export function BrowsePage({
   onAddToCart,
   onOpenListing,
   session,
+  globalRenewalFrequency = 'weekly',
+  globalRenewalDay = 'Monday',
 }: BrowsePageProps) {
   const [searchParams] = useSearchParams()
   const initialFilter = searchParams.get('category') || searchParams.get('filter')
@@ -152,86 +157,9 @@ export function BrowsePage({
   const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory)
   const [sortBy, setSortBy] = useState('featured')
   const [quickViewListing, setQuickViewListing] = useState<Listing | null>(null)
-  const [isHeroExpanded, setIsHeroExpanded] = useState(false)
-  const [headerOffset, setHeaderOffset] = useState(0)
-  const heroExpandedRef = useRef(isHeroExpanded)
-
-  useEffect(() => {
-    heroExpandedRef.current = isHeroExpanded
-  }, [isHeroExpanded])
-
-  useEffect(() => {
-    const header = document.querySelector('.site-header-bar')
-    if (!header) return
-
-    const updateHeaderOffset = () => setHeaderOffset(Math.ceil(header.getBoundingClientRect().height))
-    updateHeaderOffset()
-
-    const observer = new ResizeObserver(updateHeaderOffset)
-    observer.observe(header)
-    return () => observer.disconnect()
-  }, [])
-
-  useEffect(() => {
-    let touchStartY: number | null = null
-    let touchStartExpanded = false
-    const scrollTop = () => window.scrollY <= 1
-    const updateHero = (expanded: boolean) => {
-      heroExpandedRef.current = expanded
-      setIsHeroExpanded(expanded)
-    }
-
-    const handleWheel = (event: WheelEvent) => {
-      if (event.ctrlKey || event.metaKey || Math.abs(event.deltaY) < 12 || !scrollTop()) return
-
-      if (event.deltaY < 0 && !heroExpandedRef.current) {
-        event.preventDefault()
-        updateHero(true)
-      } else if (event.deltaY > 0 && heroExpandedRef.current) {
-        event.preventDefault()
-        updateHero(false)
-      }
-    }
-
-    const handleTouchStart = (event: TouchEvent) => {
-      touchStartY = scrollTop() ? event.touches[0]?.clientY ?? null : null
-      touchStartExpanded = heroExpandedRef.current
-    }
-
-    const handleTouchMove = (event: TouchEvent) => {
-      if (touchStartY === null || !scrollTop()) return
-      const currentY = event.touches[0]?.clientY
-      if (currentY === undefined) return
-      const deltaY = currentY - touchStartY
-
-      if (touchStartExpanded && deltaY <= -1) {
-        event.preventDefault()
-        if (deltaY <= -36 && heroExpandedRef.current) updateHero(false)
-      } else if (!touchStartExpanded && deltaY >= 1) {
-        event.preventDefault()
-        if (deltaY >= 36 && !heroExpandedRef.current) updateHero(true)
-      }
-    }
-
-    const clearTouchStart = () => {
-      touchStartY = null
-      touchStartExpanded = false
-    }
-
-    window.addEventListener('wheel', handleWheel, { passive: false })
-    window.addEventListener('touchstart', handleTouchStart, { passive: true })
-    window.addEventListener('touchmove', handleTouchMove, { passive: false })
-    window.addEventListener('touchend', clearTouchStart, { passive: true })
-    window.addEventListener('touchcancel', clearTouchStart, { passive: true })
-
-    return () => {
-      window.removeEventListener('wheel', handleWheel)
-      window.removeEventListener('touchstart', handleTouchStart)
-      window.removeEventListener('touchmove', handleTouchMove)
-      window.removeEventListener('touchend', clearTouchStart)
-      window.removeEventListener('touchcancel', clearTouchStart)
-    }
-  }, [])
+  const [categoryLoopCopies, setCategoryLoopCopies] = useState(2)
+  const categoryRailRef = useRef<HTMLDivElement>(null)
+  const { isExpanded: isHeroExpanded, setIsExpanded: setIsHeroExpanded, headerOffset } = useTopScrollExpandableHero()
 
   const categories = [
     {
@@ -278,6 +206,19 @@ export function BrowsePage({
     },
   ]
 
+  useEffect(() => {
+    const rail = categoryRailRef.current
+    if (!rail) return
+    const updateCopies = () => {
+      const minimumGroupWidth = (190 + 14) * categories.length
+      setCategoryLoopCopies(Math.max(2, Math.ceil(rail.clientWidth / minimumGroupWidth) + 1))
+    }
+    updateCopies()
+    const observer = new ResizeObserver(updateCopies)
+    observer.observe(rail)
+    return () => observer.disconnect()
+  }, [categories.length])
+
   const marketplaceAds = useMemo(() => {
     const now = Date.now()
     return Object.values(allBusinesses).flatMap((business): Array<BusinessAd & { sellerName: string; sellerUserId: string }> => {
@@ -298,24 +239,29 @@ export function BrowsePage({
     }).sort((a, b) => Number(Boolean(b.promoted)) - Number(Boolean(a.promoted))).slice(0, 8)
   }, [allBusinesses])
 
+  const browseListings = useMemo(
+    () => getBrowseListings(listings, globalRenewalFrequency, globalRenewalDay),
+    [globalRenewalDay, globalRenewalFrequency, listings]
+  )
+
   const newArrivals = useMemo(
-    () => listings
+    () => browseListings
       .filter((listing) => isNewArrival(listing))
       .sort((a, b) => Date.parse(b.created_at!) - Date.parse(a.created_at!)),
-    [listings]
+    [browseListings]
   )
 
   const bestSellers = useMemo(
-    () => listings
+    () => browseListings
       .filter((listing) => isBestSeller(listing))
       .sort((a, b) => Number(b.rating ?? 0) - Number(a.rating ?? 0)),
-    [listings]
+    [browseListings]
   )
 
   const storeListingCategories = ['All', 'Electronics', 'Fashion', 'Home & Garden', 'Vehicles', 'Sports', 'Services']
   const storeListings = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
-    return listings.filter((listing) => {
+    return browseListings.filter((listing) => {
       if (!listing.user_id || !allBusinesses[listing.user_id]?.shopName) return false
       if (selectedCategory !== 'All' && listing.category !== selectedCategory) return false
       if (!query) return true
@@ -323,7 +269,7 @@ export function BrowsePage({
         (listing.category || '').toLowerCase().includes(query) ||
         allBusinesses[listing.user_id].shopName.toLowerCase().includes(query)
     })
-  }, [allBusinesses, listings, searchQuery, selectedCategory])
+  }, [allBusinesses, browseListings, searchQuery, selectedCategory])
 
   const newArrivalCards = newArrivals.map((listing) => ({
     ...listing,
@@ -333,7 +279,7 @@ export function BrowsePage({
 
   // Filter listings
   const filteredCatalog = useMemo(() => {
-    let result = listings.length > 0 ? [...listings] : []
+    let result = browseListings.length > 0 ? [...browseListings] : []
 
     if (selectedCategory && selectedCategory !== 'All') {
       result = result.filter((item) =>
@@ -359,7 +305,7 @@ export function BrowsePage({
       if (sortBy === 'latest') return Number(b.id) - Number(a.id)
       return 0
     })
-  }, [listings, selectedCategory, searchQuery, sortBy])
+  }, [browseListings, selectedCategory, searchQuery, sortBy])
 
   const scrollToCatalog = () => {
     const el = document.getElementById('marketplace-catalog')
@@ -674,43 +620,49 @@ export function BrowsePage({
           </button>
         </div>
 
-        <div className="shop-category-rail">
-          {categories.map((cat) => (
-            <div
-              key={cat.id}
-              className="shop-category-card"
-              onClick={() => {
-                setSelectedCategory(cat.name)
-                scrollToCatalog()
-              }}
-              style={{
-                cursor: 'pointer',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-4px)'
-                e.currentTarget.style.boxShadow = '0 12px 24px rgba(15,23,42,0.16)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.boxShadow = '0 4px 14px rgba(15,23,42,0.1)'
-              }}
-            >
-              <div className="shop-category-image">
-                <img
-                  src={cat.image}
-                  alt={cat.title}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
+        <div className="shop-category-rail" ref={categoryRailRef}>
+          <div className="shop-category-track">
+            {[0, 1].map(groupIndex => (
+              <div
+                key={groupIndex}
+                className="shop-category-track-group"
+                aria-hidden={groupIndex > 0}
+                inert={groupIndex > 0}
+              >
+                {Array.from({ length: categoryLoopCopies }, (_, cycleIndex) => (
+                  <div
+                    key={cycleIndex}
+                    className="shop-category-track-cycle"
+                    aria-hidden={cycleIndex > 0}
+                    inert={cycleIndex > 0}
+                  >
+                    {categories.map(cat => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        className="shop-category-card"
+                        onClick={() => {
+                          setSelectedCategory(cat.name)
+                          scrollToCatalog()
+                        }}
+                        style={{ padding: 0, cursor: 'pointer', textAlign: 'left' }}
+                      >
+                        <div className="shop-category-image">
+                          <img src={cat.image} alt={cat.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </div>
+                        <div className="shop-category-caption">
+                          <strong style={{ display: 'block', fontSize: '0.92rem', color: '#0f172a', marginBottom: '2px' }}>
+                            {cat.name}
+                          </strong>
+                          <span style={{ fontSize: '0.76rem', color: '#ea5808', fontWeight: 700 }}>Shop Now →</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ))}
               </div>
-              <div className="shop-category-caption">
-                <strong style={{ display: 'block', fontSize: '0.92rem', color: '#0f172a', marginBottom: '2px' }}>
-                  {cat.name}
-                </strong>
-                <span style={{ fontSize: '0.76rem', color: '#ea580c', fontWeight: 700 }}>Shop Now →</span>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
 

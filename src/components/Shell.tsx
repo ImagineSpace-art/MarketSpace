@@ -5,6 +5,7 @@ import type { BusinessProfile, Profile } from '../types'
 import { STORE_MARKET_LOCATIONS } from '../features/marketplace/storeLocations'
 import { CartDrawer, type CartItem } from './CartDrawer'
 import { SettingsNavigationDrawer } from './SettingsNavigation'
+import { SiteAnnouncementBar } from './SiteAnnouncementBar'
 
 type ShellProps = {
   children: ReactNode
@@ -26,6 +27,7 @@ type ShellProps = {
   savedCount?: number
   unreadChatCount?: number
   allBusinesses?: Record<string, BusinessProfile>
+  hasOwnStore?: boolean
   searchQuery: string
   onSearchQueryChange: (query: string) => void
   hasNewArrivals: boolean
@@ -94,6 +96,7 @@ export function Shell({
   savedCount = 0,
   unreadChatCount = 0,
   allBusinesses = {},
+  hasOwnStore = false,
   searchQuery,
   onSearchQueryChange,
   hasNewArrivals,
@@ -165,10 +168,11 @@ export function Shell({
   }
 
   const cartCount = cartItems.reduce((acc, it) => acc + it.quantity, 0)
+  const userHasStore = Boolean(session?.user.id && (hasOwnStore || allBusinesses[session.user.id]))
 
   return (
     <div className="app-shell">
-      
+      <SiteAnnouncementBar />
 
       {/* 2. Top Header Navigation Bar */}
       <header className="site-header-bar" onMouseLeave={() => setHoveredCategory(null)}>
@@ -258,23 +262,25 @@ export function Shell({
                   Best Sellers
                 </button>
               )}
-              <Link
-                to="/profile/business-setup"
-                className="header-nav-pill header-open-store-link"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  color: '#2563eb',
-                  padding: '5px 12px',
-                  borderRadius: '20px',
-                  fontSize: '0.82rem',
-                  fontWeight: 700,
-                  textDecoration: 'none',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                Open a Store
-              </Link>
+              {!userHasStore && (
+                <Link
+                  to="/profile/business-setup"
+                  className="header-nav-pill header-open-store-link"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    color: '#2563eb',
+                    padding: '5px 12px',
+                    borderRadius: '20px',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  Open a Store
+                </Link>
+              )}
             </nav>
           </div>
 

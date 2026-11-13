@@ -119,6 +119,7 @@ export function BoutiqueGridTemplate({
     ? safeImageUrl(shop.logo, DEFAULT_LOGO_IMAGE)
     : safeImageUrl(content.logoImage, DEFAULT_LOGO_IMAGE)
   const accent = content.accentColor || STORE_ACCENT_PALETTE[0]
+  const announcement = preview ? content.announcementBar || shop.announcementBar : shop.announcementBar
   const averageRating = reviews.length
     ? (reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length).toFixed(1)
     : null
@@ -174,7 +175,7 @@ export function BoutiqueGridTemplate({
       </header>
 
       <main id="boutique-top">
-        {content.announcementBar && <div className="boutique-announcement">{content.announcementBar}</div>}
+        {announcement && <div className="boutique-announcement">{announcement}</div>}
         <section className="boutique-hero boutique-catalog-banner" style={{ backgroundImage: `url("${bannerImage}")` }}>
           <div className="boutique-catalog-title">
             <h1>{content.shopHeading || 'Shop'}</h1>

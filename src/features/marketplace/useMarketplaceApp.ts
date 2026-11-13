@@ -707,6 +707,10 @@ export function useMarketplaceApp(): MarketplaceAppModel {
       setMessage('Please sign in to follow stores')
       return
     }
+    if (session.user.id === storeId) {
+      setMessage('You cannot follow your own store or profile.')
+      return
+    }
     const isFollowing = followingIds.includes(storeId)
     setFollowingIds(prev =>
       isFollowing ? prev.filter(id => id !== storeId) : [...prev, storeId]
@@ -1960,14 +1964,44 @@ export function useMarketplaceApp(): MarketplaceAppModel {
 
   const deleteStore = async (storeId: string) => {
     if (!session?.user?.id) throw new Error('Sign in to permanently delete this store.')
-    const { error } = await supabase.rpc('delete_archived_owned_store', {
-      p_store_id: storeId,
+    const { data, error } = await supabase.functions.invoke<{
+      success?: boolean
+      storeDeleted?: boolean
+      cleanupPending?: boolean
+    }>('store-deletion', {
+      body: { action: 'delete_owned', storeId },
     })
-    if (error) throw new Error(`The store could not be permanently deleted: ${error.message}`)
+    if (error) {
+      const details = error.context instanceof Response
+        ? await error.context.clone().json().catch(() => ({})) as { storeDeleted?: boolean; cleanupPending?: boolean }
+        : {}
+      if (details.storeDeleted && details.cleanupPending) {
+        const { error: retryError } = await supabase.functions.invoke('store-deletion', {
+          body: { action: 'retry_cleanup', storeId },
+        })
+        if (retryError) {
+          throw new Error(`The store was deleted, but its uploaded media still needs cleanup: ${await getFunctionErrorMessage(retryError)}`)
+        }
+      } else {
+        throw new Error(`The store could not be permanently deleted: ${await getFunctionErrorMessage(error)}`)
+      }
+    } else if (!data?.success) {
+      throw new Error('The store could not be permanently deleted.')
+    }
+
     removeOwnedStoreFromCache(session.user.id)
+    setAllBusinesses(current => {
+      const next = { ...current }
+      delete next[session.user.id]
+      return next
+    })
+    setFollowingIds(current => current.filter(id => id !== storeId && id !== session.user.id))
+    setNotifyStoreIds(current => current.filter(id => id !== storeId && id !== session.user.id))
+    setStoreReviews(current => current.filter(review => review.storeId !== storeId && review.storeId !== session.user.id))
+    window.localStorage.removeItem(`marketspace_cart_${session.user.id}`)
     setBusinessProfile(null)
-    setMessage('Store and its store-owned listings and reviews were permanently deleted.')
-    await Promise.all([loadBusinesses(), fetchListings(session.user.id)])
+    setMessage('Store, its store-owned data, and uploaded media were permanently deleted. You can register another store using the released address.')
+    await Promise.all([loadBusinesses(), fetchListings(session.user.id), fetchStoreReviews()])
   }
 
   const handleSaveStoreTemplate = async (
