@@ -5,6 +5,8 @@ import {
   STORE_ASSETS_BUCKET,
   STORE_ASSET_MAX_DIMENSION,
 } from '../../../supabase/functions/_shared/storeTemplateSchema'
+import type { BusinessProfile } from '../../types'
+import { getStoreCardBannerPath } from './storeCardBanner'
 
 const ACCEPTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
@@ -36,4 +38,10 @@ export async function uploadStoreTemplateImage(file: File): Promise<string> {
 
 export function getStoreTemplateImageUrl(path: string) {
   return supabase.storage.from(STORE_ASSETS_BUCKET).getPublicUrl(path).data.publicUrl
+}
+
+export function getStoreCardBannerUrl(store: Pick<BusinessProfile, 'templateId' | 'templateContent' | 'cover'>) {
+  const banner = getStoreCardBannerPath(store)
+  if (!banner || /^(https?:\/\/|data:image\/)/i.test(banner)) return banner
+  return getStoreTemplateImageUrl(banner)
 }

@@ -15,7 +15,7 @@ type UserProfilePageProps = {
   businessProfile?: BusinessProfile | null
   followingIds: string[]
   savedIds: string[]
-  onToggleFollow: (userId: string) => void
+  onToggleFollow: (userId: string) => Promise<boolean>
   onToggleSave: (listingId: number) => void
   onOpenListing: (listing: ListingData) => void
   onUploadAvatar: (url: string) => Promise<void>
@@ -50,6 +50,43 @@ export function UserProfilePage({
   const [username, setUsername] = useState('')
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState('')
+  const [followStats, setFollowStats] = useState<{ userId: string; followers: number; following: number } | null>(null)
+  const [followStatsError, setFollowStatsError] = useState<{ userId: string; message: string } | null>(null)
+  const [followStatsRefresh, setFollowStatsRefresh] = useState(0)
+  const [followPending, setFollowPending] = useState(false)
+  const [followError, setFollowError] = useState('')
+  const viewerFollowsProfile = followingIds.includes(userId)
+
+  useEffect(() => {
+    if (!userId) return
+
+    let active = true
+    setFollowStats(null)
+    setFollowStatsError(null)
+    void (async () => {
+      try {
+        const [followersResult, followingResult] = await Promise.all([
+          supabase.from('store_followers').select('user_id', { count: 'exact', head: true }).eq('store_id', userId),
+          supabase.from('store_followers').select('store_id', { count: 'exact', head: true }).eq('user_id', userId),
+        ])
+        if (followersResult.error) throw followersResult.error
+        if (followingResult.error) throw followingResult.error
+        if (active) {
+          setFollowStats({
+            userId,
+            followers: followersResult.count ?? 0,
+            following: followingResult.count ?? 0,
+          })
+        }
+      } catch {
+        if (active) {
+          setFollowStatsError({ userId, message: 'Follower and following counts could not be loaded.' })
+        }
+      }
+    })()
+
+    return () => { active = false }
+  }, [userId, followStatsRefresh])
 
   useEffect(() => {
     if (isOwner || !userId) return
@@ -135,6 +172,20 @@ export function UserProfilePage({
     }
   }
 
+  const toggleFollow = async () => {
+    setFollowPending(true)
+    setFollowError('')
+    try {
+      const updated = await onToggleFollow(userId)
+      if (!updated) setFollowError('Your follow preference could not be updated. Please try again.')
+      else setFollowStatsRefresh(current => current + 1)
+    } catch (toggleError) {
+      setFollowError(toggleError instanceof Error ? toggleError.message : 'Your follow preference could not be updated.')
+    } finally {
+      setFollowPending(false)
+    }
+  }
+
   if (loading) return <section className="section-card">Loading profile…</section>
   if (!profile) {
     return (
@@ -172,7 +223,7 @@ export function UserProfilePage({
               <label className="user-profile-avatar-edit" title="Change profile photo">
                 <input type="file" accept="image/*" onChange={(event) => void uploadAvatar(event)} />
                 <span className="material-icons" aria-hidden="true">photo_camera</span>
-                <span className="sr-only">Change profile photo</span>
+                {/*<span className="sr-only">Change profile photo</span>*/}
               </label>
             )}
           </div>
@@ -182,8 +233,12 @@ export function UserProfilePage({
             {isOwner && <p>{userEmail}</p>}
             <div className="user-profile-stats">
               <span><strong>{profileListings.length}</strong> {profileListings.length === 1 ? 'listing' : 'listings'}</span>
+              <span><strong>{followStats?.userId === userId ? followStats.followers : '—'}</strong> followers</span>
+              <span><strong>{followStats?.userId === userId ? followStats.following : '—'}</strong> following</span>
               {businessProfile && <span><span className="material-icons" aria-hidden="true">verified</span> Store owner</span>}
             </div>
+            {followStatsError?.userId === userId && <p role="alert" className="user-profile-message error">{followStatsError.message}</p>}
+            {followError && <p role="alert" className="user-profile-message error">{followError}</p>}
           </div>
           <div className="user-profile-actions">
             {isOwner ? (
@@ -203,12 +258,14 @@ export function UserProfilePage({
               <>
                 <button
                   type="button"
-                  className={followingIds.includes(userId) ? 'secondary-btn' : 'primary-btn'}
-                  onClick={() => onToggleFollow(userId)}
-                  disabled={!sessionUserId || sessionUserId === userId}
+                  className={viewerFollowsProfile ? 'secondary-btn' : 'primary-btn'}
+                  onClick={() => void toggleFollow()}
+                  disabled={!sessionUserId || sessionUserId === userId || followPending}
+                  aria-pressed={viewerFollowsProfile}
+                  aria-label={viewerFollowsProfile ? 'Unfollow this profile' : 'Follow this profile'}
                 >
-                  <span className="material-icons" aria-hidden="true">{followingIds.includes(userId) ? 'person_remove' : 'person_add'}</span>
-                  {followingIds.includes(userId) ? 'Following' : 'Follow'}
+                  <span className="material-icons" aria-hidden="true">{viewerFollowsProfile ? 'person_remove' : 'person_add'}</span>
+                  {followPending ? 'Updating…' : viewerFollowsProfile ? 'Unfollow' : 'Follow'}
                 </button>
                 {businessProfile && (
                   <a className="secondary-btn user-profile-store-link" href={getStoreUrl(userId, businessProfile.subdomain)}>

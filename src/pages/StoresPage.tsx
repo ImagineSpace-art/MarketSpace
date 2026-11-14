@@ -4,6 +4,7 @@ import type { BusinessProfile, Listing } from '../types'
 import { STORE_MARKET_LOCATIONS, groupStoreLocation } from '../features/marketplace/storeLocations'
 import { recordBoostEvent } from '../utils/visibilityBoosts'
 import { useTopScrollExpandableHero } from '../hooks/useTopScrollExpandableHero'
+import { getStoreCardBannerUrl } from '../features/store-templates/storeTemplateAssets'
 
 // ---------------- STORES & STORE LISTINGS PAGE ----------------
 type StoresPageProps = {
@@ -308,6 +309,7 @@ export function StoresPage({
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
                   {filteredShops.map((shop, index) => {
                     const shopListingsCount = listings.filter(l => l.user_id === shop.userId).length
+                    const storeBanner = getStoreCardBannerUrl(shop)
                     const shopLocation = groupStoreLocation(shop.address, shop.locationName)
                     const previousLocation = index > 0 ? groupStoreLocation(filteredShops[index - 1].address, filteredShops[index - 1].locationName) : null
                     return (
@@ -329,7 +331,7 @@ export function StoresPage({
                           height: '110px',
                           position: 'relative',
                           backgroundColor: '#1e293b',
-                          backgroundImage: shop.cover ? `url(${shop.cover})` : 'linear-gradient(135deg, #1e3a8a, #2563eb)',
+                          backgroundImage: storeBanner ? `url("${storeBanner}")` : 'linear-gradient(135deg, #1e3a8a, #2563eb)',
                           backgroundSize: 'cover',
                           backgroundPosition: 'center'
                         }}>
@@ -352,7 +354,7 @@ export function StoresPage({
 
                         {/* Store Body */}
                         <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '-36px', position: 'relative', zIndex: 2 }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginTop: '-36px', position: 'relative', zIndex: 2 }}>
                             {shop.logo ? (
                               <img
                                 src={shop.logo}
@@ -364,7 +366,7 @@ export function StoresPage({
                                 {shop.shopName.slice(0, 1).toUpperCase()}
                               </div>
                             )}
-                            <div style={{ minWidth: 0 }}>
+                            <div style={{ minWidth: 0, paddingTop: '20px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 <strong style={{ fontSize: '1.08rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                   {shop.shopName}

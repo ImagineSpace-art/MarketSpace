@@ -112,24 +112,20 @@ Deno.serve(async (request: Request) => {
       && !Array.isArray(existingBoutiqueContent)
       ? (existingBoutiqueContent as Record<string, unknown>).logoImage
       : undefined
-    const existingBoutiqueBanner = existingBoutiqueContent && typeof existingBoutiqueContent === 'object'
-      && !Array.isArray(existingBoutiqueContent)
-      ? (existingBoutiqueContent as Record<string, unknown>).bannerImage
-      : undefined
     const templateLogo = templateId === 'boutique-grid' ? validated.content.logoImage : undefined
-    const templateBanner = templateId === 'boutique-grid' ? validated.content.bannerImage : undefined
+    const templateBanner = templateId === 'boutique-grid'
+      ? validated.content.bannerImage
+      : validated.content.heroImage
     const shouldSyncStoreLogo = Boolean(templateLogo) && (
       !store.logo || existingBoutiqueLogo !== templateLogo
-    )
-    const shouldSyncStoreCover = Boolean(templateBanner) && (
-      !store.cover || existingBoutiqueBanner !== templateBanner
     )
     const nextStoreLogo = shouldSyncStoreLogo && templateLogo
       ? admin.storage.from('store-assets').getPublicUrl(templateLogo).data.publicUrl
       : store.logo
-    const nextStoreCover = shouldSyncStoreCover && templateBanner
+    const nextStoreCover = templateBanner
       ? admin.storage.from('store-assets').getPublicUrl(templateBanner).data.publicUrl
       : store.cover
+    const shouldSyncStoreCover = Boolean(templateBanner) && store.cover !== nextStoreCover
 
     const { data: updatedStore, error: updateError } = await admin
       .from('stores')

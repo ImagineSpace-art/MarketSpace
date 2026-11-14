@@ -465,6 +465,7 @@ export function AppContent() {
         onListingKindChange={setListingKindFilter}
         savedCount={savedIds.length}
         unreadChatCount={app.chatThreads.filter((t) => t.unread).length}
+        unreadNotificationCount={notifications.filter((notification) => notification.unread).length}
         allBusinesses={allBusinesses}
         hasOwnStore={Boolean(businessProfile || (session?.user.id && allBusinesses[session.user.id]))}
         searchQuery={app.searchQuery}

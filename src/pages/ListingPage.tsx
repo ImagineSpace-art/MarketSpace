@@ -342,6 +342,10 @@ export function ListingDetailPage({
           )}
 
           <div>
+            <h3 style={{ margin: '0 0 10px 0', fontSize: '2.2rem', color: 'var(--text)' }}>{selectedListing.title || 'No title provided.'}</h3>
+          </div>
+
+          <div>
             <h3 style={{ margin: '0 0 10px 0', fontSize: '1.2rem', color: 'var(--text)' }}>Description</h3>
             <p style={{ fontSize: '1.02rem', lineHeight: '1.6', color: 'var(--text-secondary)', margin: 0 }}>
               {selectedListing.description || 'No description provided.'}

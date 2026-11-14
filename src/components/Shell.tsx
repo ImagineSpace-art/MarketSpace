@@ -26,6 +26,7 @@ type ShellProps = {
   onListingKindChange: (value: 'all' | 'item' | 'service') => void
   savedCount?: number
   unreadChatCount?: number
+  unreadNotificationCount?: number
   allBusinesses?: Record<string, BusinessProfile>
   hasOwnStore?: boolean
   searchQuery: string
@@ -95,6 +96,7 @@ export function Shell({
   profile,
   savedCount = 0,
   unreadChatCount = 0,
+  unreadNotificationCount = 0,
   allBusinesses = {},
   hasOwnStore = false,
   searchQuery,
@@ -417,14 +419,23 @@ export function Shell({
                 type="button"
                 className="header-avatar-bubble"
                 title="Open settings navigation"
-                aria-label="Open settings navigation"
+                aria-label={unreadNotificationCount > 0
+                  ? `Open settings navigation, ${unreadNotificationCount} unread notifications`
+                  : 'Open settings navigation'}
                 aria-expanded={isSettingsNavigationOpen}
                 onClick={() => setIsSettingsNavigationOpen(true)}
               >
-                {profile?.avatar_url ? (
-                  <img src={profile.avatar_url} alt="Profile" className="header-avatar-img" />
-                ) : (
-                  <span>{(profile?.username || session.user.email || 'MS').slice(0, 2).toUpperCase()}</span>
+                <span className="header-avatar-content">
+                  {profile?.avatar_url ? (
+                    <img src={profile.avatar_url} alt="Profile" className="header-avatar-img" />
+                  ) : (
+                    <span>{(profile?.username || session.user.email || 'MS').slice(0, 2).toUpperCase()}</span>
+                  )}
+                </span>
+                {unreadNotificationCount > 0 && (
+                  <span className="notification-count-badge header-notification-count" aria-hidden="true">
+                    {unreadNotificationCount}
+                  </span>
                 )}
               </button>
             ) : (
@@ -695,6 +706,7 @@ export function Shell({
       isOpen={isSettingsNavigationOpen}
       onClose={() => setIsSettingsNavigationOpen(false)}
       onLogout={onLogout}
+      unreadNotificationCount={unreadNotificationCount}
     />
       </header>
 

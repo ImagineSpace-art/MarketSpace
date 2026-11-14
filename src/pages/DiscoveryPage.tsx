@@ -5,7 +5,7 @@ import type { BusinessProfile, Listing, StoreReview } from '../types'
 import { Listing as ListingView } from '../components/Listing'
 import { getStoreUrl } from '../utils/storeUrl'
 import { BoostTrackedLink } from '../components/BoostTrackedLink'
-import { getStoreTemplateImageUrl } from '../features/store-templates/storeTemplateAssets'
+import { getStoreCardBannerUrl, getStoreTemplateImageUrl } from '../features/store-templates/storeTemplateAssets'
 
 type DiscoveryPageProps = {
   allBusinesses?: Record<string, BusinessProfile>
@@ -20,13 +20,6 @@ function getStoreLogoUrl(store: BusinessProfile) {
   const logo = store.logo || templateLogo
   if (!logo || /^(https?:\/\/|data:image\/)/i.test(logo)) return logo || ''
   return getStoreTemplateImageUrl(logo)
-}
-
-function getStoreBannerUrl(store: BusinessProfile) {
-  const templateBanner = store.templateContent?.['boutique-grid']?.bannerImage
-  const banner = store.cover || templateBanner
-  if (!banner || /^(https?:\/\/|data:image\/)/i.test(banner)) return banner || ''
-  return getStoreTemplateImageUrl(banner)
 }
 
 function StoreLogo({ store }: { store: BusinessProfile }) {
@@ -249,7 +242,7 @@ export function DiscoveryPage({
                 className={`discovery-featured-store discovery-featured-store-${index}`}
               >
                 <img
-                  src={getStoreBannerUrl(store)
+                  src={getStoreCardBannerUrl(store)
                     || availableListings.find((listing) => listing.user_id === store.userId)?.images?.[0]
                     || '/banners/store_banner_apparel.png'}
                   alt=""
@@ -335,7 +328,7 @@ export function DiscoveryPage({
               ? (reviews.reduce((total, review) => total + review.rating, 0) / reviews.length).toFixed(1)
               : null
             const itemCount = availableListings.filter((listing) => listing.user_id === store.userId).length
-            const storeImage = getStoreBannerUrl(store)
+            const storeImage = getStoreCardBannerUrl(store)
               || availableListings.find((listing) => listing.user_id === store.userId)?.images?.[0]
               || '/banners/store_banner_apparel.png'
             return (

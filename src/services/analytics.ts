@@ -300,29 +300,28 @@ export async function fetchStoreFollowers(storeId: string): Promise<string[]> {
 }
 
 export async function toggleStoreFollowInDb(userId: string, storeId: string): Promise<boolean> {
-    try {
-        const { data: existing } = await supabase
+    const { data: existing, error: lookupError } = await supabase
+        .from('store_followers')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('store_id', storeId)
+        .maybeSingle()
+
+    if (lookupError) throw new Error(`Follow status could not be checked: ${lookupError.message}`)
+
+    if (existing) {
+        const { error: deleteError } = await supabase
             .from('store_followers')
-            .select('id')
+            .delete()
             .eq('user_id', userId)
             .eq('store_id', storeId)
-            .maybeSingle()
-
-        if (existing) {
-            await supabase
-                .from('store_followers')
-                .delete()
-                .eq('user_id', userId)
-                .eq('store_id', storeId)
-            return false // Now unfollowed
-        } else {
-            await supabase
-                .from('store_followers')
-                .insert({ user_id: userId, store_id: storeId })
-            return true // Now following
-        }
-    } catch (err) {
-        console.warn('Failed to update store follow in DB:', err)
+        if (deleteError) throw new Error(`Profile could not be unfollowed: ${deleteError.message}`)
         return false
     }
+
+    const { error: insertError } = await supabase
+        .from('store_followers')
+        .insert({ user_id: userId, store_id: storeId })
+    if (insertError) throw new Error(`Profile could not be followed: ${insertError.message}`)
+    return true
 }

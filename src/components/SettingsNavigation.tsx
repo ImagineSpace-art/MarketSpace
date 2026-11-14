@@ -38,9 +38,15 @@ type SettingsNavigationDrawerProps = {
   isOpen: boolean
   onClose: () => void
   onLogout: () => void
+  unreadNotificationCount?: number
 }
 
-export function SettingsNavigationDrawer({ isOpen, onClose, onLogout }: SettingsNavigationDrawerProps) {
+export function SettingsNavigationDrawer({
+  isOpen,
+  onClose,
+  onLogout,
+  unreadNotificationCount = 0,
+}: SettingsNavigationDrawerProps) {
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -83,12 +89,22 @@ export function SettingsNavigationDrawer({ isOpen, onClose, onLogout }: Settings
               type="button"
               className={`settings-navigation-item${isActive(item.path, 'exact' in item ? item.exact : false) ? ' active' : ''}${'isPrimary' in item && item.isPrimary ? ' primary' : ''}`}
               aria-current={isActive(item.path, 'exact' in item ? item.exact : false) ? 'page' : undefined}
+              aria-label={item.path === '/profile/notifications' && unreadNotificationCount > 0
+                ? `${item.label}, ${unreadNotificationCount} unread notifications`
+                : undefined}
               onClick={() => {
                 navigate(item.path)
                 onClose()
               }}
             >
-              <span className="material-icons" aria-hidden="true">{item.icon}</span>
+              <span className="profile-menu-icon-wrap">
+                <span className="material-icons" aria-hidden="true">{item.icon}</span>
+                {item.path === '/profile/notifications' && unreadNotificationCount > 0 && (
+                  <span className="notification-count-badge profile-menu-notification-count" aria-hidden="true">
+                    {unreadNotificationCount}
+                  </span>
+                )}
+              </span>
               <span>{item.label}</span>
             </button>
           ))}

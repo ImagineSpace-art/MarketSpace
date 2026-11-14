@@ -87,7 +87,7 @@ export interface MarketplaceAppModel {
   setSavedIds: Dispatch<SetStateAction<string[]>>
   followingIds: string[]
   notifyStoreIds: string[]
-  toggleFollowStore: (storeId: string) => void
+  toggleFollowStore: (storeId: string) => Promise<boolean>
   toggleNotifyStore: (storeId: string) => void
   notifications: NotificationItem[]
   setNotifications: Dispatch<SetStateAction<NotificationItem[]>>
@@ -705,20 +705,27 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     setMessage('Response posted successfully')
   }
 
-  const toggleFollowStore = (storeId: string) => {
+  const toggleFollowStore = async (storeId: string): Promise<boolean> => {
     if (!session) {
       setMessage('Please sign in to follow stores')
-      return
+      return false
     }
     if (session.user.id === storeId) {
       setMessage('You cannot follow your own store or profile.')
-      return
+      return false
     }
-    const isFollowing = followingIds.includes(storeId)
-    setFollowingIds(prev =>
-      isFollowing ? prev.filter(id => id !== storeId) : [...prev, storeId]
-    )
-    void toggleStoreFollowInDb(session.user.id, storeId)
+    try {
+      const isFollowing = await toggleStoreFollowInDb(session.user.id, storeId)
+      setFollowingIds(prev =>
+        isFollowing
+          ? prev.includes(storeId) ? prev : [...prev, storeId]
+          : prev.filter(id => id !== storeId)
+      )
+      return true
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Your follow preference could not be updated.')
+      return false
+    }
   }
 
   const toggleNotifyStore = (storeId: string) => {
