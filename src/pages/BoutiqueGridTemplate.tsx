@@ -59,7 +59,7 @@ function safeImageUrl(value: string | undefined, fallback: string) {
 function ContactStoreButton({ onMessageSeller }: { onMessageSeller?: () => void }) {
   return (
     <button className="boutique-contact-button" type="button" onClick={onMessageSeller}>
-      Message store on MarketSpace
+      Message store
     </button>
   )
 }

@@ -43,3 +43,19 @@ export function getStoreSubdomain(hostname: string, configuredDomain = configure
     ? normalizedHostname.slice(0, -suffix.length)
     : ''
 }
+
+export function getMarketplaceRootUrl(
+  configuredDomain = configuredStoreDomain,
+  currentOrigin = window.location.origin,
+) {
+  const domain = configuredDomain.trim()
+  if (!domain) return `${currentOrigin.replace(/\/+$/, '')}/`
+
+  const domainUrl = new URL(/^https?:\/\//i.test(domain) ? domain : `http://${domain}`)
+  const localDomain = isLocalhost(domainUrl.hostname)
+  const currentUrl = new URL(currentOrigin)
+  const protocol = localDomain ? currentUrl.protocol : 'https:'
+  const port = domainUrl.port || (localDomain ? currentUrl.port : '')
+
+  return `${protocol}//${domainUrl.hostname}${port ? `:${port}` : ''}/`
+}

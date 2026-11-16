@@ -707,6 +707,7 @@ export function Shell({
       onClose={() => setIsSettingsNavigationOpen(false)}
       onLogout={onLogout}
       unreadNotificationCount={unreadNotificationCount}
+      hasOwnStore={hasOwnStore}
     />
       </header>
 

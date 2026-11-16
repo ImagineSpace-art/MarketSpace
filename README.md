@@ -29,6 +29,20 @@ For a new Supabase project, first apply the existing baseline schema in
 preserve its current schema and apply the pending migrations. Link the CLI to the
 intended project before pushing migrations.
 
+Storefront guest messaging is added by
+`supabase/migrations/202611140001_store_guest_messaging.sql`. Guests can start
+and resume store conversations without a MarketSpace account using a private
+recovery code. The code is saved in that browser's local storage and can be
+copied for use on another device; it grants access only to that conversation.
+Guest conversations appear under the store name, and deleting one requires the
+recovery code and removes it from both the visitor's chat list and the owner's
+inbox. Apply `supabase/migrations/202611140002_delete_guest_store_conversation.sql`
+to enable deletion.
+Store owners sign in with their existing MarketSpace credentials on the
+storefront and ownership is checked before showing the guest inbox. Auth
+sessions are origin-scoped, so a separate storefront domain may require the
+owner to sign in again even if they are already signed in on MarketSpace.
+
 2. Install dependencies:
 
 ```bash

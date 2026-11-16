@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getStoreSubdomain, getStoreUrl } from './storeUrl'
+import { getMarketplaceRootUrl, getStoreSubdomain, getStoreUrl } from './storeUrl'
 
 describe('store URLs', () => {
   it('creates a localhost subdomain URL and carries over the dev-server port', () => {
@@ -22,5 +22,12 @@ describe('store URLs', () => {
   it('extracts tenant slugs even when the configured domain includes a port', () => {
     expect(getStoreSubdomain('shop.localhost', 'localhost:5173')).toBe('shop')
     expect(getStoreSubdomain('localhost', 'localhost:5173')).toBe('')
+  })
+
+  it('links owners from a store subdomain back to the marketplace root', () => {
+    expect(getMarketplaceRootUrl('marketspace.example.com', 'https://shop.marketspace.example.com'))
+      .toBe('https://marketspace.example.com/')
+    expect(getMarketplaceRootUrl('localhost:5173', 'http://shop.localhost:5173'))
+      .toBe('http://localhost:5173/')
   })
 })

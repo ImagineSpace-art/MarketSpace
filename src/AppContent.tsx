@@ -24,6 +24,8 @@ import { getStoreSubdomain, getStoreUrl } from './utils/storeUrl'
 import { recordBoostEvent } from './utils/visibilityBoosts'
 import { supabase } from './lib/supabaseClient'
 import { SiteAnnouncementBar } from './components/SiteAnnouncementBar'
+import { StoreGuestInbox } from './features/store-messaging/StoreGuestInbox'
+import { StoreOwnerLoginPage, StoreOwnerOnboardingPage } from './features/store-messaging/StoreOwnerAccessPage'
 
 function SlowlyFlashingMarketSpaceTemplate({ message = 'Loading MarketSpace...' }: { message?: string }) {
   return (
@@ -378,6 +380,69 @@ export function AppContent() {
   const tenantStore = tenantSlug
     ? Object.values(allBusinesses).find((store) => store.subdomain?.toLowerCase() === tenantSlug)
     : undefined
+
+  const tenantStoreView = tenantStore ? (
+    <StoreViewRoute
+      storeOverride={tenantStore}
+      stores={stores}
+      businessProfile={businessProfile}
+      allBusinesses={allBusinesses}
+      listings={listings}
+      handleStartChat={handleStartChat}
+      toggleSave={toggleSave}
+      savedIds={savedIds}
+      loading={loading}
+      followingIds={followingIds}
+      notifyStoreIds={notifyStoreIds}
+      toggleFollowStore={toggleFollowStore}
+      toggleNotifyStore={toggleNotifyStore}
+      session={session}
+      storeReviews={app.storeReviews}
+      addStoreReview={app.addStoreReview}
+      replyToStoreReview={app.replyToStoreReview}
+      globalRenewalFrequency={app.globalRenewalFrequency}
+      globalRenewalDay={app.globalRenewalDay}
+      onEditListing={openEditListing}
+      onRenewListing={handleRenewListing}
+      isTenantSite
+    />
+  ) : null
+
+  if (tenantSlug && tenantStore && tenantStoreView) {
+    return (
+      <div className="standalone-store-site" style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+        <SiteAnnouncementBar />
+        {message ? <div className="status-banner">{message}</div> : null}
+        <Routes>
+          <Route path="/" element={<Navigate to={`/store/${encodeURIComponent(tenantStore.userId)}`} replace />} />
+          <Route path="/login" element={<Navigate to="/owner/login" replace />} />
+          <Route path="/signup" element={<Navigate to="/owner/login" replace />} />
+          <Route path={`/store/${encodeURIComponent(tenantStore.userId)}`} element={tenantStoreView} />
+          <Route path="/listings/:id" element={<TenantStoreListingRedirect userId={tenantStore.userId} />} />
+          <Route
+            path="/owner/login"
+            element={session?.user.id === tenantStore.userId
+              ? <Navigate to="/owner/onboarding" replace />
+              : <StoreOwnerLoginPage shop={tenantStore} />}
+          />
+          <Route
+            path="/owner/onboarding"
+            element={session?.user.id === tenantStore.userId
+              ? <StoreOwnerOnboardingPage shop={tenantStore} />
+              : <Navigate to="/owner/login" replace />}
+          />
+          <Route
+            path="/owner/messages"
+            element={session?.user.id === tenantStore.userId
+              ? <StoreGuestInbox />
+              : <Navigate to="/owner/login" replace />}
+          />
+          <Route path="*" element={<Navigate to={`/store/${encodeURIComponent(tenantStore.userId)}`} replace />} />
+        </Routes>
+        {messagesPopup}
+      </div>
+    )
+  }
 
   if (isStorePage) {
     return (
@@ -896,6 +961,10 @@ export function AppContent() {
             }
           />
           <Route
+            path="/profile/store-inbox"
+            element={session ? <StoreGuestInbox /> : <Navigate to="/login" replace />}
+          />
+          <Route
             path="/login"
             element={
               <AuthPage
@@ -1186,10 +1255,11 @@ function ListingEditRoute({
   )
 }
 
-function StoreViewRoute({ stores, businessProfile, allBusinesses, listings, handleStartChat, toggleSave, savedIds, loading, followingIds, notifyStoreIds, toggleFollowStore, toggleNotifyStore, session, storeReviews, addStoreReview, replyToStoreReview, globalRenewalFrequency, globalRenewalDay, onEditListing, onRenewListing }: any) {
+function StoreViewRoute({ storeOverride, stores, businessProfile, allBusinesses, listings, handleStartChat, toggleSave, savedIds, loading, followingIds, notifyStoreIds, toggleFollowStore, toggleNotifyStore, session, storeReviews, addStoreReview, replyToStoreReview, globalRenewalFrequency, globalRenewalDay, onEditListing, onRenewListing, isTenantSite = false }: any) {
   const { userId } = useParams()
 
   const regStore: BusinessProfile | null =
+    storeOverride ||
     (businessProfile?.userId === userId ? businessProfile : null) ||
     allBusinesses[userId || ''] ||
     Object.values(allBusinesses).find((b: any) => b.userId === userId) ||
@@ -1269,8 +1339,14 @@ function StoreViewRoute({ stores, businessProfile, allBusinesses, listings, hand
       globalRenewalDay={globalRenewalDay}
       onEditListing={onEditListing}
       onRenewListing={onRenewListing}
+      isTenantSite={isTenantSite}
     />
   )
+}
+
+function TenantStoreListingRedirect({ userId }: { userId: string }) {
+  const { id } = useParams()
+  return <Navigate to={`/store/${encodeURIComponent(userId)}?listing=${encodeURIComponent(id || '')}`} replace />
 }
 
 function SellerProfileRoute({ allBusinesses, ...props }: Omit<ComponentProps<typeof UserProfilePage>, 'profileUserId' | 'businessProfile'> & {

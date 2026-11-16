@@ -39,6 +39,7 @@ type SettingsNavigationDrawerProps = {
   onClose: () => void
   onLogout: () => void
   unreadNotificationCount?: number
+  hasOwnStore?: boolean
 }
 
 export function SettingsNavigationDrawer({
@@ -46,6 +47,7 @@ export function SettingsNavigationDrawer({
   onClose,
   onLogout,
   unreadNotificationCount = 0,
+  hasOwnStore = false,
 }: SettingsNavigationDrawerProps) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -83,7 +85,9 @@ export function SettingsNavigationDrawer({
           </button>
         </div>
         <nav className="profile-menu-navigation" aria-label="Profile navigation">
-          {PROFILE_NAVIGATION_ITEMS.map((item) => (
+          {PROFILE_NAVIGATION_ITEMS
+            .filter((item) => !('requiresStore' in item && item.requiresStore) || hasOwnStore)
+            .map((item) => (
             <button
               key={item.path}
               type="button"

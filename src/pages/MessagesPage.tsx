@@ -189,6 +189,10 @@ function renderMessageContent(content: string) {
   return <p style={{ margin: 0 }}>{content}</p>
 }
 
+export function MessageContent({ content }: { content: string }) {
+  return renderMessageContent(content)
+}
+
 type MessagesPageProps = {
   chatThreads: ChatThread[]
   activeChatId: number | null

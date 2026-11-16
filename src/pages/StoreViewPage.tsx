@@ -7,6 +7,8 @@ import { BoutiqueGridTemplate } from './BoutiqueGridTemplate'
 import { StorefrontLandingTemplate } from './StorefrontLandingTemplate'
 import { TemplateStoreListingView } from './TemplateStoreListingView'
 import './StoreTemplates.css'
+import { GuestStoreMessaging } from '../features/store-messaging/GuestStoreMessaging'
+import type { GuestStoreInquiryCard } from '../features/store-messaging/guestMessageContent'
 
 type StoreViewPageProps = {
   shop: BusinessProfile
@@ -26,6 +28,7 @@ type StoreViewPageProps = {
   globalRenewalDay?: string
   onEditListing?: (listing: Listing) => void
   onRenewListing?: (listingId: number) => void
+  isTenantSite?: boolean
 }
 
 export function StoreViewPage({
@@ -46,6 +49,7 @@ export function StoreViewPage({
   globalRenewalDay = 'Monday',
   onEditListing,
   onRenewListing,
+  isTenantSite = false,
 }: StoreViewPageProps) {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -56,6 +60,16 @@ export function StoreViewPage({
   const isNotified = notifyStoreIds.includes(shop.userId)
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [isInfoOpen, setIsInfoOpen] = useState(false)
+  const [isGuestMessagingOpen, setIsGuestMessagingOpen] = useState(false)
+  const [guestMessagingView, setGuestMessagingView] = useState<'inbox' | 'compose'>('compose')
+  const [guestInquiry, setGuestInquiry] = useState<{
+    listingId?: number
+    message: string
+    contact?: string
+    inquiryCard?: GuestStoreInquiryCard
+  }>({
+    message: `Hello, I have a question about ${shop.shopName}.`,
+  })
   const [cartItems, setCartItems] = useState<StoreCartItem[]>(() => {
     try {
       const saved = localStorage.getItem(`marketspace_cart_${shop.userId}`)
@@ -146,12 +160,61 @@ export function StoreViewPage({
 
   const startStoreMessage = (message?: string) => {
     if (isOwner) return
-    onMessageSeller(message)
+    if (currentUserId) {
+      onMessageSeller(message)
+      return
+    }
+
+    let listingId: number | undefined
+    let initialContact: string | undefined
+    let initialMessage = message || `Hello, I have a question about ${shop.shopName}.`
+    let inquiryCard: GuestStoreInquiryCard | undefined
+    if (message?.startsWith('[INQUIRY_CARD]')) {
+      try {
+        const parsed: unknown = JSON.parse(message.slice('[INQUIRY_CARD]'.length))
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          throw new Error('Invalid inquiry card')
+        }
+        const inquiry = parsed as GuestStoreInquiryCard
+        inquiryCard = inquiry
+        listingId = Number.isSafeInteger(inquiry.listingId) ? inquiry.listingId : undefined
+        initialContact = inquiry.phone?.trim() || undefined
+        initialMessage = inquiry.message?.trim() || ''
+      } catch {
+        initialMessage = message
+      }
+    }
+    setGuestInquiry({ listingId, message: initialMessage, contact: initialContact, inquiryCard })
+    setGuestMessagingView('compose')
+    setIsGuestMessagingOpen(true)
+  }
+
+  const openGuestMessages = () => {
+    setGuestMessagingView('inbox')
+    setIsGuestMessagingOpen(true)
   }
 
   if (activeListing) {
     return (
       <>
+        <div className="storefront-access-toolbar">
+          {isOwner ? (
+            <button type="button" onClick={() => navigate(isTenantSite ? '/owner/messages' : '/profile/store-inbox')}>
+              <span className="material-icons" aria-hidden="true">forum</span> Guest inquiries
+            </button>
+          ) : (
+            <>
+              {shop.storeId && (
+                <button type="button" onClick={openGuestMessages}>
+                  <span className="material-icons" aria-hidden="true">forum</span> Messages
+                </button>
+              )}
+              {isTenantSite && (
+                <button type="button" onClick={() => navigate('/owner/login')}>Store owner? Sign in</button>
+              )}
+            </>
+          )}
+        </div>
         <TemplateStoreListingView
           key={activeListing.id}
           templateId={templateId}
@@ -168,6 +231,19 @@ export function StoreViewPage({
           onEditListing={onEditListing}
           onRenewListing={onRenewListing}
         />
+        {shop.storeId && (
+          <GuestStoreMessaging
+            isOpen={isGuestMessagingOpen}
+            storeId={shop.storeId}
+            storeName={shop.shopName}
+            initialView={guestMessagingView}
+            listingId={guestInquiry.listingId}
+            initialMessage={guestInquiry.message}
+            initialContact={guestInquiry.contact}
+            initialInquiryCard={guestInquiry.inquiryCard}
+            onClose={() => setIsGuestMessagingOpen(false)}
+          />
+        )}
       </>
     )
   }
@@ -204,9 +280,40 @@ export function StoreViewPage({
 
   return (
     <>
+      <div className="storefront-access-toolbar">
+        {isOwner ? (
+          <button type="button" onClick={() => navigate(isTenantSite ? '/owner/messages' : '/profile/store-inbox')}>
+            <span className="material-icons" aria-hidden="true">forum</span> Guest inquiries
+          </button>
+        ) : (
+          <>
+            {shop.storeId && (
+              <button type="button" onClick={openGuestMessages}>
+                <span className="material-icons" aria-hidden="true">forum</span> Messages
+              </button>
+            )}
+            {isTenantSite && (
+              <button type="button" onClick={() => navigate('/owner/login')}>Store owner? Sign in</button>
+            )}
+          </>
+        )}
+      </div>
       {templateId === 'storefront-landing'
         ? <StorefrontLandingTemplate {...templateProps} />
         : <BoutiqueGridTemplate {...templateProps} />}
+      {shop.storeId && (
+        <GuestStoreMessaging
+          isOpen={isGuestMessagingOpen}
+          storeId={shop.storeId}
+          storeName={shop.shopName}
+          initialView={guestMessagingView}
+          listingId={guestInquiry.listingId}
+          initialMessage={guestInquiry.message}
+          initialContact={guestInquiry.contact}
+          initialInquiryCard={guestInquiry.inquiryCard}
+          onClose={() => setIsGuestMessagingOpen(false)}
+        />
+      )}
     </>
   )
 }
