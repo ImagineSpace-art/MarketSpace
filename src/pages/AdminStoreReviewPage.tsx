@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { adminSupabase } from '../lib/adminSupabaseClient'
 import { getFunctionErrorMessage } from '../utils/functionError'
@@ -27,6 +28,7 @@ type PendingAd = BusinessAd & {
   user_id: string
   store_name: string
   seller_name: string
+  created_at: string
 }
 
 type PendingSellerVerification = {
@@ -39,6 +41,7 @@ type PendingSellerVerification = {
 
 type ReviewApplication = {
   id: string
+  created_at: string
   shop_name: string
   description: string
   category: string
@@ -69,6 +72,88 @@ type StoreReportGroup = {
   store: { id: string; shop_name: string; subdomain: string | null } | undefined
   count: number
   reports: StoreReport[]
+}
+
+type ReviewStoreReport = StoreReport & {
+  store: StoreReportGroup['store']
+  store_report_count: number
+}
+
+function sortOldestFirst<T>(items: T[], getDate: (item: T) => string | null | undefined) {
+  return [...items].sort((left, right) => {
+    const leftTimestamp = Date.parse(getDate(left) || '')
+    const rightTimestamp = Date.parse(getDate(right) || '')
+    const leftValid = Number.isFinite(leftTimestamp)
+    const rightValid = Number.isFinite(rightTimestamp)
+    if (!leftValid && !rightValid) return 0
+    if (!leftValid) return 1
+    if (!rightValid) return -1
+    return leftTimestamp - rightTimestamp
+  })
+}
+
+function AdminReviewSplitLayout<T>({
+  queueName,
+  items,
+  selectedId,
+  onSelect,
+  onBack,
+  getId,
+  renderListItem,
+  renderDetails,
+}: {
+  queueName: string
+  items: T[]
+  selectedId: string
+  onSelect: (id: string) => void
+  onBack: () => void
+  getId: (item: T) => string
+  renderListItem: (item: T, isSelected: boolean) => ReactNode
+  renderDetails: (item: T) => ReactNode
+}) {
+  const selectedItem = items.find(item => getId(item) === selectedId)
+  return (
+    <div className={`admin-application-review${selectedItem ? ' has-selected-application' : ''}`}>
+      <div className="admin-application-workspace">
+        <aside className="admin-application-list" aria-label={`${queueName} awaiting review`}>
+          <div className="admin-application-list-items">
+            {items.length > 0 ? items.map(item => {
+              const id = getId(item)
+              const isSelected = id === selectedId
+              return (
+                <button
+                  type="button"
+                  key={id}
+                  className={`admin-application-list-item${isSelected ? ' is-selected' : ''}`}
+                  aria-pressed={isSelected}
+                  onClick={() => onSelect(id)}
+                >
+                  {renderListItem(item, isSelected)}
+                </button>
+              )
+            }) : (
+              <p className="admin-application-list-empty">No items are waiting for review.</p>
+            )}
+          </div>
+        </aside>
+        <div className="admin-application-detail">
+          {selectedItem ? (
+            <article className="section-card admin-application-card">
+              <button type="button" className="admin-application-back" onClick={onBack}>
+                <span aria-hidden="true">←</span> All {queueName.toLowerCase()}
+              </button>
+              {renderDetails(selectedItem)}
+            </article>
+          ) : (
+            <section className="section-card admin-application-detail-empty">
+              <h3>{items.length ? `Select a ${queueName.toLowerCase()} to review` : `No ${queueName.toLowerCase()} waiting`}</h3>
+              <p>{items.length ? `Choose an item from the list to inspect its details and make a decision.` : `There are no ${queueName.toLowerCase()} in this queue.`}</p>
+            </section>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 type NotificationRecipient = {
@@ -155,6 +240,10 @@ export function AdminStoreReviewPage() {
   const [pendingListings, setPendingListings] = useState<PendingListing[]>([])
   const [pendingAds, setPendingAds] = useState<PendingAd[]>([])
   const [pendingSellerVerifications, setPendingSellerVerifications] = useState<PendingSellerVerification[]>([])
+  const [selectedListingId, setSelectedListingId] = useState('')
+  const [selectedAdId, setSelectedAdId] = useState('')
+  const [selectedSellerVerificationId, setSelectedSellerVerificationId] = useState('')
+  const [selectedReportId, setSelectedReportId] = useState('')
   const [loading, setLoading] = useState(true)
   const [reportsLoading, setReportsLoading] = useState(false)
   const [listingsLoading, setListingsLoading] = useState(false)
@@ -184,7 +273,22 @@ export function AdminStoreReviewPage() {
   const [boostsLoading, setBoostsLoading] = useState(false)
   const [moderatorUserId, setModeratorUserId] = useState('')
 
-  const filteredApplications = applications.filter(application => {
+  const oldestApplications = sortOldestFirst(applications, application => application.created_at)
+  const oldestListings = sortOldestFirst(pendingListings, listing => listing.created_at)
+  const oldestAds = sortOldestFirst(pendingAds, ad => ad.created_at)
+  const oldestSellerVerifications = sortOldestFirst(
+    pendingSellerVerifications,
+    verification => verification.submitted_at,
+  )
+  const oldestReports: ReviewStoreReport[] = sortOldestFirst(
+    reportGroups.flatMap(group => group.reports.map(report => ({
+      ...report,
+      store: group.store,
+      store_report_count: group.count,
+    }))),
+    report => report.created_at,
+  )
+  const filteredApplications = oldestApplications.filter(application => {
     const query = applicationSearch.trim().toLocaleLowerCase()
     if (!query) return true
     return [
@@ -231,9 +335,11 @@ export function AdminStoreReviewPage() {
       })
       if (invokeError) setError(await getFunctionErrorMessage(invokeError))
       else {
-        const nextApplications = data?.applications || []
+        const nextApplications = sortOldestFirst(data?.applications || [], application => application.created_at)
         setApplications(nextApplications)
-        setSelectedApplicationId(current => nextApplications.some(application => application.id === current) ? current : '')
+        setSelectedApplicationId(current => nextApplications.some(application => application.id === current)
+          ? current
+          : nextApplications[0]?.id || '')
       }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'The review queue could not be loaded.')
@@ -250,7 +356,17 @@ export function AdminStoreReviewPage() {
         body: { action: 'open_reports' },
       })
       if (invokeError) setError(await getFunctionErrorMessage(invokeError))
-      else setReportGroups(data?.reports || [])
+      else {
+        const nextGroups = data?.reports || []
+        const nextReports = sortOldestFirst(
+          nextGroups.flatMap(group => group.reports),
+          report => report.created_at,
+        )
+        setReportGroups(nextGroups)
+        setSelectedReportId(current => nextReports.some(report => report.id === current)
+          ? current
+          : nextReports[0]?.id || '')
+      }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Open store reports could not be loaded.')
     } finally {
@@ -266,7 +382,13 @@ export function AdminStoreReviewPage() {
         body: { action: 'pending_listings' },
       })
       if (invokeError) setError(await getFunctionErrorMessage(invokeError))
-      else setPendingListings(data?.listings || [])
+      else {
+        const nextListings = sortOldestFirst(data?.listings || [], listing => listing.created_at)
+        setPendingListings(nextListings)
+        setSelectedListingId(current => nextListings.some(listing => String(listing.id) === current)
+          ? current
+          : String(nextListings[0]?.id || ''))
+      }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Pending listings could not be loaded.')
     } finally {
@@ -282,7 +404,13 @@ export function AdminStoreReviewPage() {
         body: { action: 'pending_ads' },
       })
       if (invokeError) setError(await getFunctionErrorMessage(invokeError))
-      else setPendingAds(data?.ads || [])
+      else {
+        const nextAds = sortOldestFirst(data?.ads || [], ad => ad.created_at)
+        setPendingAds(nextAds)
+        setSelectedAdId(current => nextAds.some(ad => ad.id === current)
+          ? current
+          : nextAds[0]?.id || '')
+      }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Pending ads could not be loaded.')
     } finally {
@@ -298,7 +426,16 @@ export function AdminStoreReviewPage() {
         verifications: PendingSellerVerification[]
       }>('seller-verification', { body: { action: 'pending_reviews' } })
       if (invokeError) setError(await getFunctionErrorMessage(invokeError))
-      else setPendingSellerVerifications(data?.verifications || [])
+      else {
+        const nextVerifications = sortOldestFirst(
+          data?.verifications || [],
+          verification => verification.submitted_at,
+        )
+        setPendingSellerVerifications(nextVerifications)
+        setSelectedSellerVerificationId(current => nextVerifications.some(verification => verification.user_id === current)
+          ? current
+          : nextVerifications[0]?.user_id || '')
+      }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Identity verification queue could not be loaded.')
     } finally {
@@ -830,60 +967,80 @@ export function AdminStoreReviewPage() {
         {notice && <p role="status" className="store-wizard-alert notice">{notice}</p>}
         {listingsLoading ? (
           <section className="section-card"><p>Loading pending listings…</p></section>
-        ) : pendingListings.length === 0 ? (
-          <section className="section-card"><p>No listings are waiting for review.</p></section>
         ) : (
-          <div style={{ display: 'grid', gap: 16 }}>
-            {pendingListings.map(listing => (
-              <article key={listing.id} className="section-card" style={{ padding: 20 }}>
-                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14, flexWrap: 'wrap' }}>
-                  <div>
-                    <h3 style={{ margin: '0 0 4px' }}>{listing.title}</h3>
-                    <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
-                      {listing.seller_name || 'Seller'}{listing.store_name ? ` · ${listing.store_name}` : ' · Individual seller'}
-                    </p>
-                    {listing.user_id === moderatorUserId && <p role="note" style={{ margin: '5px 0 0', color: '#b45309' }}>You cannot review your own listing.</p>}
+          <AdminReviewSplitLayout
+            queueName="Listings"
+            items={oldestListings}
+            selectedId={selectedListingId}
+            onSelect={setSelectedListingId}
+            onBack={() => setSelectedListingId('')}
+            getId={listing => String(listing.id)}
+            renderListItem={listing => (
+              <>
+                <span className="admin-application-list-title">{listing.title}</span>
+                <span className="admin-application-list-meta">
+                  {listing.seller_name || 'Seller'} · {listing.store_name || 'Individual seller'}
+                </span>
+                <span className="admin-application-list-meta">{listing.category} · ZMW {listing.price}</span>
+                <span className="admin-application-list-meta">
+                  Submitted {listing.created_at ? new Date(listing.created_at).toLocaleString() : 'date unavailable'}
+                </span>
+              </>
+            )}
+            renderDetails={listing => {
+              const isOwnListing = listing.user_id === moderatorUserId
+              const isWorking = workingId === String(listing.id)
+              return (
+                <>
+                  <div className="admin-application-detail-heading">
+                    <div>
+                      <p className="admin-eyebrow">LISTING DETAILS</p>
+                      <h3>{listing.title}</h3>
+                      <p>{listing.seller_name || 'Seller'} · {listing.store_name || 'Individual seller'} · {listing.category}</p>
+                    </div>
+                    <strong>ZMW {listing.price}</strong>
                   </div>
-                  <strong>{listing.category} · ZMW {listing.price}</strong>
-                </header>
-                <p style={{ whiteSpace: 'pre-wrap', margin: '14px 0' }}>{listing.description}</p>
-                {listing.images?.length ? (
-                  <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 14 }}>
-                    {listing.images.map((image, index) => (
-                      <img key={`${listing.id}-${index}`} src={image} alt={`${listing.title} ${index + 1}`} style={{ width: 120, height: 100, objectFit: 'cover', borderRadius: 8 }} />
-                    ))}
+                  {listing.created_at && <p>Submitted {new Date(listing.created_at).toLocaleString()}</p>}
+                  {isOwnListing && <p role="note">You cannot review your own listing.</p>}
+                  <p style={{ whiteSpace: 'pre-wrap' }}>{listing.description}</p>
+                  {listing.images?.length ? (
+                    <div className="admin-review-media-list">
+                      {listing.images.map((image, index) => (
+                        <img key={`${listing.id}-${index}`} src={image} alt={`${listing.title} ${index + 1}`} />
+                      ))}
+                    </div>
+                  ) : <p>No listing images provided.</p>}
+                  <label className="admin-application-review-reason">
+                    Review reason (required to reject)
+                    <textarea
+                      value={listingReasons[listing.id] || ''}
+                      maxLength={500}
+                      rows={3}
+                      onChange={event => setListingReasons(current => ({ ...current, [listing.id]: event.target.value }))}
+                    />
+                  </label>
+                  <div className="admin-application-actions">
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      disabled={isOwnListing || isWorking || !listingReasons[listing.id]?.trim()}
+                      onClick={() => void reviewListing(listing, 'reject')}
+                    >
+                      Reject
+                    </button>
+                    <button
+                      type="button"
+                      className="primary-btn"
+                      disabled={isOwnListing || isWorking}
+                      onClick={() => void reviewListing(listing, 'approve')}
+                    >
+                      {isWorking ? 'Saving…' : 'Approve'}
+                    </button>
                   </div>
-                ) : null}
-                <label style={{ display: 'grid', gap: 6, marginBottom: 12 }}>
-                  <span>Review reason (required to reject)</span>
-                  <textarea
-                    value={listingReasons[listing.id] || ''}
-                    maxLength={500}
-                    rows={2}
-                    onChange={event => setListingReasons(current => ({ ...current, [listing.id]: event.target.value }))}
-                  />
-                </label>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                  <button
-                    type="button"
-                    className="secondary-btn"
-                    disabled={listing.user_id === moderatorUserId || workingId === String(listing.id) || !listingReasons[listing.id]?.trim()}
-                    onClick={() => void reviewListing(listing, 'reject')}
-                  >
-                    Reject
-                  </button>
-                  <button
-                    type="button"
-                    className="primary-btn"
-                    disabled={listing.user_id === moderatorUserId || workingId === String(listing.id)}
-                    onClick={() => void reviewListing(listing, 'approve')}
-                  >
-                    {workingId === String(listing.id) ? 'Saving…' : 'Approve'}
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
+                </>
+              )
+            }}
+          />
         )}
       </section>
     )
@@ -906,48 +1063,60 @@ export function AdminStoreReviewPage() {
         {notice && <p role="status" className="store-wizard-alert notice">{notice}</p>}
         {sellerVerificationsLoading ? (
           <section className="section-card"><p>Loading identity submissions…</p></section>
-        ) : pendingSellerVerifications.length === 0 ? (
-          <section className="section-card"><p>No individual seller identities are waiting for review.</p></section>
         ) : (
-          <div style={{ display: 'grid', gap: 16 }}>
-            {pendingSellerVerifications.map(verification => {
+          <AdminReviewSplitLayout
+            queueName="Identity checks"
+            items={oldestSellerVerifications}
+            selectedId={selectedSellerVerificationId}
+            onSelect={setSelectedSellerVerificationId}
+            onBack={() => setSelectedSellerVerificationId('')}
+            getId={verification => verification.user_id}
+            renderListItem={verification => (
+              <>
+                <span className="admin-application-list-title">{verification.seller_name}</span>
+                <span className="admin-application-list-meta">Individual seller</span>
+                <span className="admin-application-list-meta">
+                  Submitted {verification.submitted_at ? new Date(verification.submitted_at).toLocaleString() : 'date unavailable'}
+                </span>
+              </>
+            )}
+            renderDetails={verification => {
               const isOwnVerification = verification.user_id === moderatorUserId
               const isWorking = workingId === verification.user_id
               const reason = sellerVerificationReasons[verification.user_id] || ''
               return (
-                <article key={verification.user_id} className="section-card" style={{ padding: 20 }}>
-                  <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+                <>
+                  <div className="admin-application-detail-heading">
                     <div>
-                      <h3 style={{ margin: '0 0 4px' }}>{verification.seller_name}</h3>
-                      <p style={{ margin: 0, color: 'var(--text-secondary)' }}>Individual seller · {verification.user_id}</p>
+                      <p className="admin-eyebrow">IDENTITY CHECK DETAILS</p>
+                      <h3>{verification.seller_name}</h3>
+                      <p>Individual seller · {verification.user_id}</p>
                     </div>
-                    <time dateTime={verification.submitted_at || undefined} style={{ color: 'var(--text-secondary)', fontSize: '.82rem' }}>
+                    <time dateTime={verification.submitted_at || undefined}>
                       Submitted {verification.submitted_at ? new Date(verification.submitted_at).toLocaleString() : 'date unavailable'}
                     </time>
-                  </header>
+                  </div>
                   {isOwnVerification && <p role="note">You cannot review your own identity verification.</p>}
-                  <p style={{ color: 'var(--text-secondary)' }}>Private image links expire after 10 minutes. Refresh this queue to renew them.</p>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 12 }}>
-                    <figure style={{ margin: 0, minWidth: 0 }}>
-                      <figcaption style={{ marginBottom: 6, fontWeight: 700 }}>ID document</figcaption>
+                  <p className="admin-review-muted">Private image links expire after 10 minutes. Refresh this queue to renew them.</p>
+                  <div className="admin-review-media-grid">
+                    <figure>
+                      <figcaption>ID document</figcaption>
                       <img
                         src={verification.id_image_url}
                         alt={`ID document submitted by ${verification.seller_name}`}
                         referrerPolicy="no-referrer"
-                        style={{ display: 'block', width: '100%', maxHeight: 360, objectFit: 'contain', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface)' }}
                       />
                     </figure>
-                    <figure style={{ margin: 0, minWidth: 0 }}>
-                      <figcaption style={{ marginBottom: 6, fontWeight: 700 }}>Seller selfie</figcaption>
+                    <figure>
+                      <figcaption>Seller selfie</figcaption>
                       <img
                         src={verification.selfie_url}
                         alt={`Seller selfie submitted by ${verification.seller_name}`}
                         referrerPolicy="no-referrer"
-                        style={{ display: 'block', width: '100%', maxHeight: 360, objectFit: 'contain', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface)' }}
                       />
                     </figure>
                   </div>
-                  <label style={{ display: 'grid', gap: 6, marginTop: 16 }}>
+                  <label className="admin-application-review-reason">
                     Rejection reason (required to reject; max 500 characters)
                     <textarea
                       value={reason}
@@ -959,7 +1128,7 @@ export function AdminStoreReviewPage() {
                       }))}
                     />
                   </label>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+                  <div className="admin-application-actions">
                     <button
                       type="button"
                       className="secondary-btn"
@@ -977,10 +1146,10 @@ export function AdminStoreReviewPage() {
                       {isWorking ? 'Saving…' : 'Approve'}
                     </button>
                   </div>
-                </article>
+                </>
               )
-            })}
-          </div>
+            }}
+          />
         )}
       </section>
     )
@@ -1003,58 +1172,77 @@ export function AdminStoreReviewPage() {
         {notice && <p role="status" className="store-wizard-alert notice">{notice}</p>}
         {adsLoading ? (
           <section className="section-card"><p>Loading pending ads…</p></section>
-        ) : pendingAds.length === 0 ? (
-          <section className="section-card"><p>No ads are waiting for review.</p></section>
         ) : (
-          <div style={{ display: 'grid', gap: 16 }}>
-            {pendingAds.map(ad => (
-              <article key={ad.id} className="section-card" style={{ padding: 20, minWidth: 0 }}>
-                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14, flexWrap: 'wrap' }}>
-                  <div style={{ minWidth: 0 }}>
-                    <h3 style={{ margin: '0 0 4px', overflowWrap: 'anywhere' }}>{ad.headline || ad.adTitle || 'Untitled ad'}</h3>
-                    <p style={{ margin: 0, color: 'var(--text-secondary)' }}>{ad.seller_name} · {ad.store_name}</p>
-                    {ad.user_id === moderatorUserId && <p role="note" style={{ margin: '5px 0 0', color: '#b45309' }}>You cannot review your own ad.</p>}
+          <AdminReviewSplitLayout
+            queueName="Store ads"
+            items={oldestAds}
+            selectedId={selectedAdId}
+            onSelect={setSelectedAdId}
+            onBack={() => setSelectedAdId('')}
+            getId={ad => ad.id}
+            renderListItem={ad => (
+              <>
+                <span className="admin-application-list-title">{ad.headline || ad.adTitle || 'Untitled ad'}</span>
+                <span className="admin-application-list-meta">{ad.seller_name} · {ad.store_name}</span>
+                <span className="admin-application-list-meta">{ad.status} · {ad.budget}</span>
+                <span className="admin-application-list-meta">Submitted {new Date(ad.created_at).toLocaleString()}</span>
+              </>
+            )}
+            renderDetails={ad => {
+              const isOwnAd = ad.user_id === moderatorUserId
+              const isWorking = workingId === ad.id
+              const adTitle = ad.headline || ad.adTitle || 'Untitled ad'
+              return (
+                <>
+                  <div className="admin-application-detail-heading">
+                    <div>
+                      <p className="admin-eyebrow">STORE AD DETAILS</p>
+                      <h3>{adTitle}</h3>
+                      <p>{ad.seller_name} · {ad.store_name}</p>
+                    </div>
+                    <strong>{ad.status} · {ad.budget}</strong>
                   </div>
-                  <strong>{ad.status} · {ad.budget}</strong>
-                </header>
-                {ad.adText && <p style={{ whiteSpace: 'pre-wrap', margin: '14px 0' }}>{ad.adText}</p>}
-                {ad.media?.length ? (
-                  <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 14 }}>
-                    {ad.media.map((source, index) => ad.mediaTypes?.[index] === 'video'
-                      ? <video key={`${ad.id}-${index}`} src={source} controls preload="metadata" style={{ width: 180, height: 120, objectFit: 'cover', borderRadius: 8, flex: '0 0 auto' }} />
-                      : <img key={`${ad.id}-${index}`} src={source} alt={`${ad.headline || ad.adTitle || 'Ad'} ${index + 1}`} style={{ width: 180, height: 120, objectFit: 'cover', borderRadius: 8, flex: '0 0 auto' }} />)}
+                  <p>Submitted {new Date(ad.created_at).toLocaleString()}</p>
+                  {isOwnAd && <p role="note">You cannot review your own ad.</p>}
+                  {ad.adText && <p style={{ whiteSpace: 'pre-wrap' }}>{ad.adText}</p>}
+                  {ad.media?.length ? (
+                    <div className="admin-review-media-list">
+                      {ad.media.map((source, index) => ad.mediaTypes?.[index] === 'video'
+                        ? <video key={`${ad.id}-${index}`} src={source} controls preload="metadata" />
+                        : <img key={`${ad.id}-${index}`} src={source} alt={`${adTitle} ${index + 1}`} />)}
+                    </div>
+                  ) : <p>No ad media provided.</p>}
+                  <label className="admin-application-review-reason">
+                    Review reason (required to reject)
+                    <textarea
+                      value={adReasons[ad.id] || ''}
+                      maxLength={500}
+                      rows={3}
+                      onChange={event => setAdReasons(current => ({ ...current, [ad.id]: event.target.value }))}
+                    />
+                  </label>
+                  <div className="admin-application-actions">
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      disabled={isOwnAd || isWorking || !adReasons[ad.id]?.trim()}
+                      onClick={() => void reviewAd(ad, 'reject')}
+                    >
+                      Reject
+                    </button>
+                    <button
+                      type="button"
+                      className="primary-btn"
+                      disabled={isOwnAd || isWorking}
+                      onClick={() => void reviewAd(ad, 'approve')}
+                    >
+                      {isWorking ? 'Saving…' : 'Approve'}
+                    </button>
                   </div>
-                ) : null}
-                <label style={{ display: 'grid', gap: 6, marginBottom: 12 }}>
-                  <span>Review reason (required to reject)</span>
-                  <textarea
-                    value={adReasons[ad.id] || ''}
-                    maxLength={500}
-                    rows={2}
-                    onChange={event => setAdReasons(current => ({ ...current, [ad.id]: event.target.value }))}
-                  />
-                </label>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
-                    className="secondary-btn"
-                    disabled={ad.user_id === moderatorUserId || workingId === ad.id || !adReasons[ad.id]?.trim()}
-                    onClick={() => void reviewAd(ad, 'reject')}
-                  >
-                    Reject
-                  </button>
-                  <button
-                    type="button"
-                    className="primary-btn"
-                    disabled={ad.user_id === moderatorUserId || workingId === ad.id}
-                    onClick={() => void reviewAd(ad, 'approve')}
-                  >
-                    {workingId === ad.id ? 'Saving…' : 'Approve'}
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
+                </>
+              )
+            }}
+          />
         )}
       </section>
     )
@@ -1079,67 +1267,71 @@ export function AdminStoreReviewPage() {
         {notice && <p role="status" className="store-wizard-alert notice">{notice}</p>}
         {reportsLoading ? (
           <section className="section-card"><p>Loading reports…</p></section>
-        ) : reportGroups.length === 0 ? (
-          <section className="section-card"><p>No open store reports.</p></section>
         ) : (
-          <div style={{ display: 'grid', gap: 18 }}>
-            {reportGroups.map(group => (
-              <section key={group.store?.id || group.reports[0]?.id} className="section-card" style={{ padding: 18 }}>
-                <header style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
-                  <div>
-                    <h3 style={{ margin: 0 }}>{group.store?.shop_name || 'Unknown store'}</h3>
-                    {group.store?.subdomain && <p style={{ margin: '4px 0 0', color: 'var(--text-secondary)' }}>{group.store.subdomain}</p>}
+          <AdminReviewSplitLayout
+            queueName="Reports"
+            items={oldestReports}
+            selectedId={selectedReportId}
+            onSelect={setSelectedReportId}
+            onBack={() => setSelectedReportId('')}
+            getId={report => report.id}
+            renderListItem={report => (
+              <>
+                <span className="admin-application-list-title">{report.store?.shop_name || 'Unknown store'}</span>
+                <span className="admin-application-list-meta">{REPORT_REASON_LABELS[report.reason]}</span>
+                <span className="admin-application-list-meta">
+                  {report.details || 'No additional details provided.'}
+                </span>
+                <span className="admin-application-list-meta">Submitted {new Date(report.created_at).toLocaleString()}</span>
+              </>
+            )}
+            renderDetails={report => {
+              const isWorking = workingId === report.id
+              const isRemovingStore = Boolean(report.store && workingId === report.store.id)
+              return (
+                <>
+                  <div className="admin-application-detail-heading">
+                    <div>
+                      <p className="admin-eyebrow">STORE REPORT DETAILS</p>
+                      <h3>{REPORT_REASON_LABELS[report.reason]}</h3>
+                      <p>{report.store?.shop_name || 'Unknown store'}{report.store?.subdomain ? ` · ${report.store.subdomain}` : ''}</p>
+                    </div>
+                    <strong>{report.store_report_count} open {report.store_report_count === 1 ? 'report' : 'reports'}</strong>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    <strong>{group.count} open {group.count === 1 ? 'report' : 'reports'}</strong>
-                    {group.store && (
+                  <time dateTime={report.created_at}>Submitted {new Date(report.created_at).toLocaleString()}</time>
+                  <p className="admin-review-report-details">{report.details || 'No additional details provided.'}</p>
+                  <div className="admin-application-actions admin-review-report-actions">
+                    {report.store && (
                       <button
                         type="button"
                         className="danger-btn compact-btn"
-                        disabled={workingId === group.store.id}
-                        onClick={() => void deleteReportedStoreForFraud(group.store!.id, group.store!.shop_name)}
+                        disabled={workingId === report.store.id}
+                        onClick={() => void deleteReportedStoreForFraud(report.store!.id, report.store!.shop_name)}
                       >
-                        {workingId === group.store.id ? 'Removing…' : 'Remove for fraud / abuse'}
+                        {isRemovingStore ? 'Removing…' : 'Remove store for fraud / abuse'}
                       </button>
                     )}
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      disabled={isWorking}
+                      onClick={() => void reviewStoreReport(report, 'dismiss')}
+                    >
+                      Dismiss
+                    </button>
+                    <button
+                      type="button"
+                      className="primary-btn"
+                      disabled={isWorking}
+                      onClick={() => void reviewStoreReport(report, 'uphold')}
+                    >
+                      {isWorking ? 'Saving…' : 'Uphold'}
+                    </button>
                   </div>
-                </header>
-                <div style={{ display: 'grid', gap: 12 }}>
-                  {group.reports.map(report => (
-                    <article key={report.id} style={{ padding: 14, border: '1px solid var(--border)', borderRadius: 10 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                        <strong>{REPORT_REASON_LABELS[report.reason]}</strong>
-                        <time dateTime={report.created_at} style={{ color: 'var(--text-secondary)', fontSize: '.82rem' }}>
-                          {new Date(report.created_at).toLocaleString()}
-                        </time>
-                      </div>
-                      <p style={{ margin: '10px 0 14px', whiteSpace: 'pre-wrap' }}>
-                        {report.details || 'No additional details provided.'}
-                      </p>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                        <button
-                          type="button"
-                          className="secondary-btn"
-                          disabled={workingId === report.id}
-                          onClick={() => void reviewStoreReport(report, 'dismiss')}
-                        >
-                          Dismiss
-                        </button>
-                        <button
-                          type="button"
-                          className="primary-btn"
-                          disabled={workingId === report.id}
-                          onClick={() => void reviewStoreReport(report, 'uphold')}
-                        >
-                          {workingId === report.id ? 'Saving…' : 'Uphold'}
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
+                </>
+              )
+            }}
+          />
         )}
       </section>
     )
@@ -1194,6 +1386,9 @@ export function AdminStoreReviewPage() {
                   <span className="admin-application-list-meta">
                     {application.category} · {application.store_type.replaceAll('_', ' ')}
                   </span>
+                  <span className="admin-application-list-meta">
+                    Submitted {new Date(application.created_at).toLocaleString()}
+                  </span>
                   <span className={`admin-application-status${application.checks?.flagged ? ' is-flagged' : ''}`}>
                     {application.checks?.flagged ? 'Manual checks' : 'Checks passed'}
                   </span>
@@ -1219,7 +1414,7 @@ export function AdminStoreReviewPage() {
                 <div>
                   <p className="admin-eyebrow">APPLICATION DETAILS</p>
                   <h3>{application.shop_name}</h3>
-                  <p>{application.subdomain}.marketspace · {application.store_type.replaceAll('_', ' ')} · {application.category}</p>
+                  <p>{application.subdomain}.marketspace · {application.store_type.replaceAll('_', ' ')} · {application.category} · Submitted {new Date(application.created_at).toLocaleString()}</p>
                 </div>
                 <strong className={application.checks?.flagged ? 'is-flagged' : 'is-passed'}>
                   {application.checks?.flagged ? 'Flagged for manual checks' : 'Automated checks passed'}

@@ -479,6 +479,69 @@
   margin-bottom: 0;
 }
 
+.admin-review-media-list {
+  display: flex;
+  gap: 10px;
+  max-width: 100%;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.admin-review-media-list img,
+.admin-review-media-list video {
+  flex: 0 0 auto;
+  width: min(220px, 42vw);
+  height: 160px;
+  border: 1px solid #dce2eb;
+  border-radius: 10px;
+  background: #f8fafc;
+  object-fit: contain;
+}
+
+.admin-review-media-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.admin-review-media-grid figure {
+  min-width: 0;
+  margin: 0;
+}
+
+.admin-review-media-grid figcaption {
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+
+.admin-review-media-grid img {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  border: 1px solid #dce2eb;
+  border-radius: 10px;
+  background: #f8fafc;
+  object-fit: contain;
+}
+
+.admin-review-muted {
+  color: #64748b;
+}
+
+.admin-review-report-details {
+  min-height: 100px;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.admin-review-report-actions {
+  justify-content: space-between;
+}
+
 @media (max-width: 900px) {
   .admin-application-workspace {
     grid-template-columns: minmax(230px, 290px) minmax(0, 1fr);
@@ -486,6 +549,14 @@
 }
 
 @media (max-width: 700px) {
+  .admin-review-media-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-review-report-actions {
+    justify-content: flex-end;
+  }
+
   .admin-application-workspace {
     grid-template-columns: minmax(0, 1fr);
   }
