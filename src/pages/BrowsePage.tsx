@@ -603,21 +603,15 @@ export function BrowsePage({
         </div>
       </section> */}
 
-      <section id="browse-store-listings" className="browse-store-listings-section" style={{ maxWidth: '1280px', margin: '12px auto 40px', padding: '0 24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '18px' }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: '#0f172a' }}>Store Listings</h2>
-            <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: '0.88rem' }}>Products from MarketSpace storefronts.</p>
+      {storeListings.length > 0 && (
+        <section id="browse-store-listings" className="browse-store-listings-section" style={{ maxWidth: '1280px', margin: '12px auto 40px', padding: '0 24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '18px' }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: '#0f172a' }}>Store Listings</h2>
+              <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: '0.88rem' }}>Products from MarketSpace storefronts.</p>
+            </div>
+            <button type="button" onClick={scrollToCatalog} className="secondary-btn">Browse all listings</button>
           </div>
-          <button type="button" onClick={scrollToCatalog} className="secondary-btn">Browse all listings</button>
-        </div>
-        {storeListings.length === 0 ? (
-          <div className="section-card" style={{ textAlign: 'center' }}>
-            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
-              {searchQuery ? `No store listings match "${searchQuery}" in this category.` : 'No store listings are available in this category yet.'}
-            </p>
-          </div>
-        ) : (
           <div className="marketplace-listing-grid">
             {storeListings.map((listing) => (
               <ListingView
@@ -630,8 +624,8 @@ export function BrowsePage({
               />
             ))}
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
       {/* ---------------- 3. SHOP BY CATEGORIES ---------------- */}
       <section className="shop-category-section" style={{ maxWidth: '1280px', margin: '54px auto 40px', padding: '0 24px' }}>

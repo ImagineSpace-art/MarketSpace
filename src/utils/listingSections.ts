@@ -15,6 +15,9 @@ export function isNewArrival(listing: Listing, now = Date.now()): boolean {
   if (!listing.created_at) return false
 
   const createdAt = Date.parse(listing.created_at)
+  const renewedAt = listing.last_renewed_at ? Date.parse(listing.last_renewed_at) : Number.NaN
+  if (Number.isFinite(renewedAt) && renewedAt >= createdAt) return false
+
   const age = now - createdAt
   return Number.isFinite(createdAt) && age >= 0 && age <= NEW_ARRIVAL_WINDOW_MS
 }

@@ -1814,7 +1814,6 @@ export function useMarketplaceApp(): MarketplaceAppModel {
     const nowIso = new Date().toISOString()
     const { error } = await supabase.from('listings').update({
       last_renewed_at: nowIso,
-      created_at: nowIso,
       status: 'Available'
     }).eq('id', listingId)
     if (error) {

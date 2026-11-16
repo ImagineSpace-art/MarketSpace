@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Listing } from '../types'
-import { getBrowseListings, groupNewArrivalsIntoRows } from './listingSections'
+import { getBrowseListings, groupNewArrivalsIntoRows, isNewArrival } from './listingSections'
 
 const now = Date.UTC(2026, 0, 10, 12)
 
@@ -25,6 +25,33 @@ describe('groupNewArrivalsIntoRows', () => {
 
   it('returns no rows when there are no new arrivals', () => {
     expect(groupNewArrivalsIntoRows([])).toEqual([])
+  })
+})
+
+describe('isNewArrival', () => {
+  it('excludes a listing renewed after it was created', () => {
+    const listing = {
+      ...makeListing(1, now - 2 * 24 * 60 * 60 * 1000),
+      last_renewed_at: new Date(now).toISOString(),
+    }
+
+    expect(isNewArrival(listing, now)).toBe(false)
+  })
+
+  it('excludes a listing whose creation timestamp was reset during renewal', () => {
+    const renewedAt = now - 2 * 24 * 60 * 60 * 1000
+    const listing = {
+      ...makeListing(1, renewedAt),
+      last_renewed_at: new Date(renewedAt).toISOString(),
+    }
+
+    expect(isNewArrival(listing, now)).toBe(false)
+  })
+
+  it('includes a recently created listing that has not been renewed', () => {
+    const listing = makeListing(1, now - 2 * 24 * 60 * 60 * 1000)
+
+    expect(isNewArrival(listing, now)).toBe(true)
   })
 })
 

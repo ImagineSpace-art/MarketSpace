@@ -5897,11 +5897,11 @@ select:disabled {
     }
 
     .shop-category-card {
-        flex-basis: clamp(160px, 62vw, 240px);
+        flex-basis: clamp(140px, 42vw, 190px);
     }
 
     .shop-category-image {
-        height: 100px;
+        height: 80px;
     }
 }
 
@@ -5914,7 +5914,7 @@ select:disabled {
     }
 
     .new-arrivals-row {
-        grid-auto-columns: minmax(170px, 72vw);
+        grid-auto-columns: clamp(140px, 42vw, 190px);
         gap: 10px;
     }
 }
