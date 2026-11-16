@@ -1,5 +1,6 @@
 import type { StorePolicy } from '../utils/storePolicies'
 import { validateStorePolicies } from '../utils/storePolicies'
+import { randomId } from '../utils/randomId'
 
 type StorePoliciesEditorProps = {
   policies: StorePolicy[]
@@ -58,7 +59,7 @@ export function StorePoliciesEditor({ policies, onChange }: StorePoliciesEditorP
         type="button"
         className="secondary-btn"
         disabled={policies.length >= 20}
-        onClick={() => onChange([...policies, { id: crypto.randomUUID(), title: '', content: '' }])}
+        onClick={() => onChange([...policies, { id: randomId(), title: '', content: '' }])}
       >
         Add policy
       </button>

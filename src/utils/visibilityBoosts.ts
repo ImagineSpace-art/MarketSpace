@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient'
 import type { VisibilityBoost } from '../types'
+import { randomId } from './randomId'
 
 const ANONYMOUS_VIEWER_KEY = 'marketspace-boost-viewer'
 const VIEWER_LOCATION_KEY = 'marketspace-viewer-location-id'
@@ -8,7 +9,7 @@ export function getBoostViewerKey(userId?: string | null) {
   if (userId) return userId
   let key = window.localStorage.getItem(ANONYMOUS_VIEWER_KEY)
   if (!key) {
-    key = crypto.randomUUID()
+    key = randomId()
     window.localStorage.setItem(ANONYMOUS_VIEWER_KEY, key)
   }
   return key

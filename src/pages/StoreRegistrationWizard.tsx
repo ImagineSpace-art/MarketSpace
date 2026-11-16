@@ -9,6 +9,7 @@ import './StoreRegistrationWizard.css'
 import { STORE_MARKET_LOCATIONS } from '../features/marketplace/storeLocations'
 import { StorePoliciesEditor } from '../components/StorePoliciesEditor'
 import { normalizeStorePolicies, validateStorePolicies, type StorePolicy } from '../utils/storePolicies'
+import { randomId } from '../utils/randomId'
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
 
@@ -376,7 +377,7 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
     setSaving(true)
     try {
       const cleanedImage = await makeMetadataFreeImage(file)
-      const path = `${userId}/${field}/${crypto.randomUUID()}.jpg`
+      const path = `${userId}/${field}/${randomId()}.jpg`
       const { error: uploadError } = await supabase.storage
         .from('store-private')
         .upload(path, cleanedImage, { contentType: 'image/jpeg', upsert: false })

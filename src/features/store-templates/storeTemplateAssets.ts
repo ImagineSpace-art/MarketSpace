@@ -7,6 +7,7 @@ import {
 } from '../../../supabase/functions/_shared/storeTemplateSchema'
 import type { BusinessProfile } from '../../types'
 import { getStoreCardBannerPath } from './storeCardBanner'
+import { randomId } from '../../utils/randomId'
 
 const ACCEPTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
@@ -28,7 +29,7 @@ export async function uploadStoreTemplateImage(file: File): Promise<string> {
     throw new Error('The compressed image exceeds the 5 MB storage limit.')
   }
 
-  const path = `${userId}/${crypto.randomUUID()}.webp`
+  const path = `${userId}/${randomId()}.webp`
   const { data, error } = await supabase.storage
     .from(STORE_ASSETS_BUCKET)
     .upload(path, compressedImage, { contentType: 'image/webp', upsert: false })

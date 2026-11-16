@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { getFunctionErrorMessage } from '../utils/functionError'
+import { randomId } from '../utils/randomId'
 import { makeMetadataFreeImage } from '../features/marketplace/metadataFreeImage'
 import { isValidZambianNrc } from '../../supabase/functions/_shared/storeRegistrationValidation'
 
@@ -78,8 +79,8 @@ export function SellerVerificationSubmission({ onSubmitted }: Props) {
         makeMetadataFreeImage(idImage),
         makeMetadataFreeImage(selfie),
       ])
-      const idImagePath = `${userData.user.id}/seller-verification/id/${crypto.randomUUID()}.jpg`
-      const selfiePath = `${userData.user.id}/seller-verification/selfie/${crypto.randomUUID()}.jpg`
+      const idImagePath = `${userData.user.id}/seller-verification/id/${randomId()}.jpg`
+      const selfiePath = `${userData.user.id}/seller-verification/selfie/${randomId()}.jpg`
       const storage = supabase.storage.from('store-private')
 
       const { error: idUploadError } = await storage.upload(idImagePath, idBlob, {
