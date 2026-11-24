@@ -184,6 +184,7 @@ export type BusinessProfile = {
   verifiedId?: boolean
   verifiedLocation?: boolean
   registeredBusiness?: boolean
+  businessVerified?: boolean
   probationState?: 'probation' | 'trusted'
   templateId?: StoreTemplateId
   templateChangedAt?: string

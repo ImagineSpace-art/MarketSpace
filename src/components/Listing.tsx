@@ -1,4 +1,5 @@
 import type { Listing, BusinessProfile } from '../types'
+import { BusinessVerifiedBadge } from './BusinessVerifiedBadge'
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { formatZMWPrice } from '../utils/formatPrice'
@@ -227,6 +228,7 @@ export function Listing({ listing, saved = false, onOpen, onToggleSave, onQuickP
                 {sellerStore.shopName}
               </span>
               {sellerStore.verifiedId && <span className="material-icons" style={{ fontSize: '12px', color: '#3b82f6' }} title="Verified ID">verified</span>}
+              {sellerStore.businessVerified && <BusinessVerifiedBadge compact size={12} />}
             </span>
             {/* <span className="modern-card-category" style={{ margin: 0 }}>
               {listing.category || 'General'}

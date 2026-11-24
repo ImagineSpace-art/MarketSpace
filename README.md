@@ -59,6 +59,7 @@ supabase functions deploy purge-store-identity-images
 supabase functions deploy store-template-save
 supabase functions deploy store-report
 supabase functions deploy seller-verification
+supabase functions deploy business-verification
 ```
 
 After applying `202611020005_seller_verification_image_retention.sql`, redeploy
@@ -411,3 +412,19 @@ npx vitest run supabase/tests/seller-verification.integration.test.ts
 It creates and removes a temporary account and verifies submission state,
 owner-only database access, and safe cleanup behavior. Never use production
 credentials or data.
+
+## Business verification
+
+`202611240001_business_verification.sql` and the `business-verification` Edge
+Function add an evidence-based "Business verified" level for approved stores. A
+moderator grants it only after three checks pass: a business document verified
+against the official source, a live video call with a live-presence code, and an
+endorsement confirmed by phone. Evidence photos go to the private `store-private`
+bucket under `{user_id}/business/`, every decision is written to
+`business_verification_audit_log`, and moderators work from
+**Business verification** in the admin area.
+
+```bash
+supabase db push
+supabase functions deploy business-verification
+```

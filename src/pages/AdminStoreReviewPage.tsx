@@ -7,8 +7,9 @@ import type { BusinessAd, Listing } from '../types'
 import { AdminOverview } from './AdminOverview'
 import { AdminAnnouncementsPage } from './AdminAnnouncementsPage'
 import { AdminTermsPage } from './AdminTermsPage'
+import { AdminBusinessVerificationPage } from './AdminBusinessVerificationPage'
 
-export type AdminSection = 'overview' | 'applications' | 'reports' | 'listings' | 'ads' | 'seller-verifications' | 'boosts' | 'notifications' | 'announcements' | 'audit' | 'terms'
+export type AdminSection = 'overview' | 'applications' | 'reports' | 'listings' | 'ads' | 'seller-verifications' | 'business-verification' | 'boosts' | 'notifications' | 'announcements' | 'audit' | 'terms'
 
 type AdminOutletContext = {
   role: 'moderator' | 'admin'
@@ -737,6 +738,7 @@ export function AdminStoreReviewPage() {
   if (activeSection === 'overview') return <AdminOverview onNavigate={navigateToSection} />
   if (activeSection === 'terms') return <AdminTermsPage role={role} />
   if (activeSection === 'announcements') return <AdminAnnouncementsPage />
+  if (activeSection === 'business-verification') return <AdminBusinessVerificationPage />
   if (loading) return <section className="section-card"><p>Loading store applications…</p></section>
 
   if (activeSection === 'notifications') {

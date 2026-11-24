@@ -13,6 +13,8 @@ import { fetchStoreAnalytics, type StoreAnalyticsData } from '../services/analyt
 import { getListingTimeRemainingMs, isListingExpired } from '../features/marketplace/listingExpiry'
 import { DestructiveActionDialog } from '../components/DestructiveActionDialog'
 import { SellerVerificationSubmission } from '../components/SellerVerificationSubmission'
+import { BusinessVerificationPanel } from '../components/BusinessVerificationPanel'
+import { BusinessVerifiedBadge } from '../components/BusinessVerifiedBadge'
 import { getStoreUrl } from '../utils/storeUrl'
 import { BoostControl } from '../components/BoostControl'
 import { supabase } from '../lib/supabaseClient'
@@ -643,6 +645,7 @@ export function ProfilePage({
                                             <span className="material-icons store-icon">storefront</span>
                                             {businessProfile.shopName}
                                             {businessProfile.verifiedId && <span className="badge verified-badge">Verified ID</span>}
+                                            {businessProfile.businessVerified && <BusinessVerifiedBadge />}
                                         </h3>
                                         <p>Business tools, product catalogs, and advertising active.</p>
                                     </div>
@@ -661,6 +664,8 @@ export function ProfilePage({
                                 </div>
                             )}
                         </section>
+
+                        {businessProfile && <BusinessVerificationPanel />}
 
                         {/* OVERVIEW SECTION */}
                         <section className="dashboard-section">

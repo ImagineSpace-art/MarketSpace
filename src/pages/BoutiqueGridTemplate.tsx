@@ -185,6 +185,7 @@ export function BoutiqueGridTemplate({
             {shop.verifiedId && <span><span className="material-icons">verified</span> Identity verified</span>}
             {shop.verifiedLocation && <span><span className="material-icons">location_on</span> Location checked</span>}
             {shop.registeredBusiness && <span><span className="material-icons">workspace_premium</span> Registered business</span>}
+            {shop.businessVerified && <span><span className="material-icons">verified_user</span> Business verified</span>}
             {shop.probationState === 'probation' && <span className="boutique-new-seller">New seller</span>}
           </div>
         </section>

@@ -371,6 +371,7 @@ function AdminLayout({ role }: { role: 'moderator' | 'admin' }) {
         { section: 'listings', title: 'Listings', icon: 'inventory_2' },
         { section: 'ads', title: 'Store ads', icon: 'campaign' },
         { section: 'seller-verifications', title: 'Identity checks', icon: 'verified_user' },
+        { section: 'business-verification', title: 'Business verification', icon: 'domain_verification' },
         { section: 'reports', title: 'Reports', icon: 'flag' },
       ],
     },

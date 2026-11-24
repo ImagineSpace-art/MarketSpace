@@ -5,6 +5,7 @@ import { STORE_MARKET_LOCATIONS, groupStoreLocation } from '../features/marketpl
 import { recordBoostEvent } from '../utils/visibilityBoosts'
 import { useTopScrollExpandableHero } from '../hooks/useTopScrollExpandableHero'
 import { getStoreCardBannerUrl } from '../features/store-templates/storeTemplateAssets'
+import { BusinessVerifiedBadge } from '../components/BusinessVerifiedBadge'
 
 // ---------------- STORES & STORE LISTINGS PAGE ----------------
 type StoresPageProps = {
@@ -373,6 +374,7 @@ export function StoresPage({
                                 </strong>
                                 {shop.promoted && <span className="sponsored-badge">Promoted</span>}
                                 {shop.verifiedId && <span className="material-icons" style={{ fontSize: '16px', color: '#2563eb' }} title="Verified ID">verified</span>}
+                                {shop.businessVerified && <BusinessVerifiedBadge compact size={16} />}
                               </div>
                               <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
                                 {shopListingsCount} product{shopListingsCount !== 1 ? 's' : ''} in catalog

@@ -2118,6 +2118,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
           verifiedId: s.verified_id === true,
           verifiedLocation: s.verified_location === true,
           registeredBusiness: s.registered_business === true,
+          businessVerified: Boolean(s.business_verified_at),
           probationState: s.probation_state === 'probation' ? 'probation' : 'trusted',
           templateId: s.template_id || undefined,
           templateChangedAt: s.template_changed_at || undefined,
