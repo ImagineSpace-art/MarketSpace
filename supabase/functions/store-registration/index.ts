@@ -596,7 +596,9 @@ async function reviewApplication(context: HandlerContext, body: Json) {
 
   const approved = decision === 'approve'
   const { error: updateError } = await context.admin.from('stores').update({
-    status: approved ? 'approved' : 'rejected',
+    // An approved application is not hosted until business verification is complete.
+    status: approved ? 'awaiting_verification' : 'rejected',
+    business_verification_required: approved,
     rejection_reason: approved ? null : reason,
     verified_id: approved && body.verifiedId === true,
     verified_location: approved && body.verifiedLocation === true,
@@ -635,6 +637,7 @@ async function reviewApplication(context: HandlerContext, body: Json) {
       verifiedId: body.verifiedId === true,
       verifiedLocation: body.verifiedLocation === true,
       registeredBusiness: body.registeredBusiness === true,
+      awaitingBusinessVerification: approved,
     },
   })
   if (auditError) throw new Error('The review action could not be audited.')
@@ -644,13 +647,23 @@ async function reviewApplication(context: HandlerContext, body: Json) {
     updated_at: new Date().toISOString(),
   }).eq('user_id', store.user_id)
 
+  // In-app notification: approval is not the end, verification is what takes the store live.
+  await context.admin.from('notifications').insert({
+    user_id: store.user_id,
+    title: approved ? 'Finish verification to take your store live' : 'Store application not approved',
+    body: approved
+      ? `Your application for "${store.shop_name}" was approved, but your store will not be hosted until you finish business verification. Open your seller dashboard and complete the three steps: business document, video call and endorsement.`
+      : `Your application for "${store.shop_name}" was not approved. Reason: ${reason}`,
+    link_url: '/profile',
+  })
+
   const { data: owner } = await context.admin.auth.admin.getUserById(store.user_id)
   const emailWarning = owner.user?.email
     ? await sendOwnerEmail(
       owner.user.email,
       approved ? 'Your MarketSpace store was approved' : 'Your MarketSpace store needs changes',
       approved
-        ? `<p>Your store <strong>${escapeHtml(store.shop_name)}</strong> has been approved and is live in probation.</p>`
+        ? `<p>Your store application for <strong>${escapeHtml(store.shop_name)}</strong> has been approved.</p><p><strong>Your store is not live yet.</strong> To protect shoppers from fake stores, it will not be hosted until you finish business verification. Open your seller dashboard on MarketSpace and complete the three steps: submit a business document, take a short video call with a moderator, and provide an endorsement.</p>`
         : `<p>Your store <strong>${escapeHtml(store.shop_name)}</strong> was not approved.</p><p>Reason: ${escapeHtml(reason)}</p><p>You can update your application and resubmit it.</p>`,
     )
     : 'Owner email address is unavailable; notification was not sent.'
@@ -663,7 +676,7 @@ async function deleteIdentityImages(context: HandlerContext) {
     .select('id, status')
     .eq('user_id', context.userId)
     .maybeSingle()
-  if (storeError || !store || !['approved', 'rejected'].includes(store.status)) {
+  if (storeError || !store || !['approved', 'awaiting_verification', 'rejected'].includes(store.status)) {
     return fail('Verification images can be deleted after the application decision is complete.', 409)
   }
   const { data: identity, error: identityError } = await context.admin

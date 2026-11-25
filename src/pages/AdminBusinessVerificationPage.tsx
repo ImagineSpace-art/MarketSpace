@@ -41,6 +41,7 @@ type StoreItem = {
   store_id: string
   shop_name: string
   subdomain: string | null
+  store_status: string
   is_own_store: boolean
   business_verified_at: string | null
   can_grant: boolean
@@ -127,7 +128,11 @@ function StoreVerificationCard({ item, onChanged }: { item: StoreItem; onChanged
           <h3 style={{ margin: 0 }}>{item.shop_name}</h3>
           {item.subdomain && <small>{item.subdomain}</small>}
         </div>
-        {isVerified && <strong style={{ color: '#059669' }}>Business verified</strong>}
+        {isVerified
+          ? <strong style={{ color: '#059669' }}>Business verified{item.store_status === 'approved' ? ' · live' : ''}</strong>
+          : item.store_status === 'awaiting_verification'
+            ? <strong style={{ color: '#b45309' }}>Offline until verified</strong>
+            : <strong>Live (approved before verification was required)</strong>}
       </header>
 
       {item.is_own_store && <p role="note">This is your own store. Another moderator must review it.</p>}
@@ -321,7 +326,7 @@ function StoreVerificationCard({ item, onChanged }: { item: StoreItem; onChanged
             disabled={locked || !item.can_grant}
             onClick={() => void act({ action: 'grant', storeId: item.store_id })}
           >
-            Grant Business verified
+            {item.store_status === 'awaiting_verification' ? 'Grant Business verified and take store live' : 'Grant Business verified'}
           </button>
           {!item.can_grant && <small style={{ marginLeft: '10px' }}>Available when the document, video check and endorsement have all passed.</small>}
         </div>

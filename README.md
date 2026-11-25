@@ -424,7 +424,16 @@ bucket under `{user_id}/business/`, every decision is written to
 `business_verification_audit_log`, and moderators work from
 **Business verification** in the admin area.
 
+A newly approved application is **not hosted** until business verification is
+complete. Approval sets `stores.status = 'awaiting_verification'`, which every
+public policy already treats as hidden. The owner gets an in-app notification and
+an email telling them to finish verification from their seller dashboard. When a
+moderator grants Business verified, the store moves to `approved` and goes live.
+Stores approved before this change stay live. After applying
+`202611250001_business_verification_gate.sql`, redeploy both functions:
+
 ```bash
 supabase db push
 supabase functions deploy business-verification
+supabase functions deploy store-registration
 ```

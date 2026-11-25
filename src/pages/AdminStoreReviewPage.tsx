@@ -171,7 +171,7 @@ const AUTOMATIC_NOTIFICATION_TEMPLATES = [
   {
     trigger: 'Store application approved',
     title: 'Store application approved',
-    body: 'Your store application for “[store name]” has been approved. Your store is now open on MarketSpace.',
+    body: 'Your store application for “[store name]” has been approved, but your store will not be hosted until you finish business verification from your seller dashboard.',
   },
   {
     trigger: 'Store application denied',

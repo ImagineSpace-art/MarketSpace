@@ -36,7 +36,14 @@ type EndorsementRow = {
 }
 
 type StatusResponse = {
-  store: { id: string; shopName: string; approved: boolean; businessVerifiedAt: string | null } | null
+  store: {
+    id: string
+    shopName: string
+    approved: boolean
+    live: boolean
+    awaitingVerification: boolean
+    businessVerifiedAt: string | null
+  } | null
   documents?: DocumentRow[]
   videoCheck?: VideoCheck | null
   endorsements?: EndorsementRow[]
@@ -217,7 +224,7 @@ export function BusinessVerificationPanel() {
         <h3 id="business-verification-title">Business verification</h3>
         <p role="status">
           Your store is <strong>Business verified</strong> (since {new Date(status.store.businessVerifiedAt).toLocaleDateString()}).
-          The badge shows on your storefront and listings.
+          It is live, and the badge shows on your storefront and listings.
         </p>
       </section>
     )
@@ -237,10 +244,19 @@ export function BusinessVerificationPanel() {
   return (
     <section className="setting-box" aria-labelledby="business-verification-title" style={{ display: 'grid', gap: '14px' }}>
       <div>
-        <h3 id="business-verification-title">Get Business verified</h3>
+        <h3 id="business-verification-title">
+          {status.store.awaitingVerification ? 'Finish verification to take your store live' : 'Get Business verified'}
+        </h3>
+        {status.store.awaitingVerification && (
+          <p role="status" style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #f59e0b', background: 'rgba(245, 158, 11, 0.12)' }}>
+            <strong>Your application was approved, but your store is not live yet.</strong> To keep fake stores off
+            MarketSpace, it will not be hosted until all three steps below are complete and a moderator has verified them.
+          </p>
+        )}
         <p>
-          Shoppers trust stores that are proven to exist. Complete all three steps and a moderator will add the
-          “Business verified” badge to your store. Photos are stored privately and only moderators can see them.
+          Shoppers trust stores that are proven to exist. Complete all three steps and a moderator will{' '}
+          {status.store.awaitingVerification ? 'take your store live with' : 'add'} the “Business verified” badge.
+          Photos are stored privately and only moderators can see them.
         </p>
       </div>
 

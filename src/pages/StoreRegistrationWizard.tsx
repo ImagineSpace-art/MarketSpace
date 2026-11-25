@@ -550,13 +550,15 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
       <section className="store-wizard-shell" style={cardStyle}>
         <div className="store-wizard-success-icon" aria-hidden="true">✓</div>
         <p className="store-wizard-kicker">Application received</p>
-        <h2>{applicationStatus === 'approved' ? 'Your store is approved' : 'Your store is being reviewed'}</h2>
+        <h2>{applicationStatus === 'approved' ? 'Application approved: finish verification to go live' : 'Your store is being reviewed'}</h2>
         <p className="store-wizard-description">
           {applicationStatus === 'approved'
-            ? 'Your store has completed the application process.'
+            ? 'Your store will not be hosted until you finish business verification. Open your seller dashboard and complete the three steps: business document, video call and endorsement.'
             : 'We will email you when the review is complete. You can safely leave this page.'}
         </p>
-        <button type="button" className="secondary-btn" onClick={onCancel}>Back to profile</button>
+        <button type="button" className="secondary-btn" onClick={onCancel}>
+          {applicationStatus === 'approved' ? 'Go to my dashboard' : 'Back to profile'}
+        </button>
       </section>
     )
   }

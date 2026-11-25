@@ -604,6 +604,9 @@ export function ProfilePage({
                             )}
                         </div>
                     ) : (
+                        <>
+                        {/* An approved application stays offline until verification is done; the panel hides itself for everyone else. */}
+                        <BusinessVerificationPanel />
                         <section className="dashboard-banner">
                             <div className="banner-content">
                                 <div className="banner-text">
@@ -613,6 +616,7 @@ export function ProfilePage({
                                 <Link className="primary-btn" style={{ textDecoration: 'none' }} to="/profile/business-setup">Open Store</Link>
                             </div>
                         </section>
+                        </>
                     )
                 ) : activeSection === 'saved-listings' ? (
                     <SavedItemsPage

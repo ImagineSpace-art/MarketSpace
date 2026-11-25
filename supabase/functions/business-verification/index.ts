@@ -164,7 +164,9 @@ async function getStatus(context: Context) {
     store: {
       id: store.id,
       shopName: store.shop_name,
-      approved: store.status === 'approved',
+      approved: store.status === 'approved' || store.status === 'awaiting_verification',
+      live: store.status === 'approved',
+      awaitingVerification: store.status === 'awaiting_verification',
       businessVerifiedAt: store.business_verified_at,
     },
     documents: documents.data || [],
@@ -188,7 +190,9 @@ async function getStatus(context: Context) {
 async function requireApprovedUnverifiedStore(context: Context) {
   const store = await loadOwnStore(context)
   if (!store) throw new UserError('Open and get approval for a store before applying for business verification.')
-  if (store.status !== 'approved') throw new UserError('Only approved stores can apply for business verification.')
+  if (store.status !== 'approved' && store.status !== 'awaiting_verification') {
+    throw new UserError('Only approved stores can apply for business verification.')
+  }
   if (store.business_verified_at) throw new UserError('Your store is already business verified.')
   return store
 }
@@ -316,6 +320,14 @@ async function loadQueue(context: Context, body: Json) {
     ...(videoChecks.data || []).map(row => row.store_id),
     ...(endorsements.data || []).map(row => row.store_id),
   ]))
+
+  if (scope === 'pending') {
+    // Stores approved on condition of verification belong in the queue even before they submit evidence.
+    const { data: awaiting, error: awaitingError } = await context.admin
+      .from('stores').select('id').eq('status', 'awaiting_verification').limit(200)
+    if (awaitingError) throw new Error('Stores awaiting verification could not be loaded.')
+    for (const store of awaiting || []) if (!storeIds.includes(store.id)) storeIds.push(store.id)
+  }
   const verifiedFilter = scope === 'verified'
 
   if (scope === 'verified') {
@@ -329,7 +341,7 @@ async function loadQueue(context: Context, body: Json) {
   const { data: stores, error: storesError } = storeIds.length
     ? await context.admin.from('stores')
         .select('id, user_id, shop_name, subdomain, status, business_verified_at')
-        .in('id', storeIds).eq('status', 'approved')
+        .in('id', storeIds).in('status', ['approved', 'awaiting_verification'])
     : { data: [], error: null }
   if (storesError) throw new Error('Stores could not be loaded.')
 
@@ -343,6 +355,7 @@ async function loadQueue(context: Context, body: Json) {
       store_id: store.id,
       shop_name: store.shop_name,
       subdomain: store.subdomain,
+      store_status: store.status,
       is_own_store: store.user_id === context.userId,
       business_verified_at: store.business_verified_at,
       can_grant: canGrantBusinessVerification({
