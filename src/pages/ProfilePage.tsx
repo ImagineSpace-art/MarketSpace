@@ -640,6 +640,9 @@ export function ProfilePage({
                     )
                 ) : (
                     <>
+                        {/* An approved application has no live store yet, so show its verification steps first. The panel hides itself for everyone who is not an applicant. */}
+                        {!businessProfile && <BusinessVerificationPanel />}
+
                         {/* BUSINESS OPT-IN CARD */}
                         <section className="dashboard-banner">
                             {businessProfile ? (
