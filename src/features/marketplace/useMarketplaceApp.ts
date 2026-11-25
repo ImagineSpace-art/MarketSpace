@@ -1637,7 +1637,7 @@ export function useMarketplaceApp(): MarketplaceAppModel {
   const sendInboxMessage = async () => {
     if (!chatDraft.trim() || !activeChatId || !session) return
 
-    const messageText = chatDraft.trim()
+    const messageText = chatDraft.trim().slice(0, 2000)
     setChatDraft('')
 
     const { error } = await supabase.from('messages').insert({

@@ -805,6 +805,7 @@ export function AdminStoreReviewPage() {
                 <input
                   id="notification-recipient-search"
                   value={recipientSearch}
+                  maxLength={100}
                   onChange={event => setRecipientSearch(event.target.value)}
                   onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void loadNotificationRecipients() } }}
                 />
@@ -1365,6 +1366,7 @@ export function AdminStoreReviewPage() {
               <input
                 type="search"
                 value={applicationSearch}
+                maxLength={100}
                 onChange={event => setApplicationSearch(event.target.value)}
                 placeholder="Store, owner, category…"
               />
@@ -1470,7 +1472,7 @@ export function AdminStoreReviewPage() {
               </div>
               <label className="admin-application-review-reason">
                 Review reason (required for approval or rejection)
-                <textarea rows={2} value={reasons[application.id] || ''} onChange={(event) => setReasons((current) => ({ ...current, [application.id]: event.target.value }))} />
+                <textarea rows={2} maxLength={500} value={reasons[application.id] || ''} onChange={(event) => setReasons((current) => ({ ...current, [application.id]: event.target.value }))} />
               </label>
               <div className="admin-application-actions">
                 <button type="button" className="secondary-btn" disabled={workingId === application.id} onClick={() => void review(application, 'reject')}>

@@ -585,6 +585,7 @@ async function reviewApplication(context: HandlerContext, body: Json) {
   const reason = getString(body.reason)
   if (!storeId || !['approve', 'reject'].includes(decision)) return fail('Invalid review decision.')
   if (reason.length < 8) return fail('Provide a review reason of at least 8 characters.')
+  if (reason.length > 500) return fail('The review reason must be 500 characters or fewer.')
 
   const { data: store, error: storeError } = await context.admin
     .from('stores')

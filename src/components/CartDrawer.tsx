@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { LIMITS, isTextWithin, isValidPhone } from '../utils/inputValidation'
 
 export type CartItem = {
   id: number | string
@@ -32,6 +33,7 @@ export function CartDrawer({
   const [deliveryAddress, setDeliveryAddress] = useState('Lusaka Central, Zambia')
   const [paymentMethod, setPaymentMethod] = useState<'momo' | 'card' | 'cod'>('momo')
   const [phoneNumber, setPhoneNumber] = useState('')
+  const [checkoutError, setCheckoutError] = useState('')
   const [orderComplete, setOrderComplete] = useState(false)
 
   if (!isOpen) return null
@@ -42,6 +44,15 @@ export function CartDrawer({
 
   const handlePlaceOrder = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!isTextWithin(deliveryAddress, 5, LIMITS.address)) {
+      setCheckoutError('Enter a delivery address between 5 and 200 characters.')
+      return
+    }
+    if (!isValidPhone(phoneNumber)) {
+      setCheckoutError('Enter a valid phone number, for example +260 97 1234567.')
+      return
+    }
+    setCheckoutError('')
     setOrderComplete(true)
     setTimeout(() => {
       onClearCart()
@@ -430,6 +441,7 @@ export function CartDrawer({
               </div>
             ) : (
               <form onSubmit={handlePlaceOrder}>
+                {checkoutError && <p role="alert" style={{ color: '#dc2626', fontSize: '0.84rem', margin: '0 0 10px' }}>{checkoutError}</p>}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
                   <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>Instant Checkout</h3>
                   <button
@@ -450,6 +462,8 @@ export function CartDrawer({
                     value={deliveryAddress}
                     onChange={(e) => setDeliveryAddress(e.target.value)}
                     required
+                    minLength={5}
+                    maxLength={LIMITS.address}
                     style={{
                       width: '100%',
                       padding: '10px 14px',
@@ -471,6 +485,9 @@ export function CartDrawer({
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
                     required
+                    maxLength={20}
+                    pattern="\+?[0-9 ()\-]{9,20}"
+                    title="Enter a valid phone number, for example +260 97 1234567"
                     style={{
                       width: '100%',
                       padding: '10px 14px',

@@ -430,6 +430,7 @@ export function MessagesPage({
             <input
               className="composer-input"
               value={chatDraft}
+              maxLength={2000}
               onChange={(event) => onDraftChange(event.target.value)}
               placeholder="Type a message..."
               onKeyDown={(event) => {
