@@ -6,7 +6,7 @@ import { isAtLeast18, isValidZambianNrc, validateOptionalMapCoordinates } from '
 import { getFunctionErrorMessage } from '../utils/functionError'
 import { makeMetadataFreeImage } from '../features/marketplace/metadataFreeImage'
 import './StoreRegistrationWizard.css'
-import { STORE_MARKET_LOCATIONS } from '../features/marketplace/storeLocations'
+import { PILOT_MALL, STORE_REGISTRATION_LOCATIONS, isValidUnitNumber } from '../features/marketplace/storeLocations'
 import { StorePoliciesEditor } from '../components/StorePoliciesEditor'
 import { normalizeStorePolicies, validateStorePolicies, type StorePolicy } from '../utils/storePolicies'
 import { randomId } from '../utils/randomId'
@@ -70,12 +70,12 @@ const INITIAL_DATA: RegistrationData = {
     category: 'Retail & Boutique',
     description: '',
     logo: '',
-    type: 'online_delivery',
+    type: 'physical',
     supportContact: '',
     businessRegistrationNumber: '',
   },
   location: {
-    marketplaceLocation: '',
+    marketplaceLocation: PILOT_MALL,
     streetAddress: '',
     latitude: '',
     longitude: '',
@@ -208,6 +208,8 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
           setData({
             ...INITIAL_DATA,
             ...draftData,
+            store: { ...INITIAL_DATA.store, ...draftData.store, type: 'physical' },
+            location: { ...INITIAL_DATA.location, ...draftData.location, marketplaceLocation: PILOT_MALL },
             identity: {
               ...INITIAL_DATA.identity,
               ...savedIdentity,
@@ -395,11 +397,7 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
 
   const searchAddress = async () => {
     setError('')
-    const address = data.location.streetAddress.trim()
-    if (!address) {
-      setError('Enter a street address before searching for map coordinates.')
-      return
-    }
+    const address = PILOT_MALL
     if (searchingLocation) return
     setSearchingLocation(true)
     try {
@@ -470,7 +468,7 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
       } else if (step === 4) {
         if (!data.location.marketplaceLocation.trim()) throw new Error('Select the marketplace location for your store.')
         if (data.store.type === 'physical') {
-          if (data.location.streetAddress.trim().length < 8) throw new Error('Enter the physical storefront address.')
+          if (!isValidUnitNumber(data.location.streetAddress)) throw new Error('Enter your shop or unit number, for example A12, G-07 or Shop 14B.')
           const coordinateError = validateOptionalMapCoordinates(data.location.latitude, data.location.longitude)
           if (coordinateError) throw new Error(coordinateError)
         } else if (data.store.type === 'online_delivery' && !data.location.deliveryAreas.trim()) {
@@ -700,13 +698,6 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
             {logoUploading && <small>Uploading logo…</small>}
             {data.store.logo && <img src={data.store.logo} alt="Store logo preview" style={{ width: 76, height: 76, objectFit: 'cover', borderRadius: 12 }} />}
           </label>
-          <label>Store type
-            <select value={data.store.type} onChange={(event) => update('store', { type: event.target.value as RegistrationData['store']['type'] })}>
-              <option value="physical">Physical storefront</option>
-              <option value="online_delivery">Online with delivery</option>
-              <option value="meetup_only">Online with safe meetups</option>
-            </select>
-          </label>
           <label>Customer support email or phone<input value={data.store.supportContact} onChange={(event) => update('store', { supportContact: event.target.value })} /></label>
           <label>Business registration number <span className="store-wizard-optional">Optional</span>
             <input value={data.store.businessRegistrationNumber} onChange={(event) => update('store', { businessRegistrationNumber: event.target.value })} />
@@ -718,16 +709,15 @@ export function StoreRegistrationWizard({ userId, onCancel }: StoreRegistrationW
         <div className="store-wizard-fields">
           <label>Marketplace location
             <select value={data.location.marketplaceLocation} onChange={(event) => update('location', { marketplaceLocation: event.target.value })} required>
-              <option value="">Select a location</option>
-              {STORE_MARKET_LOCATIONS.map(location => <option key={location} value={location}>{location}</option>)}
+              {STORE_REGISTRATION_LOCATIONS.map(location => <option key={location} value={location}>{location}</option>)}
             </select>
           </label>
           {data.store.type === 'physical' ? (
             <>
-              <label>Street address<input value={data.location.streetAddress} onChange={(event) => update('location', { streetAddress: event.target.value })} /></label>
+              <label>Shop or unit number<input value={data.location.streetAddress} onChange={(event) => update('location', { streetAddress: event.target.value })} maxLength={20} placeholder="e.g. A12, G-07, Shop 14B" required /></label>
               <details className="store-wizard-map-pin">
                 <summary>Optional map pin <span>Not required for location verification</span></summary>
-                <p className="store-wizard-help">You can search the store address to suggest a map pin. This is for map display only; it does not verify your location.</p>
+                <p className="store-wizard-help">You can search the mall to suggest a map pin. This is for map display only; it does not verify your location.</p>
                 <button type="button" className="secondary-btn" disabled={searchingLocation} onClick={() => void searchAddress()}>
                   {searchingLocation ? 'Searching map…' : 'Find map pin from address'}
                 </button>

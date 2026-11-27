@@ -37,3 +37,16 @@ export function groupStoreLocation(address?: string, locationName?: string) {
   const normalized = (address || '').trim()
   return STORE_MARKET_LOCATIONS.find(location => normalized.toLowerCase().includes(location.toLowerCase())) || 'Other locations'
 }
+
+/** The pilot is limited to one partner mall. */
+export const PILOT_MALL = 'Iringa Mall'
+export const STORE_REGISTRATION_LOCATIONS = [PILOT_MALL] as const
+
+/** Shop or unit identifiers are alphanumeric, for example A12, G-07 or Shop 14B (1 to 20 characters). */
+export function isValidUnitNumber(value: string) {
+  return /^[A-Za-z0-9][A-Za-z0-9 /.-]{0,19}$/.test(value.trim())
+}
+
+export function formatStoreAddress(unit: string) {
+  return `${unit.trim().replace(/\s+/g, ' ').toUpperCase()}, ${PILOT_MALL}`
+}

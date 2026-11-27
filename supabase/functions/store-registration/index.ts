@@ -1,3 +1,4 @@
+import { PILOT_MALL, formatStoreAddress, isValidUnitNumber } from '../_shared/storeUnit.ts'
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
   isDisposableEmailDomain,
@@ -158,16 +159,16 @@ function validateDraftStep(step: number, data: Json) {
     const slugError = validateStoreSubdomain(slug)
     if (slugError) return slugError
     if (getString(store.description).length < 20) return 'Add a store description of at least 20 characters.'
-    if (!['physical', 'online_delivery', 'meetup_only'].includes(getString(store.type))) return 'Select a valid store type.'
+    if (getString(store.type) !== 'physical') return 'During the pilot only physical stores inside the mall can be registered.'
     const supportContact = getString(store.supportContact)
     if (!isEmail(supportContact) && !isPhone(supportContact)) return 'Enter a valid support email address or phone number.'
   }
   if (step >= 4) {
     const store = getStepData(data, 'store')
     const location = getStepData(data, 'location')
-    if (!getString(location.marketplaceLocation)) return 'Select the marketplace location for your store.'
+    if (getString(location.marketplaceLocation) !== PILOT_MALL) return `Stores are currently accepted only at ${PILOT_MALL}.`
     if (store.type === 'physical') {
-      if (getString(location.streetAddress).length < 8) return 'Provide a complete physical address.'
+      if (!isValidUnitNumber(getString(location.streetAddress))) return 'Enter your shop or unit number, for example A12, G-07 or Shop 14B.'
       const coordinateError = validateOptionalMapCoordinates(getString(location.latitude), getString(location.longitude))
       if (coordinateError) return coordinateError
     }
@@ -356,11 +357,11 @@ async function submitApplication(context: HandlerContext, body: Json) {
     ? await hashSensitiveIdentifier(verifiedPhone, 'phone', Deno.env.get('STORE_ID_HASH_SECRET') || '')
     : ''
   const storeAddress = storeData.type === 'physical'
-    ? getString(location.streetAddress)
+    ? formatStoreAddress(getString(location.streetAddress))
     : storeData.type === 'online_delivery' ? 'Online delivery' : 'Meetup only'
   const residentialAddress = getString(identity.residentialAddress)
   const normalizedAddress = residentialAddress.toLowerCase().replace(/[^a-z0-9]/g, '')
-  const normalizedStoreAddress = getString(location.streetAddress).toLowerCase().replace(/[^a-z0-9]/g, '')
+  const normalizedStoreAddress = storeAddress.toLowerCase().replace(/[^a-z0-9]/g, '')
   const descriptionText = `${getString(storeData.name)} ${getString(storeData.description)}`.toLowerCase()
   const prohibitedMatches = STORE_PROHIBITED_TERMS.filter((term) => descriptionText.includes(term))
   const { data: banned, error: bannedError } = await context.admin
